@@ -27,7 +27,17 @@ type release struct {
 }
 
 type asset struct {
-	Name string `json:"name"`
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+	Digest             string `json:"digest"`
+}
+
+// Archive describes a downloadable golangci-lint archive for a specific platform.
+type Archive struct {
+	Version  string
+	Filename string
+	URL      string
+	SHA256   string
 }
 
 // Config configures a golangci-lint release provider.
@@ -165,6 +175,43 @@ func (p *Provider) fetchReleases(ctx context.Context) ([]release, error) {
 	return releases, nil
 }
 
+// FindArchive returns archive metadata for a golangci-lint version on the configured platform.
+func (p *Provider) FindArchive(ctx context.Context, version string) (Archive, error) {
+	releases, err := p.fetchReleases(ctx)
+	if err != nil {
+		return Archive{}, err
+	}
+
+	for _, release := range releases {
+		if release.TagName != version {
+			continue
+		}
+
+		for _, asset := range release.Assets {
+			if !assetMatchesPlatform(asset.Name, p.goos, p.goarch) {
+				continue
+			}
+			if !strings.HasSuffix(asset.Name, ".tar.gz") && !strings.HasSuffix(asset.Name, ".zip") {
+				continue
+			}
+
+			return Archive{
+				Version:  version,
+				Filename: asset.Name,
+				URL:      asset.BrowserDownloadURL,
+				SHA256:   strings.TrimPrefix(asset.Digest, "sha256:"),
+			}, nil
+		}
+	}
+
+	return Archive{}, fmt.Errorf(
+		"golangci-lint archive for version %s and platform %s/%s was not found",
+		version,
+		p.goos,
+		p.goarch,
+	)
+}
+
 func parseGoMinor(version string) (int, error) {
 	trimmed := strings.TrimPrefix(strings.TrimSpace(version), "go")
 	parts := strings.Split(trimmed, ".")
@@ -181,14 +228,18 @@ func parseGoMinor(version string) (int, error) {
 }
 
 func supportsPlatform(assets []asset, goos string, goarch string) bool {
-	needle := "-" + goos + "-" + goarch + "."
 	for _, asset := range assets {
-		if strings.Contains(asset.Name, needle) {
+		if assetMatchesPlatform(asset.Name, goos, goarch) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func assetMatchesPlatform(name string, goos string, goarch string) bool {
+	needle := "-" + goos + "-" + goarch + "."
+	return strings.Contains(name, needle)
 }
 
 func pickCompatibilityData(configData []byte) []byte {

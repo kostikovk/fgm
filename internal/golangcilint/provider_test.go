@@ -192,3 +192,52 @@ func TestProviderListRemoteLintVersions_ReturnsErrorForInvalidManifest(t *testin
 		t.Fatal("expected an error for invalid compatibility manifest")
 	}
 }
+
+func TestProviderFindArchive_ReturnsArchiveMetadataForPlatform(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{
+				"tag_name": "v2.11.2",
+				"assets": [
+					{
+						"name": "golangci-lint-2.11.2-darwin-arm64.tar.gz",
+						"browser_download_url": "https://example.test/v2.11.2/darwin-arm64.tar.gz",
+						"digest": "sha256:abc123"
+					},
+					{
+						"name": "golangci-lint-2.11.2-linux-amd64.tar.gz",
+						"browser_download_url": "https://example.test/v2.11.2/linux-amd64.tar.gz",
+						"digest": "sha256:skipme"
+					}
+				]
+			}
+		]`))
+	}))
+	defer server.Close()
+
+	provider := New(Config{
+		Client:            server.Client(),
+		BaseURL:           server.URL,
+		GOOS:              "darwin",
+		GOARCH:            "arm64",
+		CompatibilityData: []byte(`{"versions":{}}`),
+	})
+
+	archive, err := provider.FindArchive(context.Background(), "v2.11.2")
+	if err != nil {
+		t.Fatalf("FindArchive: %v", err)
+	}
+
+	if archive.Filename != "golangci-lint-2.11.2-darwin-arm64.tar.gz" {
+		t.Fatalf("archive.Filename = %q, want %q", archive.Filename, "golangci-lint-2.11.2-darwin-arm64.tar.gz")
+	}
+	if archive.URL != "https://example.test/v2.11.2/darwin-arm64.tar.gz" {
+		t.Fatalf("archive.URL = %q, want %q", archive.URL, "https://example.test/v2.11.2/darwin-arm64.tar.gz")
+	}
+	if archive.SHA256 != "abc123" {
+		t.Fatalf("archive.SHA256 = %q, want %q", archive.SHA256, "abc123")
+	}
+}

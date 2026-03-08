@@ -43,6 +43,11 @@ type GoInstaller interface {
 	InstallGoVersion(ctx context.Context, version string) (string, error)
 }
 
+// LintInstaller installs golangci-lint into the local FGM-managed store.
+type LintInstaller interface {
+	InstallLintVersion(ctx context.Context, version string) (string, error)
+}
+
 // ImportedGo describes a Go installation imported into FGM.
 type ImportedGo struct {
 	Version string
@@ -82,6 +87,7 @@ type App struct {
 	GoRemoteProvider   GoRemoteVersionProvider
 	LintRemoteProvider LintRemoteVersionProvider
 	GoInstaller        GoInstaller
+	LintInstaller      LintInstaller
 	GoImporter         GoImporter
 	Doctor             Doctor
 	Executor           Executor
@@ -95,6 +101,7 @@ type Config struct {
 	GoRemoteProvider   GoRemoteVersionProvider
 	LintRemoteProvider LintRemoteVersionProvider
 	GoInstaller        GoInstaller
+	LintInstaller      LintInstaller
 	GoImporter         GoImporter
 	Doctor             Doctor
 	Executor           Executor
@@ -109,6 +116,7 @@ func New(config Config) *App {
 		GoRemoteProvider:   config.GoRemoteProvider,
 		LintRemoteProvider: config.LintRemoteProvider,
 		GoInstaller:        config.GoInstaller,
+		LintInstaller:      config.LintInstaller,
 		GoImporter:         config.GoImporter,
 		Doctor:             config.Doctor,
 		Executor:           config.Executor,

@@ -158,6 +158,14 @@ fgm install go 1.25.7
 
 FGM downloads the correct archive for your OS and architecture, verifies it, shows download progress, and installs it into the local FGM store.
 
+### Install a golangci-lint version
+
+```bash
+fgm install golangci-lint v2.11.2
+```
+
+FGM downloads the matching archive for your platform, verifies the archive checksum when available, and installs the binary into the local FGM store.
+
 ### Switch the global default
 
 ```bash
@@ -224,6 +232,7 @@ fgm env [--shell zsh|bash|fish|powershell]
 fgm exec -- <command> [args...]
 fgm import auto
 fgm install go <version>
+fgm install golangci-lint <version>
 fgm remove go <version>
 fgm use go <version> --global
 fgm versions go --local

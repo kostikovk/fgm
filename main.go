@@ -17,6 +17,7 @@ import (
 	"github.com/koskosovu4/fgm/internal/golangcilint"
 	"github.com/koskosovu4/fgm/internal/golocal"
 	"github.com/koskosovu4/fgm/internal/goreleases"
+	"github.com/koskosovu4/fgm/internal/lintinstall"
 	"github.com/koskosovu4/fgm/internal/resolve"
 )
 
@@ -44,6 +45,12 @@ func main() {
 		Provider:       goReleaseProvider,
 		ProgressWriter: os.Stderr,
 	})
+	lintInstaller := lintinstall.New(lintinstall.Config{
+		Root:           goRoot,
+		Client:         http.DefaultClient,
+		Provider:       lintReleaseProvider,
+		ProgressWriter: os.Stderr,
+	})
 	goImporter := goimport.New(goimport.DefaultCandidates(os.Getenv("PATH")), goStore)
 	doctorService := doctor.New(goStore, os.Getenv("PATH"))
 	executor := execenv.New(resolve.New(goStore), goStore, os.Getenv("PATH"))
@@ -58,6 +65,7 @@ func main() {
 		GoRemoteProvider:   goReleaseProvider,
 		LintRemoteProvider: lintReleaseProvider,
 		GoInstaller:        goInstaller,
+		LintInstaller:      lintInstaller,
 		GoImporter:         goImporter,
 		Doctor:             doctorService,
 		Executor:           executor,
