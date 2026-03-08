@@ -33,16 +33,16 @@ func NewRootCmd(application *app.App) *cobra.Command {
 	_ = v.BindPFlag(flagVerbose, rootCmd.PersistentFlags().Lookup(flagVerbose))
 
 	rootCmd.AddCommand(newCurrentCmd(application, v))
-	rootCmd.AddCommand(newDoctorCmd(application))
+	rootCmd.AddCommand(newDoctorCmd(application, v))
 	rootCmd.AddCommand(newEnvCmd(application))
 	rootCmd.AddCommand(newExecCmd(application, v))
 	rootCmd.AddCommand(newImportCmd(application))
-	rootCmd.AddCommand(newInstallCmd(application))
+	rootCmd.AddCommand(newInstallCmd(application, v))
 	rootCmd.AddCommand(newPinCmd(v))
 	rootCmd.AddCommand(newRemoveCmd(application))
 	rootCmd.AddCommand(newUpgradeCmd(application, v))
 	rootCmd.AddCommand(newUseCmd(application))
-	rootCmd.AddCommand(newVersionsCmd(application))
+	rootCmd.AddCommand(newVersionsCmd(application, v))
 	rootCmd.AddCommand(newShimCmd(application))
 
 	return rootCmd

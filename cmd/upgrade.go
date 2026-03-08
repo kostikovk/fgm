@@ -31,8 +31,11 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 		Short: "Upgrade Go globally or for the current project",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if global == project {
-				return fmt.Errorf("choose --global or --project")
+			if global && project {
+				return fmt.Errorf("--global and --project are mutually exclusive")
+			}
+			if !global && !project {
+				return fmt.Errorf("provide --global or --project")
 			}
 			if application.GoUpgrader == nil {
 				return fmt.Errorf("Go upgrader is not configured")

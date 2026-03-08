@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,10 +19,47 @@ func (s stubDoctor) Diagnose(ctx context.Context, workDir string) ([]string, err
 	return s.diagnoseFn(ctx, workDir)
 }
 
+func TestDoctorCommand_RejectsNilDoctor(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{Doctor: nil}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "doctor")
+	if err == nil {
+		t.Fatal("expected an error when Doctor is nil")
+	}
+	if !strings.Contains(err.Error(), "doctor service is not configured") {
+		t.Fatalf("err = %q, want not configured error", err)
+	}
+}
+
+func TestDoctorCommand_DiagnoseErrorIsPropagated(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		Resolver: resolve.New(nil),
+		Doctor: stubDoctor{
+			diagnoseFn: func(ctx context.Context, workDir string) ([]string, error) {
+				return nil, fmt.Errorf("diagnose boom")
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "doctor")
+	if err == nil {
+		t.Fatal("expected an error when Diagnose fails")
+	}
+	if !strings.Contains(err.Error(), "diagnose boom") {
+		t.Fatalf("err = %q, want diagnose boom", err)
+	}
+}
+
 func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
 	t.Parallel()
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(nil),
 		Doctor: stubDoctor{
 			diagnoseFn: func(ctx context.Context, workDir string) ([]string, error) {
@@ -35,7 +73,7 @@ func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
 				}, nil
 			},
 		},
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "doctor")

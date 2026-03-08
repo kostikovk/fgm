@@ -5,9 +5,10 @@ import (
 
 	"github.com/koskosovu4/fgm/internal/app"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func newInstallCmd(application *app.App) *cobra.Command {
+func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	installCmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install toolchains into the local FGM store",
@@ -23,12 +24,7 @@ func newInstallCmd(application *app.App) *cobra.Command {
 				return fmt.Errorf("golangci-lint installer is not configured")
 			}
 
-			workDir, err := cmd.Flags().GetString(flagChdir)
-			if err != nil {
-				return err
-			}
-
-			selection, err := application.Resolver.Current(cmd.Context(), workDir)
+			selection, err := application.Resolver.Current(cmd.Context(), v.GetString(flagChdir))
 			if err != nil {
 				return err
 			}

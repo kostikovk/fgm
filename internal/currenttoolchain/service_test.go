@@ -2,6 +2,7 @@ package currenttoolchain
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -203,5 +204,193 @@ func TestServiceCurrent_TreatsAutoPinnedLintAsFallbackToAutoResolution(t *testin
 	}
 	if selection.LintSource != "local" {
 		t.Fatalf("LintSource = %q, want %q", selection.LintSource, "local")
+	}
+}
+
+func TestCurrent_ErrorWhenPinnedLintConfigIsMalformed(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	// Write an invalid TOML file so ResolvePinned returns a parse error.
+	if err := os.WriteFile(
+		filepath.Join(workDir, ".fgm.toml"),
+		[]byte("this is not valid TOML [[["),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+	})
+
+	_, err := service.Current(context.Background(), workDir)
+	if err == nil {
+		t.Fatal("expected error from malformed .fgm.toml, got nil")
+	}
+}
+
+func TestCurrent_ErrorWhenGoResolverFails(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{}, fmt.Errorf("go resolver broken")
+			},
+		},
+	})
+
+	_, err := service.Current(context.Background(), ".")
+	if err == nil {
+		t.Fatalf("expected error from GoResolver, got nil")
+	}
+}
+
+func TestCurrent_SkipsLintWhenNoRemoteProvider(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+		LintRemoteProvider: nil,
+	})
+
+	selection, err := service.Current(context.Background(), ".")
+	if err != nil {
+		t.Fatalf("Current: %v", err)
+	}
+
+	if selection.GoVersion != "1.25.0" {
+		t.Fatalf("GoVersion = %q, want %q", selection.GoVersion, "1.25.0")
+	}
+	if selection.LintVersion != "" {
+		t.Fatalf("LintVersion = %q, want empty", selection.LintVersion)
+	}
+}
+
+func TestCurrent_ErrorWhenRemoteProviderFails(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return nil, fmt.Errorf("remote provider broken")
+			},
+		},
+	})
+
+	_, err := service.Current(context.Background(), ".")
+	if err == nil {
+		t.Fatalf("expected error from LintRemoteProvider, got nil")
+	}
+}
+
+func TestCurrent_ErrorWhenLintStoreFails(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+		LintStore: stubLintStore{
+			listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+				return nil, fmt.Errorf("lint store broken")
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return []app.LintVersion{
+					{Version: "v2.11.2", Recommended: true},
+				}, nil
+			},
+		},
+	})
+
+	_, err := service.Current(context.Background(), ".")
+	if err == nil {
+		t.Fatalf("expected error from LintStore, got nil")
+	}
+}
+
+func TestCurrent_FallsBackToRemoteWhenNoLocalOverlap(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+		LintStore: stubLintStore{
+			listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"v2.10.0"}, nil
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return []app.LintVersion{
+					{Version: "v2.11.2", Recommended: true},
+				}, nil
+			},
+		},
+	})
+
+	selection, err := service.Current(context.Background(), ".")
+	if err != nil {
+		t.Fatalf("Current: %v", err)
+	}
+
+	if selection.LintVersion != "v2.11.2" {
+		t.Fatalf("LintVersion = %q, want %q", selection.LintVersion, "v2.11.2")
+	}
+	if selection.LintSource != "remote" {
+		t.Fatalf("LintSource = %q, want %q", selection.LintSource, "remote")
+	}
+}
+
+func TestCurrent_FallsBackToRemoteWhenNoStore(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+		LintStore: nil,
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return []app.LintVersion{
+					{Version: "v2.11.2", Recommended: true},
+				}, nil
+			},
+		},
+	})
+
+	selection, err := service.Current(context.Background(), ".")
+	if err != nil {
+		t.Fatalf("Current: %v", err)
+	}
+
+	if selection.LintVersion != "v2.11.2" {
+		t.Fatalf("LintVersion = %q, want %q", selection.LintVersion, "v2.11.2")
+	}
+	if selection.LintSource != "remote" {
+		t.Fatalf("LintSource = %q, want %q", selection.LintSource, "remote")
 	}
 }

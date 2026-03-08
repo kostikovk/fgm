@@ -23,11 +23,17 @@ type Importer struct {
 	registry   Registry
 }
 
+// Config configures an Importer.
+type Config struct {
+	Candidates []string
+	Registry   Registry
+}
+
 // New constructs an Importer.
-func New(candidates []string, registry Registry) *Importer {
+func New(config Config) *Importer {
 	return &Importer{
-		candidates: candidates,
-		registry:   registry,
+		candidates: config.Candidates,
+		registry:   config.Registry,
 	}
 }
 

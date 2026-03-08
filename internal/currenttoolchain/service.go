@@ -2,10 +2,9 @@ package currenttoolchain
 
 import (
 	"context"
-	"strings"
 
 	"github.com/koskosovu4/fgm/internal/app"
-	"github.com/koskosovu4/fgm/internal/fgmconfig"
+	"github.com/koskosovu4/fgm/internal/pinnedlint"
 )
 
 // GoResolver resolves the current Go toolchain selection.
@@ -43,7 +42,7 @@ func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, e
 		return app.Selection{}, err
 	}
 
-	if lintVersion, ok, err := resolvePinnedLintVersion(workDir); err != nil {
+	if lintVersion, ok, err := pinnedlint.ResolvePinned(workDir); err != nil {
 		return app.Selection{}, err
 	} else if ok {
 		selection.LintVersion = lintVersion
@@ -78,20 +77,6 @@ func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, e
 	selection.LintVersion = remoteVersions[0].Version
 	selection.LintSource = "remote"
 	return selection, nil
-}
-
-func resolvePinnedLintVersion(workDir string) (string, bool, error) {
-	config, found, err := fgmconfig.LoadNearest(workDir)
-	if err != nil || !found {
-		return "", false, err
-	}
-
-	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
-	if version == "" || version == "auto" {
-		return "", false, nil
-	}
-
-	return version, true, nil
 }
 
 func pickInstalledLintVersion(localVersions []string, remoteVersions []app.LintVersion) (string, bool) {

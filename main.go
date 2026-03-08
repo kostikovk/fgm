@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/koskosovu4/fgm/cmd"
 	"github.com/koskosovu4/fgm/internal/app"
@@ -32,15 +33,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	httpClient := &http.Client{Timeout: 5 * time.Minute}
+
 	goStore := golocal.New(goRoot, os.Getenv("PATH"))
 	lintStore := lintlocal.New(goRoot)
 	goReleaseProvider := goreleases.New(goreleases.Config{
-		Client: http.DefaultClient,
+		Client: httpClient,
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
 	})
 	lintReleaseProvider := golangcilint.New(golangcilint.Config{
-		Client: http.DefaultClient,
+		Client: httpClient,
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
 	})
@@ -56,7 +59,10 @@ func main() {
 		Provider:       lintReleaseProvider,
 		ProgressWriter: os.Stderr,
 	})
-	goImporter := goimport.New(goimport.DefaultCandidates(os.Getenv("PATH")), goStore)
+	goImporter := goimport.New(goimport.Config{
+		Candidates: goimport.DefaultCandidates(os.Getenv("PATH")),
+		Registry:   goStore,
+	})
 	lintImporter := lintimport.New(lintimport.Config{
 		Candidates: lintimport.DefaultCandidates(os.Getenv("PATH")),
 		Registry:   lintStore,
@@ -91,7 +97,7 @@ func main() {
 		ShellPath: os.Getenv("SHELL"),
 		GOOS:      runtime.GOOS,
 	})
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver:           currentResolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
@@ -105,7 +111,7 @@ func main() {
 		Doctor:             doctorService,
 		Executor:           executor,
 		EnvRenderer:        envRenderer,
-	})
+	}
 
 	root := cmd.NewRootCmd(application)
 	if err := root.ExecuteContext(context.Background()); err != nil {

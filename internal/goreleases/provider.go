@@ -74,6 +74,9 @@ func (p *Provider) ListRemoteGoVersions(ctx context.Context) ([]string, error) {
 
 	var versions []string
 	for _, release := range releases {
+		if !release.Stable {
+			continue
+		}
 		if !supportsPlatform(release.Files, p.goos, p.goarch) {
 			continue
 		}

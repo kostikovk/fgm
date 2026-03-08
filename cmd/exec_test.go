@@ -48,11 +48,11 @@ func TestExecCommand_RunsCommandWithSelectedGoOnPATH(t *testing.T) {
 		GoLocator: store,
 		PathEnv:   "",
 	})
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(store),
 		GoStore:  store,
 		Executor: executor,
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "exec", "--chdir", workDir, "--", "go", "version")
@@ -132,13 +132,13 @@ func TestExecCommand_RunsCommandWithSelectedLintOnPATH(t *testing.T) {
 		LintLocator: locator,
 		PathEnv:     "",
 	})
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver:           resolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		LintRemoteProvider: lintProvider,
 		Executor:           executor,
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "exec", "--chdir", workDir, "--", "golangci-lint", "version")
@@ -210,10 +210,10 @@ func TestExecCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 		LintLocator: locator,
 		PathEnv:     "",
 	})
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolver,
 		Executor: executor,
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "exec", "--chdir", workDir, "--", "golangci-lint", "version")
@@ -223,6 +223,36 @@ func TestExecCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 
 	if !strings.Contains(stdout, "golangci-lint has version v2.10.1") {
 		t.Fatalf("stdout = %q, want it to contain pinned lint output", stdout)
+	}
+}
+
+func TestExecCommand_RejectsNoCommand(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "exec", "--")
+	if err == nil {
+		t.Fatal("expected an error when no command is provided")
+	}
+	if !strings.Contains(err.Error(), "no command provided") {
+		t.Fatalf("err = %q, want no command error", err)
+	}
+}
+
+func TestExecCommand_RejectsNilExecutor(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{Executor: nil}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "exec", "--", "go", "version")
+	if err == nil {
+		t.Fatal("expected an error when Executor is nil")
+	}
+	if !strings.Contains(err.Error(), "executor is not configured") {
+		t.Fatalf("err = %q, want not configured error", err)
 	}
 }
 

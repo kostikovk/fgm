@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -39,7 +40,14 @@ func newShimCmd(application *app.App) *cobra.Command {
 				execCmd.Stdout = cmd.OutOrStdout()
 				execCmd.Stderr = cmd.ErrOrStderr()
 				execCmd.Env = os.Environ()
-				return execCmd.Run()
+				if err := execCmd.Run(); err != nil {
+					var exitErr *exec.ExitError
+					if errors.As(err, &exitErr) {
+						os.Exit(exitErr.ExitCode())
+					}
+					return err
+				}
+				return nil
 			default:
 				return fmt.Errorf("unsupported shim tool %q", args[0])
 			}

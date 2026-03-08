@@ -23,9 +23,9 @@ func TestCurrentCommand_ResolvesGoVersionFromGoMod(t *testing.T) {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(nil),
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)
@@ -48,9 +48,9 @@ func TestCurrentCommand_PrefersToolchainDirective(t *testing.T) {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(nil),
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)
@@ -83,9 +83,9 @@ func TestCurrentCommand_PrefersGoWorkOverNestedGoMod(t *testing.T) {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(nil),
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", moduleDir)
@@ -107,10 +107,10 @@ func TestCurrentCommand_FallsBackToGlobalVersionOutsideRepos(t *testing.T) {
 			return "1.25.7", true, nil
 		},
 	}
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(store),
 		GoStore:  store,
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)
@@ -132,7 +132,7 @@ func TestCurrentCommand_DisplaysCompatibleLintVersion(t *testing.T) {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: currenttoolchain.New(currenttoolchain.Config{
 			GoResolver: resolve.New(nil),
 			LintRemoteProvider: stubLintRemoteProvider{
@@ -150,7 +150,7 @@ func TestCurrentCommand_DisplaysCompatibleLintVersion(t *testing.T) {
 				},
 			},
 		}),
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)
@@ -182,7 +182,7 @@ func TestCurrentCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 		t.Fatalf("write .fgm.toml: %v", err)
 	}
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: currenttoolchain.New(currenttoolchain.Config{
 			GoResolver: resolve.New(nil),
 			LintRemoteProvider: stubLintRemoteProvider{
@@ -196,7 +196,7 @@ func TestCurrentCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 				},
 			},
 		}),
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)

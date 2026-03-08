@@ -5,9 +5,10 @@ import (
 
 	"github.com/koskosovu4/fgm/internal/app"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func newDoctorCmd(application *app.App) *cobra.Command {
+func newDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Check FGM installation and environment health",
@@ -17,12 +18,7 @@ func newDoctorCmd(application *app.App) *cobra.Command {
 				return fmt.Errorf("doctor service is not configured")
 			}
 
-			workDir, err := cmd.Flags().GetString(flagChdir)
-			if err != nil {
-				return err
-			}
-
-			lines, err := application.Doctor.Diagnose(cmd.Context(), workDir)
+			lines, err := application.Doctor.Diagnose(cmd.Context(), v.GetString(flagChdir))
 			if err != nil {
 				return err
 			}

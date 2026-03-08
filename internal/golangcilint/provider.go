@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/koskosovu4/fgm/internal/app"
 )
@@ -56,6 +58,10 @@ type Provider struct {
 	goos              string
 	goarch            string
 	compatibilityData []byte
+
+	releasesOnce sync.Once
+	cachedReleases []release
+	cachedReleasesErr error
 }
 
 type compatibilityManifest struct {
@@ -147,32 +153,61 @@ func (p *Provider) loadCompatibilityManifest() (compatibilityManifest, error) {
 }
 
 func (p *Provider) fetchReleases(ctx context.Context) ([]release, error) {
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodGet,
-		p.baseURL+"/repos/golangci/golangci-lint/releases?per_page=100",
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("build golangci-lint releases request: %w", err)
+	p.releasesOnce.Do(func() {
+		p.cachedReleases, p.cachedReleasesErr = p.fetchAllReleasePages(ctx)
+	})
+	return p.cachedReleases, p.cachedReleasesErr
+}
+
+var linkNextPattern = regexp.MustCompile(`<([^>]+)>;\s*rel="next"`)
+
+func (p *Provider) fetchAllReleasePages(ctx context.Context) ([]release, error) {
+	url := p.baseURL + "/repos/golangci/golangci-lint/releases?per_page=100"
+	var allReleases []release
+
+	for url != "" {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("build golangci-lint releases request: %w", err)
+		}
+
+		resp, err := p.client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("fetch golangci-lint releases: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("fetch golangci-lint releases: unexpected status %s", resp.Status)
+		}
+
+		var page []release
+		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decode golangci-lint releases: %w", err)
+		}
+		resp.Body.Close()
+
+		allReleases = append(allReleases, page...)
+
+		url = parseNextLink(resp.Header.Get("Link"))
+		if len(allReleases) > 500 {
+			break
+		}
 	}
 
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetch golangci-lint releases: %w", err)
-	}
-	defer resp.Body.Close()
+	return allReleases, nil
+}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetch golangci-lint releases: unexpected status %s", resp.Status)
+func parseNextLink(linkHeader string) string {
+	if linkHeader == "" {
+		return ""
 	}
-
-	var releases []release
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return nil, fmt.Errorf("decode golangci-lint releases: %w", err)
+	match := linkNextPattern.FindStringSubmatch(linkHeader)
+	if len(match) < 2 {
+		return ""
 	}
-
-	return releases, nil
+	return match[1]
 }
 
 // FindArchive returns archive metadata for a golangci-lint version on the configured platform.

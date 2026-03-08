@@ -3,12 +3,13 @@ package resolve
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/koskosovu4/fgm/internal/versionutil"
 )
 
 // GlobalVersionSource returns the globally selected Go version.
@@ -28,7 +29,10 @@ func New(global GlobalVersionSource) *Resolver {
 
 // Current resolves the currently selected Go version from the workspace.
 func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, error) {
-	goWorkPath, err := findNearestFile(workDir, "go.work")
+	goWorkPath, err := versionutil.FindNearestFile(workDir, "go.work")
+	if err != nil && !errors.Is(err, versionutil.ErrNotFound) {
+		return app.Selection{}, err
+	}
 	if err == nil {
 		goVersion, found, parseErr := parseVersionMetadata(goWorkPath)
 		if parseErr != nil {
@@ -42,18 +46,20 @@ func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, 
 		}
 	}
 
-	goModPath, err := findNearestFile(workDir, "go.mod")
+	goModPath, err := versionutil.FindNearestFile(workDir, "go.mod")
 	if err != nil {
-		if r.global != nil {
-			goVersion, found, globalErr := r.global.GlobalGoVersion(ctx)
-			if globalErr != nil {
-				return app.Selection{}, globalErr
-			}
-			if found {
-				return app.Selection{
-					GoVersion: goVersion,
-					GoSource:  "global",
-				}, nil
+		if errors.Is(err, versionutil.ErrNotFound) {
+			if r.global != nil {
+				goVersion, found, globalErr := r.global.GlobalGoVersion(ctx)
+				if globalErr != nil {
+					return app.Selection{}, globalErr
+				}
+				if found {
+					return app.Selection{
+						GoVersion: goVersion,
+						GoSource:  "global",
+					}, nil
+				}
 			}
 		}
 		return app.Selection{}, err
@@ -71,24 +77,6 @@ func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, 
 		GoVersion: goVersion,
 		GoSource:  goModPath,
 	}, nil
-}
-
-func findNearestFile(dir string, name string) (string, error) {
-	current := dir
-	for {
-		candidate := filepath.Join(current, name)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate, nil
-		}
-
-		parent := filepath.Dir(current)
-		if parent == current {
-			break
-		}
-		current = parent
-	}
-
-	return "", fmt.Errorf("%s not found from %s upward", name, dir)
 }
 
 func parseVersionMetadata(path string) (string, bool, error) {

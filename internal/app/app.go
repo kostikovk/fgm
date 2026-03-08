@@ -138,38 +138,3 @@ type App struct {
 	EnvRenderer        EnvRenderer
 }
 
-// Config configures an App instance.
-type Config struct {
-	Resolver           Resolver
-	GoStore            GoLocalVersionStore
-	LintStore          LintLocalVersionStore
-	GoRemoteProvider   GoRemoteVersionProvider
-	LintRemoteProvider LintRemoteVersionProvider
-	GoInstaller        GoInstaller
-	LintInstaller      LintInstaller
-	GoImporter         GoImporter
-	LintImporter       LintImporter
-	GoUpgrader         GoUpgrader
-	Doctor             Doctor
-	Executor           Executor
-	EnvRenderer        EnvRenderer
-}
-
-// New constructs the application service container.
-func New(config Config) *App {
-	return &App{
-		Resolver:           config.Resolver,
-		GoStore:            config.GoStore,
-		LintStore:          config.LintStore,
-		GoRemoteProvider:   config.GoRemoteProvider,
-		LintRemoteProvider: config.LintRemoteProvider,
-		GoInstaller:        config.GoInstaller,
-		LintInstaller:      config.LintInstaller,
-		GoImporter:         config.GoImporter,
-		LintImporter:       config.LintImporter,
-		GoUpgrader:         config.GoUpgrader,
-		Doctor:             config.Doctor,
-		Executor:           config.Executor,
-		EnvRenderer:        config.EnvRenderer,
-	}
-}

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/koskosovu4/fgm/internal/app"
-	"github.com/koskosovu4/fgm/internal/fgmconfig"
+	"github.com/koskosovu4/fgm/internal/pinnedlint"
 )
 
 // GoStore provides the local state doctor needs to inspect.
@@ -98,7 +98,7 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error
 				lines = append(lines, "WARN selected Go version is not installed: "+selection.GoVersion)
 			}
 
-			pinnedLintVersion, pinned, err := resolvePinnedLintVersion(workDir)
+			pinnedLintVersion, pinned, err := pinnedlint.ResolvePinned(workDir)
 			if err != nil {
 				return nil, err
 			}
@@ -145,20 +145,6 @@ func pathContainsDir(pathEnv string, dir string) bool {
 		}
 	}
 	return false
-}
-
-func resolvePinnedLintVersion(workDir string) (string, bool, error) {
-	config, found, err := fgmconfig.LoadNearest(workDir)
-	if err != nil || !found {
-		return "", false, err
-	}
-
-	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
-	if version == "" || version == "auto" {
-		return "", false, nil
-	}
-
-	return version, true, nil
 }
 
 func lintVersionCompatible(version string, compatible []app.LintVersion) bool {

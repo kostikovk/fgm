@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
+
+	"github.com/koskosovu4/fgm/internal/versionutil"
 )
 
 const globalGoVersionStateFile = "global-go-version"
@@ -127,7 +129,7 @@ func (s *Store) DeleteGoVersion(ctx context.Context, version string) (string, er
 		return "", fmt.Errorf("stat managed Go version: %w", err)
 	}
 
-	if !info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
+	if info.Mode().IsRegular() {
 		return "", fmt.Errorf("managed Go path for %s is invalid", version)
 	}
 	if err := os.RemoveAll(installDir); err != nil {
@@ -303,6 +305,8 @@ func sortVersions(set map[string]struct{}) []string {
 		versions = append(versions, version)
 	}
 
-	sort.Sort(sort.Reverse(sort.StringSlice(versions)))
+	slices.SortFunc(versions, func(a, b string) int {
+		return -versionutil.CompareVersions(a, b)
+	})
 	return versions
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -15,7 +16,7 @@ func TestUseGoGlobal_SetsGlobalVersionAndMentionsShims(t *testing.T) {
 
 	var setGlobalVersion string
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(nil),
 		GoStore: stubGoStore{
 			hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
@@ -32,7 +33,7 @@ func TestUseGoGlobal_SetsGlobalVersionAndMentionsShims(t *testing.T) {
 				return "/tmp/fgm/shims"
 			},
 		},
-	})
+	}
 
 	root := NewRootCmd(application)
 	stdout, stderr, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7", "--global")
@@ -51,17 +52,122 @@ func TestUseGoGlobal_SetsGlobalVersionAndMentionsShims(t *testing.T) {
 	}
 }
 
+func TestUseGo_RejectsWithoutGlobalFlag(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7")
+	if err == nil {
+		t.Fatal("expected an error when --global flag is not set")
+	}
+	if !strings.Contains(err.Error(), "only --global is supported") {
+		t.Fatalf("err = %q, want only --global error", err)
+	}
+}
+
+func TestUseGoGlobal_RejectsNilGoStore(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{GoStore: nil}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7", "--global")
+	if err == nil {
+		t.Fatal("expected an error when GoStore is nil")
+	}
+	if !strings.Contains(err.Error(), "local Go version store is not configured") {
+		t.Fatalf("err = %q, want not configured error", err)
+	}
+}
+
+func TestUseGoGlobal_HasGoVersionErrorIsPropagated(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		Resolver: resolve.New(nil),
+		GoStore: stubGoStore{
+			hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
+				return false, fmt.Errorf("has version boom")
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7", "--global")
+	if err == nil {
+		t.Fatal("expected an error when HasGoVersion fails")
+	}
+	if !strings.Contains(err.Error(), "has version boom") {
+		t.Fatalf("err = %q, want has version boom", err)
+	}
+}
+
+func TestUseGoGlobal_SetGlobalGoVersionErrorIsPropagated(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		Resolver: resolve.New(nil),
+		GoStore: stubGoStore{
+			hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
+				return true, nil
+			},
+			setGlobalGoVersionFn: func(ctx context.Context, version string) error {
+				return fmt.Errorf("set global boom")
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7", "--global")
+	if err == nil {
+		t.Fatal("expected an error when SetGlobalGoVersion fails")
+	}
+	if !strings.Contains(err.Error(), "set global boom") {
+		t.Fatalf("err = %q, want set global boom", err)
+	}
+}
+
+func TestUseGoGlobal_EnsureShimsErrorIsPropagated(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		Resolver: resolve.New(nil),
+		GoStore: stubGoStore{
+			hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
+				return true, nil
+			},
+			setGlobalGoVersionFn: func(ctx context.Context, version string) error {
+				return nil
+			},
+			ensureShimsFn: func() error {
+				return fmt.Errorf("ensure shims boom")
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7", "--global")
+	if err == nil {
+		t.Fatal("expected an error when EnsureShims fails")
+	}
+	if !strings.Contains(err.Error(), "ensure shims boom") {
+		t.Fatalf("err = %q, want ensure shims boom", err)
+	}
+}
+
 func TestUseGoGlobal_RejectsMissingVersion(t *testing.T) {
 	t.Parallel()
 
-	application := app.New(app.Config{
+	application := &app.App{
 		Resolver: resolve.New(nil),
 		GoStore: stubGoStore{
 			hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
 				return false, nil
 			},
 		},
-	})
+	}
 
 	root := NewRootCmd(application)
 	_, stderr, err := testutil.ExecuteCommand(t, root, "use", "go", "1.25.7", "--global")

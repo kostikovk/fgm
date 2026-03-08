@@ -37,7 +37,7 @@ func (s *Store) ListLocalLintVersions(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		binaryPath := filepath.Join(s.root, "golangci-lint", entry.Name(), "golangci-lint")
+		binaryPath := filepath.Join(s.root, "golangci-lint", entry.Name(), lintBinaryName())
 		if _, err := os.Stat(binaryPath); err == nil {
 			versions = append(versions, entry.Name())
 		}

@@ -77,10 +77,11 @@ func (r *Renderer) Render(ctx context.Context, shell string) ([]string, error) {
 
 func detectShell(shellPath string, goos string) string {
 	if goos == "windows" {
-		if strings.Contains(strings.ToLower(shellPath), "powershell") {
+		lower := strings.ToLower(shellPath)
+		if strings.Contains(lower, "powershell") || strings.Contains(lower, "pwsh") {
 			return "powershell"
 		}
-		return "powershell"
+		return ""
 	}
 
 	base := filepath.Base(shellPath)
