@@ -38,6 +38,7 @@ func NewRootCmd(application *app.App) *cobra.Command {
 	rootCmd.AddCommand(newExecCmd(application, v))
 	rootCmd.AddCommand(newImportCmd(application))
 	rootCmd.AddCommand(newInstallCmd(application))
+	rootCmd.AddCommand(newPinCmd(v))
 	rootCmd.AddCommand(newRemoveCmd(application))
 	rootCmd.AddCommand(newUseCmd(application))
 	rootCmd.AddCommand(newVersionsCmd(application))

@@ -55,6 +55,13 @@ Use `golangci_lint = "auto"` to keep the default compatibility-based selection.
 
 When present, this lint pin is honored by `fgm current`, root `fgm install`, and `fgm exec`.
 
+You can manage this file through the CLI:
+
+```bash
+fgm pin golangci-lint v2.10.1
+fgm pin golangci-lint auto
+```
+
 ## Install
 
 Build FGM from source:
@@ -260,6 +267,7 @@ fgm exec -- <command> [args...]
 fgm import auto
 fgm install go <version>
 fgm install golangci-lint <version>
+fgm pin golangci-lint <version|auto>
 fgm remove go <version>
 fgm remove golangci-lint <version>
 fgm use go <version> --global
