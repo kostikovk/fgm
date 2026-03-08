@@ -261,6 +261,33 @@ make build
 
 The codebase is being built test-first with table-driven unit tests and CLI-level command tests.
 
+### Pre-commit hook
+
+This repo includes a Hooky-managed pre-commit hook in [`.hooky/hooks/pre-commit`](/Users/koskosovu4/projects/fgm/.hooky/hooks/pre-commit).
+
+Install Hooky:
+
+```bash
+go install github.com/kostikovk/hooky@latest
+```
+
+Sync the hook into `.git/hooks`:
+
+```bash
+make hook-install
+```
+
+The hook runs:
+
+```bash
+make pre-commit
+```
+
+That currently executes:
+
+- `make fix`
+- `make build`
+
 ## Status And Next Work
 
 Implemented now:
