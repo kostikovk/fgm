@@ -95,6 +95,14 @@ func (s stubLintRemoteProvider) ListRemoteLintVersions(
 	return s.listRemoteLintVersionsFn(ctx, goVersion)
 }
 
+type stubLintStore struct {
+	listLocalLintVersionsFn func(ctx context.Context) ([]string, error)
+}
+
+func (s stubLintStore) ListLocalLintVersions(ctx context.Context) ([]string, error) {
+	return s.listLocalLintVersionsFn(ctx)
+}
+
 func TestVersionsGoLocal_ShowsInstalledVersions(t *testing.T) {
 	t.Parallel()
 
@@ -258,5 +266,29 @@ func TestVersionsGolangCILintRemote_UsesResolvedRepoGoVersion(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "* v2.5.0") {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "* v2.5.0")
+	}
+}
+
+func TestVersionsGolangCILintLocal_ShowsInstalledVersions(t *testing.T) {
+	t.Parallel()
+
+	application := app.New(app.Config{
+		LintStore: stubLintStore{
+			listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"v2.11.2", "v2.11.1"}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "versions", "golangci-lint", "--local")
+	if err != nil {
+		t.Fatalf("execute versions golangci-lint --local: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "v2.11.2") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "v2.11.2")
+	}
+	if !strings.Contains(stdout, "v2.11.1") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "v2.11.1")
 	}
 }

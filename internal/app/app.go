@@ -38,6 +38,11 @@ type LintRemoteVersionProvider interface {
 	ListRemoteLintVersions(ctx context.Context, goVersion string) ([]LintVersion, error)
 }
 
+// LintLocalVersionStore lists installed golangci-lint versions.
+type LintLocalVersionStore interface {
+	ListLocalLintVersions(ctx context.Context) ([]string, error)
+}
+
 // GoInstaller installs Go toolchains into the local FGM-managed store.
 type GoInstaller interface {
 	InstallGoVersion(ctx context.Context, version string) (string, error)
@@ -84,6 +89,7 @@ type Selection struct {
 type App struct {
 	Resolver           Resolver
 	GoStore            GoLocalVersionStore
+	LintStore          LintLocalVersionStore
 	GoRemoteProvider   GoRemoteVersionProvider
 	LintRemoteProvider LintRemoteVersionProvider
 	GoInstaller        GoInstaller
@@ -98,6 +104,7 @@ type App struct {
 type Config struct {
 	Resolver           Resolver
 	GoStore            GoLocalVersionStore
+	LintStore          LintLocalVersionStore
 	GoRemoteProvider   GoRemoteVersionProvider
 	LintRemoteProvider LintRemoteVersionProvider
 	GoInstaller        GoInstaller
@@ -113,6 +120,7 @@ func New(config Config) *App {
 	return &App{
 		Resolver:           config.Resolver,
 		GoStore:            config.GoStore,
+		LintStore:          config.LintStore,
 		GoRemoteProvider:   config.GoRemoteProvider,
 		LintRemoteProvider: config.LintRemoteProvider,
 		GoInstaller:        config.GoInstaller,

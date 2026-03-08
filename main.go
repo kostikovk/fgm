@@ -18,6 +18,7 @@ import (
 	"github.com/koskosovu4/fgm/internal/golocal"
 	"github.com/koskosovu4/fgm/internal/goreleases"
 	"github.com/koskosovu4/fgm/internal/lintinstall"
+	"github.com/koskosovu4/fgm/internal/lintlocal"
 	"github.com/koskosovu4/fgm/internal/resolve"
 )
 
@@ -29,6 +30,7 @@ func main() {
 	}
 
 	goStore := golocal.New(goRoot, os.Getenv("PATH"))
+	lintStore := lintlocal.New(goRoot)
 	goReleaseProvider := goreleases.New(goreleases.Config{
 		Client: http.DefaultClient,
 		GOOS:   runtime.GOOS,
@@ -62,6 +64,7 @@ func main() {
 	application := app.New(app.Config{
 		Resolver:           resolve.New(goStore),
 		GoStore:            goStore,
+		LintStore:          lintStore,
 		GoRemoteProvider:   goReleaseProvider,
 		LintRemoteProvider: lintReleaseProvider,
 		GoInstaller:        goInstaller,

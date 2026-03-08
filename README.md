@@ -133,9 +133,12 @@ FGM marks the currently resolved version with `*`.
 ### List compatible remote golangci-lint versions
 
 ```bash
+fgm versions golangci-lint --local
 fgm versions golangci-lint --remote --go 1.25.0
 fgm versions golangci-lint --remote --chdir /path/to/repo
 ```
+
+`--local` lists installed `golangci-lint` versions from the FGM-managed store.
 
 FGM filters the fetched remote releases to versions that match your platform and a curated embedded compatibility manifest, then marks the recommended version with `*`.
 
@@ -237,6 +240,7 @@ fgm remove go <version>
 fgm use go <version> --global
 fgm versions go --local
 fgm versions go --remote
+fgm versions golangci-lint --local
 fgm versions golangci-lint --remote [--go <version>]
 ```
 
