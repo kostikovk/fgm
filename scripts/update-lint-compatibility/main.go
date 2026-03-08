@@ -20,9 +20,9 @@ type manifestGenerator interface {
 var (
 	stdoutWriter io.Writer = os.Stdout
 	stderrWriter io.Writer = os.Stderr
-	getEnv       = os.Getenv
-	writeFile    = os.WriteFile
-	newGenerator = func(config golangcilint.GeneratorConfig) manifestGenerator {
+	getEnv                 = os.Getenv
+	writeFile              = os.WriteFile
+	newGenerator           = func(config golangcilint.GeneratorConfig) manifestGenerator {
 		return golangcilint.NewGenerator(config)
 	}
 	exitMain = os.Exit

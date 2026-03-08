@@ -32,10 +32,10 @@ type rootCommand interface {
 }
 
 var (
-	defaultGoRoot = golocal.DefaultRoot
-	getEnv        = os.Getenv
+	defaultGoRoot           = golocal.DefaultRoot
+	getEnv                  = os.Getenv
 	stderrWriter  io.Writer = os.Stderr
-	newRootCmd    = func(application *app.App) rootCommand {
+	newRootCmd              = func(application *app.App) rootCommand {
 		return cmd.NewRootCmd(application)
 	}
 	exitMain = os.Exit
