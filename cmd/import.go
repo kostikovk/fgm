@@ -24,21 +24,40 @@ func newImportAutoCmd(application *app.App) *cobra.Command {
 		Short: "Automatically import existing Go installations from common locations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if application.GoImporter == nil {
-				return fmt.Errorf("Go importer is not configured")
+			if application.GoImporter == nil && application.LintImporter == nil {
+				return fmt.Errorf("importers are not configured")
 			}
 
-			imported, err := application.GoImporter.ImportAuto(cmd.Context())
-			if err != nil {
-				return err
+			importedGo := []app.ImportedGo(nil)
+			if application.GoImporter != nil {
+				var err error
+				importedGo, err = application.GoImporter.ImportAuto(cmd.Context())
+				if err != nil {
+					return err
+				}
 			}
-			if len(imported) == 0 {
-				_, err := fmt.Fprintln(cmd.OutOrStdout(), "No Go installations were imported.")
+
+			importedLint := []app.ImportedLint(nil)
+			if application.LintImporter != nil {
+				var err error
+				importedLint, err = application.LintImporter.ImportAuto(cmd.Context())
+				if err != nil {
+					return err
+				}
+			}
+
+			if len(importedGo) == 0 && len(importedLint) == 0 {
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), "No Go or golangci-lint installations were imported.")
 				return err
 			}
 
-			for _, item := range imported {
+			for _, item := range importedGo {
 				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Imported Go %s from %s\n", item.Version, item.Path); err != nil {
+					return err
+				}
+			}
+			for _, item := range importedLint {
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Imported golangci-lint %s from %s\n", item.Version, item.Path); err != nil {
 					return err
 				}
 			}

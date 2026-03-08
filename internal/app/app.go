@@ -60,9 +60,20 @@ type ImportedGo struct {
 	Path    string
 }
 
+// ImportedLint describes a golangci-lint installation imported into FGM.
+type ImportedLint struct {
+	Version string
+	Path    string
+}
+
 // GoImporter imports existing Go installations into FGM.
 type GoImporter interface {
 	ImportAuto(ctx context.Context) ([]ImportedGo, error)
+}
+
+// LintImporter imports existing golangci-lint installations into FGM.
+type LintImporter interface {
+	ImportAuto(ctx context.Context) ([]ImportedLint, error)
 }
 
 // Doctor reports environment and configuration diagnostics for FGM.
@@ -98,6 +109,7 @@ type App struct {
 	GoInstaller        GoInstaller
 	LintInstaller      LintInstaller
 	GoImporter         GoImporter
+	LintImporter       LintImporter
 	Doctor             Doctor
 	Executor           Executor
 	EnvRenderer        EnvRenderer
@@ -113,6 +125,7 @@ type Config struct {
 	GoInstaller        GoInstaller
 	LintInstaller      LintInstaller
 	GoImporter         GoImporter
+	LintImporter       LintImporter
 	Doctor             Doctor
 	Executor           Executor
 	EnvRenderer        EnvRenderer
@@ -129,6 +142,7 @@ func New(config Config) *App {
 		GoInstaller:        config.GoInstaller,
 		LintInstaller:      config.LintInstaller,
 		GoImporter:         config.GoImporter,
+		LintImporter:       config.LintImporter,
 		Doctor:             config.Doctor,
 		Executor:           config.Executor,
 		EnvRenderer:        config.EnvRenderer,

@@ -69,3 +69,33 @@ func TestStoreDeleteLintVersion_RemovesManagedVersion(t *testing.T) {
 		t.Fatalf("expected %s to be removed, err=%v", versionDir, err)
 	}
 }
+
+func TestStoreRegisterExistingLintInstallation_CreatesSymlinkedManagedVersion(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	externalDir := t.TempDir()
+	externalBinary := filepath.Join(externalDir, "golangci-lint")
+	if err := os.WriteFile(externalBinary, []byte("binary"), 0o755); err != nil {
+		t.Fatalf("WriteFile external: %v", err)
+	}
+
+	store := New(root)
+	installPath, err := store.RegisterExistingLintInstallation("v2.11.2", externalBinary)
+	if err != nil {
+		t.Fatalf("RegisterExistingLintInstallation: %v", err)
+	}
+
+	wantPath := filepath.Join(root, "golangci-lint", "v2.11.2")
+	if installPath != wantPath {
+		t.Fatalf("installPath = %q, want %q", installPath, wantPath)
+	}
+
+	info, err := os.Lstat(filepath.Join(wantPath, "golangci-lint"))
+	if err != nil {
+		t.Fatalf("Lstat: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("managed binary mode = %v, want symlink", info.Mode())
+	}
+}

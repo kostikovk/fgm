@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 )
 
@@ -72,10 +73,35 @@ func (s *Store) DeleteLintVersion(ctx context.Context, version string) (string, 
 func (s *Store) LintBinaryPath(ctx context.Context, version string) (string, error) {
 	_ = ctx
 
-	binaryPath := filepath.Join(s.root, "golangci-lint", version, "golangci-lint")
+	binaryPath := filepath.Join(s.root, "golangci-lint", version, lintBinaryName())
 	if _, err := os.Stat(binaryPath); err == nil {
 		return binaryPath, nil
 	}
 
 	return "", fmt.Errorf("golangci-lint version %s is not installed", version)
+}
+
+// RegisterExistingLintInstallation registers an existing golangci-lint binary into the FGM-managed store.
+func (s *Store) RegisterExistingLintInstallation(version string, binaryPath string) (string, error) {
+	installDir := filepath.Join(s.root, "golangci-lint", version)
+	if _, err := os.Stat(filepath.Join(installDir, lintBinaryName())); err == nil {
+		return installDir, nil
+	}
+
+	if err := os.MkdirAll(installDir, 0o755); err != nil {
+		return "", fmt.Errorf("create managed golangci-lint root: %w", err)
+	}
+	targetPath := filepath.Join(installDir, lintBinaryName())
+	if err := os.Symlink(binaryPath, targetPath); err != nil {
+		return "", fmt.Errorf("symlink existing golangci-lint installation: %w", err)
+	}
+
+	return installDir, nil
+}
+
+func lintBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "golangci-lint.exe"
+	}
+	return "golangci-lint"
 }

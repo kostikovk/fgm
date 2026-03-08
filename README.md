@@ -87,7 +87,7 @@ fgm import auto
 fgm versions go --local
 ```
 
-`import auto` scans common locations such as your current `PATH`, `/usr/local/go`, and Homebrew Go installs, then registers them in the FGM store.
+`import auto` scans common locations such as your current `PATH`, `/usr/local/go`, Homebrew Go installs, and existing `golangci-lint` binaries, then registers them in the FGM store.
 
 ### 2. Pick a global default
 

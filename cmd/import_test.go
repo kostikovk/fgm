@@ -18,6 +18,14 @@ func (s stubGoImporter) ImportAuto(ctx context.Context) ([]app.ImportedGo, error
 	return s.importAutoFn(ctx)
 }
 
+type stubLintImporter struct {
+	importAutoFn func(ctx context.Context) ([]app.ImportedLint, error)
+}
+
+func (s stubLintImporter) ImportAuto(ctx context.Context) ([]app.ImportedLint, error) {
+	return s.importAutoFn(ctx)
+}
+
 func TestImportAuto_ReportsImportedVersions(t *testing.T) {
 	t.Parallel()
 
@@ -28,6 +36,13 @@ func TestImportAuto_ReportsImportedVersions(t *testing.T) {
 				return []app.ImportedGo{
 					{Version: "1.26.1", Path: "/usr/local/go"},
 					{Version: "1.25.7", Path: "/opt/homebrew/Cellar/go/1.25.7/libexec"},
+				}, nil
+			},
+		},
+		LintImporter: stubLintImporter{
+			importAutoFn: func(ctx context.Context) ([]app.ImportedLint, error) {
+				return []app.ImportedLint{
+					{Version: "v2.11.2", Path: "/opt/homebrew/bin/golangci-lint"},
 				}, nil
 			},
 		},
@@ -44,5 +59,8 @@ func TestImportAuto_ReportsImportedVersions(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Imported Go 1.25.7 from /opt/homebrew/Cellar/go/1.25.7/libexec") {
 		t.Fatalf("stdout = %q, want it to contain second import line", stdout)
+	}
+	if !strings.Contains(stdout, "Imported golangci-lint v2.11.2 from /opt/homebrew/bin/golangci-lint") {
+		t.Fatalf("stdout = %q, want it to contain lint import line", stdout)
 	}
 }
