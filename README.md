@@ -158,10 +158,13 @@ make update-lint-compat
 ### Install a Go version
 
 ```bash
+fgm install
 fgm install go 1.25.7
 ```
 
-FGM downloads the correct archive for your OS and architecture, verifies it, shows download progress, and installs it into the local FGM store.
+`fgm install` installs the currently resolved Go version and, when available, the recommended compatible `golangci-lint` version for the current repo or global context.
+
+`fgm install go <version>` downloads the correct Go archive for your OS and architecture, verifies it, shows download progress, and installs it into the local FGM store.
 
 ### Install a golangci-lint version
 

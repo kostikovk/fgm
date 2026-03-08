@@ -74,3 +74,32 @@ func TestServiceCurrent_PrefersCompatibleInstalledLintVersion(t *testing.T) {
 		t.Fatalf("LintSource = %q, want %q", selection.LintSource, "local")
 	}
 }
+
+func TestServiceCurrent_ReturnsGoOnlyWhenNoCompatibleLintKnown(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		GoResolver: stubGoResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.25.0", GoSource: "go.mod"}, nil
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return nil, nil
+			},
+		},
+	})
+
+	selection, err := service.Current(context.Background(), ".")
+	if err != nil {
+		t.Fatalf("Current: %v", err)
+	}
+
+	if selection.GoVersion != "1.25.0" {
+		t.Fatalf("GoVersion = %q, want %q", selection.GoVersion, "1.25.0")
+	}
+	if selection.LintVersion != "" {
+		t.Fatalf("LintVersion = %q, want empty", selection.LintVersion)
+	}
+}
