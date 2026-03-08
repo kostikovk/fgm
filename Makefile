@@ -3,7 +3,7 @@ BIN_DIR := tmp
 BIN := $(BIN_DIR)/$(APP)
 CMD ?= --help
 
-.PHONY: help build run cmd test fmt fix clean
+.PHONY: help build run cmd test fmt fix update-lint-compat clean
 
 help:
 	@echo "Available targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make test   - run all tests"
 	@echo "  make fmt    - format Go files"
 	@echo "  make fix    - apply Go fixes, format Go files, and run tests"
+	@echo "  make update-lint-compat - regenerate golangci-lint compatibility.json"
 	@echo "  make clean  - remove local build artifacts"
 
 build:
@@ -35,6 +36,9 @@ fix:
 	go fix ./...
 	go fmt ./...
 	go test ./...
+
+update-lint-compat:
+	go run ./scripts/update-lint-compatibility
 
 clean:
 	rm -rf $(BIN_DIR)

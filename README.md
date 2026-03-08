@@ -5,7 +5,7 @@ Fast Go toolchain management for local machines and repositories.
 FGM is a Go CLI for selecting the right Go version for the current directory, switching a global default, importing existing installations, and routing `go` through shims so repo-level and machine-level selection can coexist.
 
 > [!IMPORTANT]
-> FGM's Go workflow is implemented today. `golangci-lint` compatibility and paired install flows are planned, but not shipped yet.
+> FGM's Go workflow is implemented today. `golangci-lint` remote compatibility listing is available, while lint install and paired Go plus lint install flows are still planned.
 
 ## Why FGM
 
@@ -20,6 +20,7 @@ FGM is a Go CLI for selecting the right Go version for the current directory, sw
 - Prefer `toolchain` over `go` when both exist.
 - Fall back to a global Go version outside repos.
 - List local and remote Go versions.
+- List compatible remote `golangci-lint` versions for a target Go version.
 - Install Go versions into an FGM-managed store.
 - Import existing Go installs from common locations.
 - Select a global default Go version.
@@ -129,6 +130,21 @@ fgm versions go --remote
 
 FGM marks the currently resolved version with `*`.
 
+### List compatible remote golangci-lint versions
+
+```bash
+fgm versions golangci-lint --remote --go 1.25.0
+fgm versions golangci-lint --remote --chdir /path/to/repo
+```
+
+FGM filters remote releases to versions that match your platform and a curated embedded compatibility manifest, then marks the recommended version with `*`.
+
+The manifest is generated from upstream `golangci-lint` releases, Go support issues, and the Go releases feed. Regenerate it with:
+
+```bash
+make update-lint-compat
+```
+
 ### Install a Go version
 
 ```bash
@@ -207,6 +223,7 @@ fgm remove go <version>
 fgm use go <version> --global
 fgm versions go --local
 fgm versions go --remote
+fgm versions golangci-lint --remote [--go <version>]
 ```
 
 FGM also exposes Cobra-generated shell completion via `fgm completion`.
@@ -245,11 +262,12 @@ Implemented now:
 
 - Go resolution from `go.work` and `go.mod`
 - local and remote Go version listing
+- remote compatible `golangci-lint` version listing
+- embedded compatibility manifest for verified `golangci-lint` support ranges
 - Go install, remove, import, global use, doctor, env, exec, and shim support
 
 Planned next:
 
-- `golangci-lint` compatibility resolution for a selected Go version
-- `fgm versions golangci-lint --remote --go <version>`
 - paired install flow for Go plus compatible `golangci-lint`
+- `golangci-lint` install and local version management
 - richer health checks and shell onboarding polish
