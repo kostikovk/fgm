@@ -84,6 +84,17 @@ func (s stubGoRemoteProvider) ListRemoteGoVersions(ctx context.Context) ([]strin
 	return s.listRemoteGoVersionsFn(ctx)
 }
 
+type stubLintRemoteProvider struct {
+	listRemoteLintVersionsFn func(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
+func (s stubLintRemoteProvider) ListRemoteLintVersions(
+	ctx context.Context,
+	goVersion string,
+) ([]app.LintVersion, error) {
+	return s.listRemoteLintVersionsFn(ctx, goVersion)
+}
+
 func TestVersionsGoLocal_ShowsInstalledVersions(t *testing.T) {
 	t.Parallel()
 
@@ -162,5 +173,90 @@ func TestVersionsGoRemote_MarksCurrentVersion(t *testing.T) {
 
 	if !strings.Contains(stdout, "* 1.25.1") {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "* 1.25.1")
+	}
+}
+
+func TestVersionsGolangCILintRemote_ShowsCompatibleVersions(t *testing.T) {
+	t.Parallel()
+
+	application := app.New(app.Config{
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(
+				ctx context.Context,
+				goVersion string,
+			) ([]app.LintVersion, error) {
+				if goVersion != "1.25.0" {
+					t.Fatalf("goVersion = %q, want %q", goVersion, "1.25.0")
+				}
+
+				return []app.LintVersion{
+					{Version: "v2.6.2", Recommended: true},
+					{Version: "v2.6.1"},
+				}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(
+		t,
+		root,
+		"versions",
+		"golangci-lint",
+		"--remote",
+		"--go",
+		"1.25.0",
+	)
+	if err != nil {
+		t.Fatalf("execute versions golangci-lint --remote: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "* v2.6.2") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "* v2.6.2")
+	}
+	if !strings.Contains(stdout, "v2.6.1") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "v2.6.1")
+	}
+}
+
+func TestVersionsGolangCILintRemote_UsesResolvedRepoGoVersion(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	goMod := "module example.com/demo\n\ngo 1.24.3\n"
+	if err := os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	application := app.New(app.Config{
+		Resolver: resolve.New(nil),
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(
+				ctx context.Context,
+				goVersion string,
+			) ([]app.LintVersion, error) {
+				if goVersion != "1.24.3" {
+					t.Fatalf("goVersion = %q, want %q", goVersion, "1.24.3")
+				}
+
+				return []app.LintVersion{{Version: "v2.5.0", Recommended: true}}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(
+		t,
+		root,
+		"versions",
+		"golangci-lint",
+		"--remote",
+		"--chdir",
+		tempDir,
+	)
+	if err != nil {
+		t.Fatalf("execute versions golangci-lint --remote: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "* v2.5.0") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "* v2.5.0")
 	}
 }

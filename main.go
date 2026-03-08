@@ -14,6 +14,7 @@ import (
 	"github.com/koskosovu4/fgm/internal/execenv"
 	"github.com/koskosovu4/fgm/internal/goimport"
 	"github.com/koskosovu4/fgm/internal/goinstall"
+	"github.com/koskosovu4/fgm/internal/golangcilint"
 	"github.com/koskosovu4/fgm/internal/golocal"
 	"github.com/koskosovu4/fgm/internal/goreleases"
 	"github.com/koskosovu4/fgm/internal/resolve"
@@ -28,6 +29,11 @@ func main() {
 
 	goStore := golocal.New(goRoot, os.Getenv("PATH"))
 	goReleaseProvider := goreleases.New(goreleases.Config{
+		Client: http.DefaultClient,
+		GOOS:   runtime.GOOS,
+		GOARCH: runtime.GOARCH,
+	})
+	lintReleaseProvider := golangcilint.New(golangcilint.Config{
 		Client: http.DefaultClient,
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
@@ -47,14 +53,15 @@ func main() {
 		GOOS:      runtime.GOOS,
 	})
 	application := app.New(app.Config{
-		Resolver:         resolve.New(goStore),
-		GoStore:          goStore,
-		GoRemoteProvider: goReleaseProvider,
-		GoInstaller:      goInstaller,
-		GoImporter:       goImporter,
-		Doctor:           doctorService,
-		Executor:         executor,
-		EnvRenderer:      envRenderer,
+		Resolver:           resolve.New(goStore),
+		GoStore:            goStore,
+		GoRemoteProvider:   goReleaseProvider,
+		LintRemoteProvider: lintReleaseProvider,
+		GoInstaller:        goInstaller,
+		GoImporter:         goImporter,
+		Doctor:             doctorService,
+		Executor:           executor,
+		EnvRenderer:        envRenderer,
 	})
 
 	root := cmd.NewRootCmd(application)

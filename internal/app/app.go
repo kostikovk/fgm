@@ -27,6 +27,17 @@ type GoRemoteVersionProvider interface {
 	ListRemoteGoVersions(ctx context.Context) ([]string, error)
 }
 
+// LintVersion describes a remotely available golangci-lint version.
+type LintVersion struct {
+	Version     string
+	Recommended bool
+}
+
+// LintRemoteVersionProvider lists remotely available golangci-lint versions.
+type LintRemoteVersionProvider interface {
+	ListRemoteLintVersions(ctx context.Context, goVersion string) ([]LintVersion, error)
+}
+
 // GoInstaller installs Go toolchains into the local FGM-managed store.
 type GoInstaller interface {
 	InstallGoVersion(ctx context.Context, version string) (string, error)
@@ -66,38 +77,41 @@ type Selection struct {
 
 // App holds the services used by Cobra commands.
 type App struct {
-	Resolver         Resolver
-	GoStore          GoLocalVersionStore
-	GoRemoteProvider GoRemoteVersionProvider
-	GoInstaller      GoInstaller
-	GoImporter       GoImporter
-	Doctor           Doctor
-	Executor         Executor
-	EnvRenderer      EnvRenderer
+	Resolver           Resolver
+	GoStore            GoLocalVersionStore
+	GoRemoteProvider   GoRemoteVersionProvider
+	LintRemoteProvider LintRemoteVersionProvider
+	GoInstaller        GoInstaller
+	GoImporter         GoImporter
+	Doctor             Doctor
+	Executor           Executor
+	EnvRenderer        EnvRenderer
 }
 
 // Config configures an App instance.
 type Config struct {
-	Resolver         Resolver
-	GoStore          GoLocalVersionStore
-	GoRemoteProvider GoRemoteVersionProvider
-	GoInstaller      GoInstaller
-	GoImporter       GoImporter
-	Doctor           Doctor
-	Executor         Executor
-	EnvRenderer      EnvRenderer
+	Resolver           Resolver
+	GoStore            GoLocalVersionStore
+	GoRemoteProvider   GoRemoteVersionProvider
+	LintRemoteProvider LintRemoteVersionProvider
+	GoInstaller        GoInstaller
+	GoImporter         GoImporter
+	Doctor             Doctor
+	Executor           Executor
+	EnvRenderer        EnvRenderer
 }
 
 // New constructs the application service container.
 func New(config Config) *App {
 	return &App{
-		Resolver:         config.Resolver,
-		GoStore:          config.GoStore,
-		GoRemoteProvider: config.GoRemoteProvider,
-		GoInstaller:      config.GoInstaller,
-		GoImporter:       config.GoImporter,
-		Doctor:           config.Doctor,
-		Executor:         config.Executor,
-		EnvRenderer:      config.EnvRenderer,
+		Resolver:           config.Resolver,
+		GoStore:            config.GoStore,
+		GoRemoteProvider:   config.GoRemoteProvider,
+		LintRemoteProvider: config.LintRemoteProvider,
+		GoInstaller:        config.GoInstaller,
+		GoImporter:         config.GoImporter,
+		Doctor:             config.Doctor,
+		Executor:           config.Executor,
+		EnvRenderer:        config.EnvRenderer,
 	}
 }
