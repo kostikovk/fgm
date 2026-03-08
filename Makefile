@@ -2,8 +2,10 @@ APP := fgm
 BIN_DIR := tmp
 BIN := $(BIN_DIR)/$(APP)
 CMD ?= --help
+COVERPROFILE := $(BIN_DIR)/coverage.out
+COVERHTML := $(BIN_DIR)/coverage.html
 
-.PHONY: help build run cmd test fmt fix tidy pre-commit hook-install update-lint-compat clean
+.PHONY: help build run cmd test cover cover-html fmt fix tidy pre-commit hook-install update-lint-compat clean
 
 help:
 	@echo "Available targets:"
@@ -11,6 +13,8 @@ help:
 	@echo "  make run    - run the CLI with --help"
 	@echo "  make cmd    - run the built CLI, override with CMD='current --chdir .'"
 	@echo "  make test   - run all tests"
+	@echo "  make cover  - run all tests with a coverage profile"
+	@echo "  make cover-html - generate an HTML coverage report at $(COVERHTML)"
 	@echo "  make fmt    - format Go files"
 	@echo "  make fix    - apply Go fixes and format Go files"
 	@echo "  make tidy   - clean up go.mod and go.sum"
@@ -31,6 +35,15 @@ cmd: build
 
 test:
 	go test ./...
+
+cover:
+	@mkdir -p $(BIN_DIR)
+	go test ./... -coverprofile=$(COVERPROFILE)
+	go tool cover -func=$(COVERPROFILE)
+
+cover-html: cover
+	go tool cover -html=$(COVERPROFILE) -o $(COVERHTML)
+	@echo "HTML coverage report written to $(COVERHTML)"
 
 fmt:
 	go fmt ./...

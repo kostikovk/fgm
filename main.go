@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"runtime"
@@ -26,16 +27,42 @@ import (
 	"github.com/koskosovu4/fgm/internal/resolve"
 )
 
+type rootCommand interface {
+	ExecuteContext(ctx context.Context) error
+}
+
+var (
+	defaultGoRoot = golocal.DefaultRoot
+	getEnv        = os.Getenv
+	stderrWriter  io.Writer = os.Stderr
+	newRootCmd    = func(application *app.App) rootCommand {
+		return cmd.NewRootCmd(application)
+	}
+	exitMain = os.Exit
+)
+
 func main() {
-	goRoot, err := golocal.DefaultRoot()
+	if err := run(context.Background(), stderrWriter, getEnv, defaultGoRoot, newRootCmd); err != nil {
+		_, _ = fmt.Fprintln(stderrWriter, err)
+		exitMain(1)
+	}
+}
+
+func run(
+	ctx context.Context,
+	stderr io.Writer,
+	getenv func(string) string,
+	resolveRoot func() (string, error),
+	buildRoot func(application *app.App) rootCommand,
+) error {
+	goRoot, err := resolveRoot()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 
 	httpClient := &http.Client{Timeout: 5 * time.Minute}
 
-	goStore := golocal.New(goRoot, os.Getenv("PATH"))
+	goStore := golocal.New(goRoot, getenv("PATH"))
 	lintStore := lintlocal.New(goRoot)
 	goReleaseProvider := goreleases.New(goreleases.Config{
 		Client: httpClient,
@@ -51,20 +78,20 @@ func main() {
 		Root:           goRoot,
 		Client:         http.DefaultClient,
 		Provider:       goReleaseProvider,
-		ProgressWriter: os.Stderr,
+		ProgressWriter: stderr,
 	})
 	lintInstaller := lintinstall.New(lintinstall.Config{
 		Root:           goRoot,
 		Client:         http.DefaultClient,
 		Provider:       lintReleaseProvider,
-		ProgressWriter: os.Stderr,
+		ProgressWriter: stderr,
 	})
 	goImporter := goimport.New(goimport.Config{
-		Candidates: goimport.DefaultCandidates(os.Getenv("PATH")),
+		Candidates: goimport.DefaultCandidates(getenv("PATH")),
 		Registry:   goStore,
 	})
 	lintImporter := lintimport.New(lintimport.Config{
-		Candidates: lintimport.DefaultCandidates(os.Getenv("PATH")),
+		Candidates: lintimport.DefaultCandidates(getenv("PATH")),
 		Registry:   lintStore,
 	})
 	goUpgrader := goupgrade.New(goupgrade.Config{
@@ -84,17 +111,17 @@ func main() {
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		LintRemoteProvider: lintReleaseProvider,
-		PathEnv:            os.Getenv("PATH"),
+		PathEnv:            getenv("PATH"),
 	})
 	executor := execenv.New(execenv.Config{
 		Resolver:    currentResolver,
 		GoLocator:   goStore,
 		LintLocator: lintStore,
-		PathEnv:     os.Getenv("PATH"),
+		PathEnv:     getenv("PATH"),
 	})
 	envRenderer := envsetup.New(envsetup.Config{
 		GoStore:   goStore,
-		ShellPath: os.Getenv("SHELL"),
+		ShellPath: getenv("SHELL"),
 		GOOS:      runtime.GOOS,
 	})
 	application := &app.App{
@@ -113,9 +140,5 @@ func main() {
 		EnvRenderer:        envRenderer,
 	}
 
-	root := cmd.NewRootCmd(application)
-	if err := root.ExecuteContext(context.Background()); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	return buildRoot(application).ExecuteContext(ctx)
 }
