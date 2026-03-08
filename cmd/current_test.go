@@ -165,3 +165,46 @@ func TestCurrentCommand_DisplaysCompatibleLintVersion(t *testing.T) {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.11.2")
 	}
 }
+
+func TestCurrentCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	goMod := "module example.com/demo\n\ngo 1.25.0\n"
+	if err := os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(tempDir, ".fgm.toml"),
+		[]byte("[toolchain]\ngolangci_lint = \"v2.10.1\"\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	application := app.New(app.Config{
+		Resolver: currenttoolchain.New(currenttoolchain.Config{
+			GoResolver: resolve.New(nil),
+			LintRemoteProvider: stubLintRemoteProvider{
+				listRemoteLintVersionsFn: func(
+					ctx context.Context,
+					goVersion string,
+				) ([]app.LintVersion, error) {
+					return []app.LintVersion{
+						{Version: "v2.11.2", Recommended: true},
+					}, nil
+				},
+			},
+		}),
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)
+	if err != nil {
+		t.Fatalf("execute current: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "golangci-lint v2.10.1") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.10.1")
+	}
+}

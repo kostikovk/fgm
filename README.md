@@ -42,6 +42,19 @@ Outside a repo, FGM falls back to the global version selected with `fgm use go <
 
 This means you can keep a machine-wide default like `1.25.7`, while a repo using `toolchain go1.26.0` will still run with `1.26.0`.
 
+## Repo Lint Policy
+
+FGM keeps Go selection in native Go files, but you can pin `golangci-lint` per repo with `.fgm.toml`:
+
+```toml
+[toolchain]
+golangci_lint = "v2.10.1"
+```
+
+Use `golangci_lint = "auto"` to keep the default compatibility-based selection.
+
+When present, this lint pin is honored by `fgm current`, root `fgm install`, and `fgm exec`.
+
 ## Install
 
 Build FGM from source:

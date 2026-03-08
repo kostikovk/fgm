@@ -151,6 +151,81 @@ func TestExecCommand_RunsCommandWithSelectedLintOnPATH(t *testing.T) {
 	}
 }
 
+func TestExecCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	workDir := t.TempDir()
+	goMod := "module example.com/demo\n\ngo 1.25.0\n"
+	if err := os.WriteFile(filepath.Join(workDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(workDir, ".fgm.toml"),
+		[]byte("[toolchain]\ngolangci_lint = \"v2.10.1\"\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	goBinDir := filepath.Join(t.TempDir(), "go-bin")
+	lintBinDir := filepath.Join(t.TempDir(), "lint-bin")
+	if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+		t.Fatalf("mkdir go bin dir: %v", err)
+	}
+	if err := os.MkdirAll(lintBinDir, 0o755); err != nil {
+		t.Fatalf("mkdir lint bin dir: %v", err)
+	}
+
+	goBinary := filepath.Join(goBinDir, "go")
+	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.25.0 darwin/arm64\\n'\n"), 0o755); err != nil {
+		t.Fatalf("write fake go binary: %v", err)
+	}
+	lintBinary := filepath.Join(lintBinDir, "golangci-lint")
+	if err := os.WriteFile(lintBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version v2.10.1\\n'\n"), 0o755); err != nil {
+		t.Fatalf("write fake lint binary: %v", err)
+	}
+
+	locator := execLocatorStub{
+		goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+			return goBinary, nil
+		},
+		lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+			if version != "v2.10.1" {
+				t.Fatalf("lint version = %q, want %q", version, "v2.10.1")
+			}
+			return lintBinary, nil
+		},
+	}
+
+	resolver := currenttoolchain.New(currenttoolchain.Config{
+		GoResolver: resolve.New(nil),
+	})
+	executor := execenv.New(execenv.Config{
+		Resolver:    resolver,
+		GoLocator:   locator,
+		LintLocator: locator,
+		PathEnv:     "",
+	})
+	application := app.New(app.Config{
+		Resolver: resolver,
+		Executor: executor,
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "exec", "--chdir", workDir, "--", "golangci-lint", "version")
+	if err != nil {
+		t.Fatalf("execute exec command: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "golangci-lint has version v2.10.1") {
+		t.Fatalf("stdout = %q, want it to contain pinned lint output", stdout)
+	}
+}
+
 type execLocatorStub struct {
 	goBinaryPathFn   func(ctx context.Context, version string) (string, error)
 	lintBinaryPathFn func(ctx context.Context, version string) (string, error)

@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/koskosovu4/fgm/internal/currenttoolchain"
 	"github.com/koskosovu4/fgm/internal/resolve"
 	"github.com/koskosovu4/fgm/internal/testutil"
 )
@@ -126,5 +129,53 @@ func TestInstallCommand_InstallsResolvedGoAndLint(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Installed golangci-lint v2.11.2") {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "Installed golangci-lint v2.11.2")
+	}
+}
+
+func TestInstallCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	goMod := "module example.com/demo\n\ngo 1.25.0\n"
+	if err := os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(tempDir, ".fgm.toml"),
+		[]byte("[toolchain]\ngolangci_lint = \"v2.10.1\"\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	application := app.New(app.Config{
+		Resolver: currenttoolchain.New(currenttoolchain.Config{
+			GoResolver: resolve.New(nil),
+		}),
+		GoInstaller: stubGoInstaller{
+			installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+				if version != "1.25.0" {
+					t.Fatalf("go version = %q, want %q", version, "1.25.0")
+				}
+				return "/tmp/fgm/go/1.25.0", nil
+			},
+		},
+		LintInstaller: stubLintInstaller{
+			installLintVersionFn: func(ctx context.Context, version string) (string, error) {
+				if version != "v2.10.1" {
+					t.Fatalf("lint version = %q, want %q", version, "v2.10.1")
+				}
+				return "/tmp/fgm/golangci-lint/v2.10.1", nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "install", "--chdir", tempDir)
+	if err != nil {
+		t.Fatalf("execute install: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "Installed golangci-lint v2.10.1") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "Installed golangci-lint v2.10.1")
 	}
 }
