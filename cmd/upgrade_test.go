@@ -88,6 +88,39 @@ func TestUpgradeGoCommand_DryRunGlobalVersion(t *testing.T) {
 	}
 }
 
+func TestUpgradeGoCommand_GlobalWithLintReportsLintInstall(t *testing.T) {
+	t.Parallel()
+
+	application := app.New(app.Config{
+		GoUpgrader: stubGoUpgrader{
+			upgradeGlobalFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				if !options.WithLint {
+					t.Fatal("WithLint = false, want true")
+				}
+				return app.GoUpgradeResult{
+					Version:     "1.26.1",
+					Path:        "global",
+					LintVersion: "v2.11.2",
+				}, nil
+			},
+			upgradeProjectFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				t.Fatal("UpgradeProject should not be called")
+				return app.GoUpgradeResult{}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "go", "--global", "--with-lint")
+	if err != nil {
+		t.Fatalf("execute upgrade go --global --with-lint: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "Installed golangci-lint v2.11.2") {
+		t.Fatalf("stdout = %q, want lint install line", stdout)
+	}
+}
+
 func TestUpgradeGoCommand_UpgradesProjectVersion(t *testing.T) {
 	t.Parallel()
 
@@ -174,6 +207,45 @@ func TestUpgradeGoCommand_DryRunProjectVersion(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Would upgrade project Go to 1.26.1") {
 		t.Fatalf("stdout = %q, want dry-run project line", stdout)
+	}
+}
+
+func TestUpgradeGoCommand_DryRunProjectWithLintReportsLintInstall(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte("module example.com/demo\n\ngo 1.25.0\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	application := app.New(app.Config{
+		GoUpgrader: stubGoUpgrader{
+			upgradeGlobalFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				t.Fatal("UpgradeGlobal should not be called")
+				return app.GoUpgradeResult{}, nil
+			},
+			upgradeProjectFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				if !options.WithLint || !options.DryRun {
+					t.Fatalf("options = %+v, want WithLint and DryRun", options)
+				}
+				return app.GoUpgradeResult{
+					Version:     "1.26.1",
+					Path:        filepath.Join(tempDir, "go.mod"),
+					LintVersion: "v2.11.2",
+					DryRun:      true,
+				}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "go", "--project", "--dry-run", "--with-lint", "--chdir", tempDir)
+	if err != nil {
+		t.Fatalf("execute upgrade go --project --dry-run --with-lint: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "Would install golangci-lint v2.11.2") {
+		t.Fatalf("stdout = %q, want lint dry-run line", stdout)
 	}
 }
 

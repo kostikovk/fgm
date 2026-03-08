@@ -1,117 +1,88 @@
-# FGM
+# Fast Go Manager (fnm)
 
 Fast Go toolchain management for local machines and repositories.
 
-FGM is a Go CLI for selecting the right Go version for the current directory, switching a global default, importing existing installations, and routing `go` through shims so repo-level and machine-level selection can coexist.
+FGM is a Go CLI that resolves the right Go version for the current directory, manages a global default for work outside repositories, imports existing local installs, and routes `go` through shims so project-specific and machine-wide selection can coexist. It also manages compatible `golangci-lint` binaries through an embedded compatibility catalog.
 
 > [!IMPORTANT]
-> FGM manages both Go toolchains and compatible `golangci-lint` binaries today. Compatibility output is driven by FGM's generated catalog, not a perfect historical upstream matrix.
+> `golangci-lint` compatibility output is based on FGM's generated catalog in [`internal/golangcilint/compatibility.json`](./internal/golangcilint/compatibility.json), not a complete upstream historical matrix.
 
-## Why FGM
+## Technology Stack
 
-- Resolve Go from native Go metadata instead of a custom version file.
-- Support both repo-level selection and a global machine default.
-- Import existing Go installations instead of forcing users to reinstall everything.
-- Keep startup and lookup paths simple: local files first, network only for remote version listing and installs.
+- Go `1.26.1`
+- Cobra for CLI command structure
+- Viper for environment-backed configuration
+- `go-toml/v2` for `.fgm.toml` parsing
+- Standard library `net/http` for remote release discovery and downloads
 
-## Current Features
+Primary module metadata lives in [`go.mod`](./go.mod).
 
-- Resolve Go from `go.work` or the nearest `go.mod`.
-- Prefer `toolchain` over `go` when both exist.
-- Fall back to a global Go version outside repos.
-- List local and remote Go versions.
-- List compatible remote `golangci-lint` versions for a target Go version.
-- Install Go versions into an FGM-managed store.
-- Import existing Go installs from common locations.
-- Select a global default Go version.
-- Run commands with the resolved Go version via `fgm exec`.
-- Generate shell environment setup with `fgm env`.
-- Validate setup with `fgm doctor`.
-- Route `go` through FGM shims.
+## Project Architecture
 
-## How Resolution Works
+FGM is a single-binary CLI with a thin Cobra command layer over focused internal packages:
 
-Inside a repo, FGM resolves Go in this order:
+- `cmd/` defines the user-facing CLI commands and flags.
+- `internal/app` wires shared services into the command layer.
+- `internal/resolve` and `internal/currenttoolchain` resolve the active Go and `golangci-lint` selection.
+- `internal/goreleases`, `internal/goinstall`, `internal/goupgrade`, and `internal/goimport` handle Go release discovery, install, upgrade, and import flows.
+- `internal/golangcilint`, `internal/lintinstall`, `internal/lintimport`, and `internal/lintlocal` provide the equivalent lint-toolchain workflow.
+- `internal/envsetup`, `internal/execenv`, `internal/doctor`, and `internal/shim` cover shell integration, command execution, setup diagnostics, and shim behavior.
+
+High-level flow:
+
+```text
+CLI command
+  -> resolve current context from go.work / go.mod / global state
+  -> locate or install toolchain in the FGM store
+  -> execute, report, or update state
+```
+
+Inside a repository, FGM resolves Go in this order:
 
 1. nearest `go.work`
 2. nearest `go.mod`
-3. inside either file, `toolchain` first
-4. inside either file, `go` second
+3. `toolchain` directive before `go`
+4. global default when no project metadata is found
 
-Outside a repo, FGM falls back to the global version selected with `fgm use go <version> --global`.
+## Getting Started
 
-This means you can keep a machine-wide default like `1.25.7`, while a repo using `toolchain go1.26.0` will still run with `1.26.0`.
+### Prerequisites
 
-## Repo Lint Policy
+- Go `1.26.1` or newer to build from source
+- A shell such as `zsh`, `bash`, `fish`, or PowerShell if you want shim support
 
-FGM keeps Go selection in native Go files, but you can pin `golangci-lint` per repo with `.fgm.toml`:
-
-```toml
-[toolchain]
-golangci_lint = "v2.10.1"
-```
-
-Use `golangci_lint = "auto"` to keep the default compatibility-based selection.
-
-When present, this lint pin is honored by `fgm current`, root `fgm install`, and `fgm exec`.
-
-You can manage this file through the CLI:
-
-```bash
-fgm pin golangci-lint v2.10.1
-fgm pin golangci-lint auto
-```
-
-## Install
-
-Build FGM from source:
+### Install
 
 ```bash
 git clone https://github.com/koskosovu4/fgm.git
 cd fgm
 go build -o ~/.local/bin/fgm .
-```
-
-Make sure the binary is on `PATH`:
-
-```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-## Quick Start
+### Quick Start
 
-### 1. Import existing Go installs
+Import existing Go installations and inspect what FGM knows about:
 
 ```bash
 fgm import auto
 fgm versions go --local
 ```
 
-`import auto` scans common locations such as your current `PATH`, `/usr/local/go`, Homebrew Go installs, and existing `golangci-lint` binaries, then registers them in the FGM store.
-
-### 2. Pick a global default
+Set a global default for directories that do not contain Go project metadata:
 
 ```bash
 fgm use go 1.26.1 --global
 ```
 
-### 3. Enable shims in your shell
-
-Preview the shell snippet:
+Preview and apply shell setup:
 
 ```bash
 fgm env
-```
-
-Apply it to the current shell:
-
-```bash
 eval "$(fgm env)"
 ```
 
-Persist it in your shell config if you want FGM active in every session.
-
-### 4. Verify setup
+Verify the environment:
 
 ```bash
 fgm doctor
@@ -119,9 +90,7 @@ which go
 go version
 ```
 
-`fgm doctor` checks the global selection, shim and binary PATH setup, and whether the currently resolved Go and `golangci-lint` versions are installed locally.
-
-### 5. Use repo-specific versions automatically
+Use the resolved toolchain in a repository:
 
 ```bash
 cd /path/to/repo
@@ -129,135 +98,152 @@ fgm current
 fgm exec -- go test ./...
 ```
 
-## Common Workflows
+## Project Structure
 
-### Show the selected Go version
+```text
+fgm/
+  cmd/                            Cobra command entrypoints
+  internal/app/                   service wiring
+  internal/currenttoolchain/      current Go + lint selection
+  internal/doctor/                health checks
+  internal/envsetup/              shell integration rendering
+  internal/execenv/               command execution with resolved PATH
+  internal/fgmconfig/             .fgm.toml parsing
+  internal/goimport/              existing Go installation import
+  internal/goinstall/             Go download and install
+  internal/golangcilint/          lint compatibility catalog and provider
+  internal/golocal/               local Go store management
+  internal/goreleases/            remote Go release provider
+  internal/goupgrade/             global and project Go upgrades
+  internal/lintimport/            existing golangci-lint import
+  internal/lintinstall/           golangci-lint download and install
+  internal/lintlocal/             local lint store management
+  internal/resolve/               project/global resolution rules
+  internal/shim/                  shim resolution logic
+  scripts/update-lint-compatibility/
+  main.go
+  Makefile
+```
 
-```bash
+## Key Features
+
+- Resolve Go versions from native Go metadata instead of a custom version file.
+- Prefer `toolchain` over `go` when both directives exist.
+- Fall back to a global Go version outside repositories.
+- List installed and remote Go versions for the current platform.
+- Install Go versions into an FGM-managed local store.
+- Import existing Go and `golangci-lint` installations from common locations.
+- Show the active Go and compatible `golangci-lint` selection with `fgm current`.
+- Pin repo-level `golangci-lint` behavior in `.fgm.toml`.
+- Run commands with the resolved toolchain via `fgm exec`.
+- Generate shell setup snippets with `fgm env`.
+- Validate installation and PATH setup with `fgm doctor`.
+- Upgrade global or project Go versions with `fgm upgrade go`.
+- Optionally install matching `golangci-lint` versions during Go upgrades.
+
+## Common Commands
+
+```text
 fgm current
-fgm current --chdir /path/to/repo
-```
-
-When a compatible `golangci-lint` version is known, `fgm current` also prints the selected lint version.
-
-### List installed Go versions
-
-```bash
-fgm versions go --local
-```
-
-### List remote Go versions for your platform
-
-```bash
-fgm versions go --remote
-```
-
-FGM marks the currently resolved version with `*`.
-
-### List compatible remote golangci-lint versions
-
-```bash
-fgm versions golangci-lint --local
-fgm versions golangci-lint --remote --go 1.25.0
-fgm versions golangci-lint --remote --chdir /path/to/repo
-```
-
-`--local` lists installed `golangci-lint` versions from the FGM-managed store.
-
-FGM filters the fetched remote releases to versions that match your platform and a curated embedded compatibility manifest, then marks the recommended version with `*`.
-
-This output should be read as:
-
-- known compatible versions in FGM's generated catalog
-- not a guaranteed complete list of every historically compatible `golangci-lint` release ever published
-
-The manifest is generated from upstream `golangci-lint` releases, Go support issues, and the Go releases feed. Regenerate it with:
-
-```bash
-make update-lint-compat
-```
-
-### Install a Go version
-
-```bash
+fgm doctor
+fgm env [--shell zsh|bash|fish|powershell]
+fgm exec -- <command> [args...]
+fgm import auto
 fgm install
-fgm install go 1.25.7
-```
-
-`fgm install` installs the currently resolved Go version and, when available, the recommended compatible `golangci-lint` version for the current repo or global context.
-
-`fgm install go <version>` downloads the correct Go archive for your OS and architecture, verifies it, shows download progress, and installs it into the local FGM store.
-
-### Upgrade Go to the latest remote version
-
-```bash
+fgm install go <version>
+fgm install golangci-lint <version>
+fgm pin golangci-lint <version|auto>
+fgm remove go <version>
+fgm remove golangci-lint <version>
 fgm upgrade go --global
 fgm upgrade go --project
 fgm upgrade go --global --dry-run
-fgm upgrade go --project --to 1.25.8
+fgm upgrade go --project --to <version>
+fgm upgrade go --project --with-lint
+fgm use go <version> --global
+fgm versions go --local
+fgm versions go --remote
+fgm versions golangci-lint --local
+fgm versions golangci-lint --remote [--go <version>]
 ```
 
-`--global` installs the latest known Go version and switches the machine-wide default to it.
+## Development Workflow
 
-`--project` installs the latest known Go version and updates the nearest `go.work` or `go.mod`, preferring the `toolchain` directive when one already exists.
-
-Use `--dry-run` to preview the selected upgrade without changing installs, global state, or repo files.
-
-Use `--to <version>` to target a specific Go version instead of the latest remote one.
-
-### Install a golangci-lint version
+Local development is centered on standard Go commands plus a small Makefile wrapper:
 
 ```bash
-fgm install golangci-lint v2.11.2
+make build
+make test
+make fmt
+make fix
+make tidy
+make pre-commit
 ```
 
-FGM downloads the matching archive for your platform, verifies the archive checksum when available, and installs the binary into the local FGM store.
-
-### Switch the global default
+Useful direct workflows:
 
 ```bash
-fgm use go 1.25.7 --global
+go run . --help
+go run . current --chdir .
+make cmd CMD='current --chdir .'
 ```
 
-### Run a command with the resolved toolchain
+The repository also includes Hooky-managed hooks in [`.hooky/hooks`](./.hooky/hooks). Sync them into `.git/hooks` with:
 
 ```bash
-fgm exec -- go version
-fgm exec -- golangci-lint version
-fgm exec --chdir /path/to/repo -- go test ./...
+make hook-install
 ```
 
-When a compatible installed `golangci-lint` version is selected, `fgm exec` also prepends its binary directory to `PATH`.
+## Coding Standards
 
-### Remove an installed FGM-managed version
+The codebase follows standard Go conventions reinforced by the current build workflow:
+
+- Keep packages focused and responsibility-driven.
+- Use Cobra commands as a thin CLI layer over internal services.
+- Prefer explicit error returns over hidden side effects.
+- Format code with `go fmt`.
+- Apply automatic source fixes with `go fix` where appropriate.
+- Keep command and service behavior covered by table-driven unit tests.
+
+## Testing
+
+Tests live alongside production code across both `cmd/` and `internal/` packages. The current project testing approach is:
+
+- command-level tests for CLI behavior
+- package-level unit tests for resolver, installer, importer, upgrade, and diagnostic services
+- standard Go test execution through `go test ./...`
+
+Run the full suite with:
 
 ```bash
-fgm remove go 1.25.7
-fgm remove golangci-lint v2.11.2
+go test ./...
 ```
 
-## Shims
+Or use:
 
-FGM shims are small wrapper scripts placed earlier on `PATH` than your system Go.
+```bash
+make test
+```
 
-They let plain `go` mean:
+## Contributing
 
-- the repo-selected version when you are inside a workspace or module
-- the global selected version when you are outside a repo
+Contributions should preserve the existing shape of the project:
 
-Without shims, FGM still works through `fgm exec`, but your normal `go` command will continue using whichever binary appears first on `PATH`.
+1. Add or adjust focused tests next to the affected package.
+2. Keep command wiring in `cmd/` and business logic in `internal/`.
+3. Run `make pre-commit` before opening a change.
+4. Regenerate the lint compatibility catalog with `make update-lint-compat` if you modify the compatibility generator or catalog inputs.
 
-> [!NOTE]
-> The shim calls `fgm __shim ...`, so the `fgm` binary itself must also be available on `PATH`.
+If you are changing shell behavior, install the local hooks and verify `fgm env`, `fgm doctor`, and shim flows manually.
 
 ## Storage Layout
 
-FGM stores data in:
+FGM stores its managed toolchains under:
 
 - `$XDG_DATA_HOME/fgm` when `XDG_DATA_HOME` is set
 - otherwise `~/.local/share/fgm`
 
-Current layout:
+Typical layout:
 
 ```text
 fgm/
@@ -272,101 +258,8 @@ fgm/
     global-go-version
 ```
 
-Imported Go installs are registered into this store, typically via symlinks to existing local installations.
+Imported Go installs are typically registered into this store via symlinks to existing local installations.
 
-## Command Summary
+## License
 
-```text
-fgm current
-fgm doctor
-fgm env [--shell zsh|bash|fish|powershell]
-fgm exec -- <command> [args...]
-fgm import auto
-fgm install go <version>
-fgm install golangci-lint <version>
-fgm pin golangci-lint <version|auto>
-fgm remove go <version>
-fgm remove golangci-lint <version>
-fgm upgrade go --global
-fgm upgrade go --project
-fgm upgrade go --global --dry-run
-fgm upgrade go --project --to <version>
-fgm use go <version> --global
-fgm versions go --local
-fgm versions go --remote
-fgm versions golangci-lint --local
-fgm versions golangci-lint --remote [--go <version>]
-```
-
-## Development
-
-Run tests:
-
-```bash
-go test ./...
-make test
-```
-
-Run the CLI directly:
-
-```bash
-go run . --help
-go run . current --chdir .
-make cmd
-make cmd CMD='current --chdir .'
-```
-
-Build a local binary:
-
-```bash
-go build -o ./tmp/fgm .
-./tmp/fgm --help
-make build
-```
-
-The codebase is being built test-first with table-driven unit tests and CLI-level command tests.
-
-### Pre-commit hook
-
-This repo includes a Hooky-managed pre-commit hook in [`.hooky/hooks/pre-commit`](/Users/koskosovu4/projects/fgm/.hooky/hooks/pre-commit).
-
-Install Hooky:
-
-```bash
-go install github.com/kostikovk/hooky@latest
-```
-
-Sync the hook into `.git/hooks`:
-
-```bash
-make hook-install
-```
-
-The hook runs:
-
-```bash
-make pre-commit
-```
-
-That currently executes:
-
-- `make fix`
-- `make test`
-- `make tidy`
-- `make build`
-
-## Status And Next Work
-
-Implemented now:
-
-- Go resolution from `go.work` and `go.mod`
-- local and remote Go version listing
-- remote compatible `golangci-lint` version listing
-- embedded compatibility manifest for verified known `golangci-lint` support ranges
-- Go install, remove, import, global use, doctor, env, exec, and shim support
-
-Planned next:
-
-- richer health checks and shell onboarding polish
-- repo-level policy for lint selection and pinning
-- import/bootstrap support for existing `golangci-lint` installations
+No license file is currently present in this repository. Add a project license before distributing the tool outside private or internal use.

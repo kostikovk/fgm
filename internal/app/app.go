@@ -78,16 +78,18 @@ type LintImporter interface {
 
 // GoUpgradeResult describes a Go upgrade action.
 type GoUpgradeResult struct {
-	Version string
-	Path    string
-	DryRun  bool
+	Version     string
+	Path        string
+	LintVersion string
+	DryRun      bool
 }
 
 // GoUpgradeOptions configures a Go upgrade operation.
 type GoUpgradeOptions struct {
-	WorkDir string
-	Version string
-	DryRun  bool
+	WorkDir  string
+	Version  string
+	DryRun   bool
+	WithLint bool
 }
 
 // GoUpgrader upgrades Go at global or project scope.

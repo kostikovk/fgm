@@ -25,6 +25,22 @@ func (s stubInstaller) InstallGoVersion(ctx context.Context, version string) (st
 	return s.installGoVersionFn(ctx, version)
 }
 
+type stubLintInstaller struct {
+	installLintVersionFn func(ctx context.Context, version string) (string, error)
+}
+
+func (s stubLintInstaller) InstallLintVersion(ctx context.Context, version string) (string, error) {
+	return s.installLintVersionFn(ctx, version)
+}
+
+type stubLintRemoteProvider struct {
+	listRemoteLintVersionsFn func(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
+func (s stubLintRemoteProvider) ListRemoteLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+	return s.listRemoteLintVersionsFn(ctx, goVersion)
+}
+
 type stubGlobalStore struct {
 	setGlobalGoVersionFn func(ctx context.Context, version string) error
 	ensureShimsFn        func() error
@@ -197,6 +213,53 @@ func TestServiceUpgradeGlobal_DryRunDoesNotInstallOrSetGlobalState(t *testing.T)
 	}
 }
 
+func TestServiceUpgradeGlobal_WithLintInstallsRecommendedLint(t *testing.T) {
+	t.Parallel()
+
+	var installedLint string
+	service := New(Config{
+		RemoteProvider: stubRemoteProvider{
+			listRemoteGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"1.26.1"}, nil
+			},
+		},
+		Installer: stubInstaller{
+			installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+				return "/tmp/fgm/go/" + version, nil
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				if goVersion != "1.26.1" {
+					t.Fatalf("goVersion = %q, want %q", goVersion, "1.26.1")
+				}
+				return []app.LintVersion{{Version: "v2.11.2", Recommended: true}}, nil
+			},
+		},
+		LintInstaller: stubLintInstaller{
+			installLintVersionFn: func(ctx context.Context, version string) (string, error) {
+				installedLint = version
+				return "/tmp/fgm/golangci-lint/" + version, nil
+			},
+		},
+		GlobalStore: stubGlobalStore{
+			setGlobalGoVersionFn: func(ctx context.Context, version string) error { return nil },
+			ensureShimsFn:        func() error { return nil },
+		},
+	})
+
+	result, err := service.UpgradeGlobal(context.Background(), app.GoUpgradeOptions{WithLint: true})
+	if err != nil {
+		t.Fatalf("UpgradeGlobal: %v", err)
+	}
+	if installedLint != "v2.11.2" {
+		t.Fatalf("installedLint = %q, want %q", installedLint, "v2.11.2")
+	}
+	if result.LintVersion != "v2.11.2" {
+		t.Fatalf("LintVersion = %q, want %q", result.LintVersion, "v2.11.2")
+	}
+}
+
 func TestServiceUpgradeProject_DryRunDoesNotRewriteMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -273,5 +336,56 @@ func TestServiceUpgradeProject_UsesExplicitVersionOverride(t *testing.T) {
 	}
 	if installed != "1.25.8" {
 		t.Fatalf("installed = %q, want %q", installed, "1.25.8")
+	}
+}
+
+func TestServiceUpgradeProject_WithPinnedLintInstallsPinnedVersion(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	goModPath := filepath.Join(workDir, "go.mod")
+	if err := os.WriteFile(goModPath, []byte("module example.com/demo\n\ngo 1.25.0\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(workDir, ".fgm.toml"),
+		[]byte("[toolchain]\ngolangci_lint = \"v2.10.1\"\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	var installedLint string
+	service := New(Config{
+		RemoteProvider: stubRemoteProvider{
+			listRemoteGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"1.26.1"}, nil
+			},
+		},
+		Installer: stubInstaller{
+			installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+				return "/tmp/fgm/go/" + version, nil
+			},
+		},
+		LintInstaller: stubLintInstaller{
+			installLintVersionFn: func(ctx context.Context, version string) (string, error) {
+				installedLint = version
+				return "/tmp/fgm/golangci-lint/" + version, nil
+			},
+		},
+	})
+
+	result, err := service.UpgradeProject(context.Background(), app.GoUpgradeOptions{
+		WorkDir:  workDir,
+		WithLint: true,
+	})
+	if err != nil {
+		t.Fatalf("UpgradeProject: %v", err)
+	}
+	if installedLint != "v2.10.1" {
+		t.Fatalf("installedLint = %q, want %q", installedLint, "v2.10.1")
+	}
+	if result.LintVersion != "v2.10.1" {
+		t.Fatalf("LintVersion = %q, want %q", result.LintVersion, "v2.10.1")
 	}
 }

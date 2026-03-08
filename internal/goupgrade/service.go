@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/koskosovu4/fgm/internal/fgmconfig"
 )
 
 // RemoteVersionProvider lists remotely available Go versions.
@@ -21,6 +22,16 @@ type Installer interface {
 	InstallGoVersion(ctx context.Context, version string) (string, error)
 }
 
+// LintRemoteVersionProvider lists compatible golangci-lint versions for a Go version.
+type LintRemoteVersionProvider interface {
+	ListRemoteLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
+// LintInstaller installs golangci-lint versions into the FGM store.
+type LintInstaller interface {
+	InstallLintVersion(ctx context.Context, version string) (string, error)
+}
+
 // GlobalStore updates global Go selection state.
 type GlobalStore interface {
 	SetGlobalGoVersion(ctx context.Context, version string) error
@@ -29,24 +40,30 @@ type GlobalStore interface {
 
 // Config configures a Service.
 type Config struct {
-	RemoteProvider RemoteVersionProvider
-	Installer      Installer
-	GlobalStore    GlobalStore
+	RemoteProvider     RemoteVersionProvider
+	Installer          Installer
+	LintRemoteProvider LintRemoteVersionProvider
+	LintInstaller      LintInstaller
+	GlobalStore        GlobalStore
 }
 
 // Service upgrades Go at global or project scope.
 type Service struct {
-	remoteProvider RemoteVersionProvider
-	installer      Installer
-	globalStore    GlobalStore
+	remoteProvider     RemoteVersionProvider
+	installer          Installer
+	lintRemoteProvider LintRemoteVersionProvider
+	lintInstaller      LintInstaller
+	globalStore        GlobalStore
 }
 
 // New constructs a Service.
 func New(config Config) *Service {
 	return &Service{
-		remoteProvider: config.RemoteProvider,
-		installer:      config.Installer,
-		globalStore:    config.GlobalStore,
+		remoteProvider:     config.RemoteProvider,
+		installer:          config.Installer,
+		lintRemoteProvider: config.LintRemoteProvider,
+		lintInstaller:      config.LintInstaller,
+		globalStore:        config.GlobalStore,
 	}
 }
 
@@ -58,7 +75,15 @@ func (s *Service) UpgradeGlobal(ctx context.Context, options app.GoUpgradeOption
 	}
 
 	if options.DryRun {
-		return app.GoUpgradeResult{Version: version, Path: "global", DryRun: true}, nil
+		result := app.GoUpgradeResult{Version: version, Path: "global", DryRun: true}
+		if options.WithLint {
+			lintVersion, err := s.resolveLintVersion(ctx, version, options.WorkDir)
+			if err != nil {
+				return app.GoUpgradeResult{}, err
+			}
+			result.LintVersion = lintVersion
+		}
+		return result, nil
 	}
 
 	if _, err := s.installer.InstallGoVersion(ctx, version); err != nil {
@@ -71,7 +96,16 @@ func (s *Service) UpgradeGlobal(ctx context.Context, options app.GoUpgradeOption
 		return app.GoUpgradeResult{}, err
 	}
 
-	return app.GoUpgradeResult{Version: version, Path: "global"}, nil
+	result := app.GoUpgradeResult{Version: version, Path: "global"}
+	if options.WithLint {
+		lintVersion, err := s.installLint(ctx, version, options.WorkDir)
+		if err != nil {
+			return app.GoUpgradeResult{}, err
+		}
+		result.LintVersion = lintVersion
+	}
+
+	return result, nil
 }
 
 // UpgradeProject updates the nearest project Go metadata file to the selected version.
@@ -86,7 +120,15 @@ func (s *Service) UpgradeProject(ctx context.Context, options app.GoUpgradeOptio
 		return app.GoUpgradeResult{}, err
 	}
 	if options.DryRun {
-		return app.GoUpgradeResult{Version: version, Path: path, DryRun: true}, nil
+		result := app.GoUpgradeResult{Version: version, Path: path, DryRun: true}
+		if options.WithLint {
+			lintVersion, err := s.resolveLintVersion(ctx, version, options.WorkDir)
+			if err != nil {
+				return app.GoUpgradeResult{}, err
+			}
+			result.LintVersion = lintVersion
+		}
+		return result, nil
 	}
 
 	if _, err := s.installer.InstallGoVersion(ctx, version); err != nil {
@@ -96,7 +138,16 @@ func (s *Service) UpgradeProject(ctx context.Context, options app.GoUpgradeOptio
 		return app.GoUpgradeResult{}, err
 	}
 
-	return app.GoUpgradeResult{Version: version, Path: path}, nil
+	result := app.GoUpgradeResult{Version: version, Path: path}
+	if options.WithLint {
+		lintVersion, err := s.installLint(ctx, version, options.WorkDir)
+		if err != nil {
+			return app.GoUpgradeResult{}, err
+		}
+		result.LintVersion = lintVersion
+	}
+
+	return result, nil
 }
 
 func (s *Service) targetVersion(ctx context.Context, options app.GoUpgradeOptions) (string, error) {
@@ -104,6 +155,39 @@ func (s *Service) targetVersion(ctx context.Context, options app.GoUpgradeOption
 		return options.Version, nil
 	}
 	return s.latestVersion(ctx)
+}
+
+func (s *Service) installLint(ctx context.Context, goVersion string, workDir string) (string, error) {
+	lintVersion, err := s.resolveLintVersion(ctx, goVersion, workDir)
+	if err != nil || lintVersion == "" {
+		return lintVersion, err
+	}
+	if s.lintInstaller == nil {
+		return "", fmt.Errorf("golangci-lint installer is not configured")
+	}
+	if _, err := s.lintInstaller.InstallLintVersion(ctx, lintVersion); err != nil {
+		return "", err
+	}
+	return lintVersion, nil
+}
+
+func (s *Service) resolveLintVersion(ctx context.Context, goVersion string, workDir string) (string, error) {
+	if pinned, ok, err := resolvePinnedLintVersion(workDir); err != nil {
+		return "", err
+	} else if ok {
+		return pinned, nil
+	}
+	if s.lintRemoteProvider == nil {
+		return "", nil
+	}
+	versions, err := s.lintRemoteProvider.ListRemoteLintVersions(ctx, goVersion)
+	if err != nil {
+		return "", err
+	}
+	if len(versions) == 0 {
+		return "", nil
+	}
+	return versions[0].Version, nil
 }
 
 func (s *Service) latestVersion(ctx context.Context) (string, error) {
@@ -225,4 +309,18 @@ func parseVersionParts(version string) []int {
 		parts = append(parts, value)
 	}
 	return parts
+}
+
+func resolvePinnedLintVersion(workDir string) (string, bool, error) {
+	config, found, err := fgmconfig.LoadNearest(workDir)
+	if err != nil || !found {
+		return "", false, err
+	}
+
+	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
+	if version == "" || version == "auto" {
+		return "", false, nil
+	}
+
+	return version, true, nil
 }

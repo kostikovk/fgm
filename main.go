@@ -62,9 +62,11 @@ func main() {
 		Registry:   lintStore,
 	})
 	goUpgrader := goupgrade.New(goupgrade.Config{
-		RemoteProvider: goReleaseProvider,
-		Installer:      goInstaller,
-		GlobalStore:    goStore,
+		RemoteProvider:     goReleaseProvider,
+		Installer:          goInstaller,
+		LintRemoteProvider: lintReleaseProvider,
+		LintInstaller:      lintInstaller,
+		GlobalStore:        goStore,
 	})
 	currentResolver := currenttoolchain.New(currenttoolchain.Config{
 		GoResolver:         resolve.New(goStore),
