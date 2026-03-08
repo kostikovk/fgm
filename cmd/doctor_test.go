@@ -11,11 +11,11 @@ import (
 )
 
 type stubDoctor struct {
-	diagnoseFn func(ctx context.Context) ([]string, error)
+	diagnoseFn func(ctx context.Context, workDir string) ([]string, error)
 }
 
-func (s stubDoctor) Diagnose(ctx context.Context) ([]string, error) {
-	return s.diagnoseFn(ctx)
+func (s stubDoctor) Diagnose(ctx context.Context, workDir string) ([]string, error) {
+	return s.diagnoseFn(ctx, workDir)
 }
 
 func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
@@ -24,7 +24,10 @@ func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
 	application := app.New(app.Config{
 		Resolver: resolve.New(nil),
 		Doctor: stubDoctor{
-			diagnoseFn: func(ctx context.Context) ([]string, error) {
+			diagnoseFn: func(ctx context.Context, workDir string) ([]string, error) {
+				if workDir != "." {
+					t.Fatalf("workDir = %q, want %q", workDir, ".")
+				}
 				return []string{
 					"OK global Go version: 1.25.7",
 					"WARN shim dir is not on PATH: /tmp/fgm/shims",

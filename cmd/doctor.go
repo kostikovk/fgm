@@ -17,7 +17,12 @@ func newDoctorCmd(application *app.App) *cobra.Command {
 				return fmt.Errorf("doctor service is not configured")
 			}
 
-			lines, err := application.Doctor.Diagnose(cmd.Context())
+			workDir, err := cmd.Flags().GetString(flagChdir)
+			if err != nil {
+				return err
+			}
+
+			lines, err := application.Doctor.Diagnose(cmd.Context(), workDir)
 			if err != nil {
 				return err
 			}

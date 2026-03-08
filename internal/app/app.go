@@ -67,7 +67,7 @@ type GoImporter interface {
 
 // Doctor reports environment and configuration diagnostics for FGM.
 type Doctor interface {
-	Diagnose(ctx context.Context) ([]string, error)
+	Diagnose(ctx context.Context, workDir string) ([]string, error)
 }
 
 // Executor runs commands with a selected Go toolchain on PATH.

@@ -5,7 +5,7 @@ Fast Go toolchain management for local machines and repositories.
 FGM is a Go CLI for selecting the right Go version for the current directory, switching a global default, importing existing installations, and routing `go` through shims so repo-level and machine-level selection can coexist.
 
 > [!IMPORTANT]
-> FGM's Go workflow is implemented today. `golangci-lint` remote compatibility listing is available, while lint install and paired Go plus lint install flows are still planned.
+> FGM manages both Go toolchains and compatible `golangci-lint` binaries today. Compatibility output is driven by FGM's generated catalog, not a perfect historical upstream matrix.
 
 ## Why FGM
 
@@ -98,6 +98,8 @@ fgm doctor
 which go
 go version
 ```
+
+`fgm doctor` checks the global selection, shim and binary PATH setup, and whether the currently resolved Go and `golangci-lint` versions are installed locally.
 
 ### 5. Use repo-specific versions automatically
 
@@ -254,8 +256,6 @@ fgm versions golangci-lint --local
 fgm versions golangci-lint --remote [--go <version>]
 ```
 
-FGM also exposes Cobra-generated shell completion via `fgm completion`.
-
 ## Development
 
 Run tests:
@@ -323,6 +323,6 @@ Implemented now:
 
 Planned next:
 
-- paired install flow for Go plus compatible `golangci-lint`
-- `golangci-lint` install and local version management
 - richer health checks and shell onboarding polish
+- repo-level policy for lint selection and pinning
+- import/bootstrap support for existing `golangci-lint` installations
