@@ -188,6 +188,17 @@ fgm install go 1.25.7
 
 `fgm install go <version>` downloads the correct Go archive for your OS and architecture, verifies it, shows download progress, and installs it into the local FGM store.
 
+### Upgrade Go to the latest remote version
+
+```bash
+fgm upgrade go --global
+fgm upgrade go --project
+```
+
+`--global` installs the latest known Go version and switches the machine-wide default to it.
+
+`--project` installs the latest known Go version and updates the nearest `go.work` or `go.mod`, preferring the `toolchain` directive when one already exists.
+
 ### Install a golangci-lint version
 
 ```bash
@@ -270,6 +281,8 @@ fgm install golangci-lint <version>
 fgm pin golangci-lint <version|auto>
 fgm remove go <version>
 fgm remove golangci-lint <version>
+fgm upgrade go --global
+fgm upgrade go --project
 fgm use go <version> --global
 fgm versions go --local
 fgm versions go --remote

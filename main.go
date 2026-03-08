@@ -18,6 +18,7 @@ import (
 	"github.com/koskosovu4/fgm/internal/golangcilint"
 	"github.com/koskosovu4/fgm/internal/golocal"
 	"github.com/koskosovu4/fgm/internal/goreleases"
+	"github.com/koskosovu4/fgm/internal/goupgrade"
 	"github.com/koskosovu4/fgm/internal/lintimport"
 	"github.com/koskosovu4/fgm/internal/lintinstall"
 	"github.com/koskosovu4/fgm/internal/lintlocal"
@@ -60,6 +61,11 @@ func main() {
 		Candidates: lintimport.DefaultCandidates(os.Getenv("PATH")),
 		Registry:   lintStore,
 	})
+	goUpgrader := goupgrade.New(goupgrade.Config{
+		RemoteProvider: goReleaseProvider,
+		Installer:      goInstaller,
+		GlobalStore:    goStore,
+	})
 	currentResolver := currenttoolchain.New(currenttoolchain.Config{
 		GoResolver:         resolve.New(goStore),
 		LintStore:          lintStore,
@@ -92,6 +98,7 @@ func main() {
 		LintInstaller:      lintInstaller,
 		GoImporter:         goImporter,
 		LintImporter:       lintImporter,
+		GoUpgrader:         goUpgrader,
 		Doctor:             doctorService,
 		Executor:           executor,
 		EnvRenderer:        envRenderer,

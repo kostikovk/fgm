@@ -40,6 +40,7 @@ func NewRootCmd(application *app.App) *cobra.Command {
 	rootCmd.AddCommand(newInstallCmd(application))
 	rootCmd.AddCommand(newPinCmd(v))
 	rootCmd.AddCommand(newRemoveCmd(application))
+	rootCmd.AddCommand(newUpgradeCmd(application, v))
 	rootCmd.AddCommand(newUseCmd(application))
 	rootCmd.AddCommand(newVersionsCmd(application))
 	rootCmd.AddCommand(newShimCmd(application))

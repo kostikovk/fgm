@@ -76,6 +76,18 @@ type LintImporter interface {
 	ImportAuto(ctx context.Context) ([]ImportedLint, error)
 }
 
+// GoUpgradeResult describes a Go upgrade action.
+type GoUpgradeResult struct {
+	Version string
+	Path    string
+}
+
+// GoUpgrader upgrades Go at global or project scope.
+type GoUpgrader interface {
+	UpgradeGlobal(ctx context.Context) (GoUpgradeResult, error)
+	UpgradeProject(ctx context.Context, workDir string) (GoUpgradeResult, error)
+}
+
 // Doctor reports environment and configuration diagnostics for FGM.
 type Doctor interface {
 	Diagnose(ctx context.Context, workDir string) ([]string, error)
@@ -110,6 +122,7 @@ type App struct {
 	LintInstaller      LintInstaller
 	GoImporter         GoImporter
 	LintImporter       LintImporter
+	GoUpgrader         GoUpgrader
 	Doctor             Doctor
 	Executor           Executor
 	EnvRenderer        EnvRenderer
@@ -126,6 +139,7 @@ type Config struct {
 	LintInstaller      LintInstaller
 	GoImporter         GoImporter
 	LintImporter       LintImporter
+	GoUpgrader         GoUpgrader
 	Doctor             Doctor
 	Executor           Executor
 	EnvRenderer        EnvRenderer
@@ -143,6 +157,7 @@ func New(config Config) *App {
 		LintInstaller:      config.LintInstaller,
 		GoImporter:         config.GoImporter,
 		LintImporter:       config.LintImporter,
+		GoUpgrader:         config.GoUpgrader,
 		Doctor:             config.Doctor,
 		Executor:           config.Executor,
 		EnvRenderer:        config.EnvRenderer,
