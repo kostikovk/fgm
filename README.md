@@ -138,6 +138,7 @@ fgm/
 - Run commands with the resolved toolchain via `fgm exec`.
 - Generate shell setup snippets with `fgm env`.
 - Validate installation and PATH setup with `fgm doctor`.
+- Check repo `golangci-lint` pins and compatibility status with `fgm doctor`.
 - Upgrade global or project Go versions with `fgm upgrade go`.
 - Optionally install matching `golangci-lint` versions during Go upgrades.
 

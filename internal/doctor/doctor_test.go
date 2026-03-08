@@ -2,6 +2,8 @@ package doctor
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -46,6 +48,14 @@ func (s stubLintStore) LintBinaryPath(ctx context.Context, version string) (stri
 		return "", nil
 	}
 	return s.lintBinaryPathFn(ctx, version)
+}
+
+type stubLintRemoteProvider struct {
+	listRemoteLintVersionsFn func(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
+func (s stubLintRemoteProvider) ListRemoteLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+	return s.listRemoteLintVersionsFn(ctx, goVersion)
 }
 
 func TestDiagnose_ReportsGlobalVersionAndShimStatus(t *testing.T) {
@@ -148,5 +158,125 @@ func TestDiagnose_ReportsSelectedToolchainAvailability(t *testing.T) {
 	}
 	if !strings.Contains(joined, "WARN selected golangci-lint version is not installed: v2.11.2") {
 		t.Fatalf("joined = %q, want missing lint line", joined)
+	}
+}
+
+func TestDiagnose_ReportsPinnedLintCompatibilityStatus(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(workDir, ".fgm.toml"),
+		[]byte("[toolchain]\ngolangci_lint = \"v2.10.1\"\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	service := New(Config{
+		Resolver: stubResolver{
+			currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+				return app.Selection{
+					GoVersion:   "1.26.1",
+					LintVersion: "v2.10.1",
+					LintSource:  "config",
+				}, nil
+			},
+		},
+		GoStore: stubGoStore{
+			globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+				return "1.26.1", true, nil
+			},
+			shimDirFn: func() string {
+				return "/tmp/fgm/shims"
+			},
+			goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return "/tmp/fgm/go/1.26.1/bin/go", nil
+			},
+		},
+		LintStore: stubLintStore{
+			lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return "/tmp/fgm/golangci-lint/v2.10.1/golangci-lint", nil
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return []app.LintVersion{{Version: "v2.10.1"}}, nil
+			},
+		},
+		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
+	})
+
+	lines, err := service.Diagnose(context.Background(), workDir)
+	if err != nil {
+		t.Fatalf("Diagnose: %v", err)
+	}
+
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "OK repo pins golangci-lint: v2.10.1") {
+		t.Fatalf("joined = %q, want pinned lint line", joined)
+	}
+	if !strings.Contains(joined, "OK pinned golangci-lint version is compatible with Go 1.26.1: v2.10.1") {
+		t.Fatalf("joined = %q, want compatible lint line", joined)
+	}
+}
+
+func TestDiagnose_WarnsWhenPinnedLintIsMissingAndIncompatible(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(workDir, ".fgm.toml"),
+		[]byte("[toolchain]\ngolangci_lint = \"v2.10.1\"\n"),
+		0o644,
+	); err != nil {
+		t.Fatalf("write .fgm.toml: %v", err)
+	}
+
+	service := New(Config{
+		Resolver: stubResolver{
+			currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+				return app.Selection{
+					GoVersion:   "1.26.1",
+					LintVersion: "v2.10.1",
+					LintSource:  "config",
+				}, nil
+			},
+		},
+		GoStore: stubGoStore{
+			globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+				return "1.26.1", true, nil
+			},
+			shimDirFn: func() string {
+				return "/tmp/fgm/shims"
+			},
+			goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return "/tmp/fgm/go/1.26.1/bin/go", nil
+			},
+		},
+		LintStore: stubLintStore{
+			lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return "", context.Canceled
+			},
+		},
+		LintRemoteProvider: stubLintRemoteProvider{
+			listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+				return []app.LintVersion{{Version: "v2.11.2"}}, nil
+			},
+		},
+		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
+	})
+
+	lines, err := service.Diagnose(context.Background(), workDir)
+	if err != nil {
+		t.Fatalf("Diagnose: %v", err)
+	}
+
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "WARN pinned golangci-lint version is not installed: v2.10.1") {
+		t.Fatalf("joined = %q, want missing pinned lint line", joined)
+	}
+	if !strings.Contains(joined, "WARN pinned golangci-lint version is not in the compatible set for Go 1.26.1: v2.10.1") {
+		t.Fatalf("joined = %q, want incompatible pinned lint line", joined)
 	}
 }

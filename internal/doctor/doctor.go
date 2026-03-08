@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/koskosovu4/fgm/internal/fgmconfig"
 )
 
 // GoStore provides the local state doctor needs to inspect.
@@ -21,6 +22,11 @@ type LintStore interface {
 	LintBinaryPath(ctx context.Context, version string) (string, error)
 }
 
+// LintRemoteProvider lists compatible remote golangci-lint versions for a Go version.
+type LintRemoteProvider interface {
+	ListRemoteLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
 // Resolver provides the current toolchain selection for a workspace.
 type Resolver interface {
 	Current(ctx context.Context, workDir string) (app.Selection, error)
@@ -28,27 +34,30 @@ type Resolver interface {
 
 // Config configures a doctor Service.
 type Config struct {
-	Resolver  Resolver
-	GoStore   GoStore
-	LintStore LintStore
-	PathEnv   string
+	Resolver           Resolver
+	GoStore            GoStore
+	LintStore          LintStore
+	LintRemoteProvider LintRemoteProvider
+	PathEnv            string
 }
 
 // Service reports diagnostics for FGM environment setup.
 type Service struct {
-	resolver  Resolver
-	goStore   GoStore
-	lintStore LintStore
-	pathEnv   string
+	resolver           Resolver
+	goStore            GoStore
+	lintStore          LintStore
+	lintRemoteProvider LintRemoteProvider
+	pathEnv            string
 }
 
 // New constructs a doctor Service.
 func New(config Config) *Service {
 	return &Service{
-		resolver:  config.Resolver,
-		goStore:   config.GoStore,
-		lintStore: config.LintStore,
-		pathEnv:   config.PathEnv,
+		resolver:           config.Resolver,
+		goStore:            config.GoStore,
+		lintStore:          config.LintStore,
+		lintRemoteProvider: config.LintRemoteProvider,
+		pathEnv:            config.PathEnv,
 	}
 }
 
@@ -89,12 +98,39 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error
 				lines = append(lines, "WARN selected Go version is not installed: "+selection.GoVersion)
 			}
 
+			pinnedLintVersion, pinned, err := resolvePinnedLintVersion(workDir)
+			if err != nil {
+				return nil, err
+			}
+			if pinned {
+				lines = append(lines, "OK repo pins golangci-lint: "+pinnedLintVersion)
+			}
+
 			if selection.LintVersion != "" && s.lintStore != nil {
 				if _, err := s.lintStore.LintBinaryPath(ctx, selection.LintVersion); err == nil {
 					lines = append(lines, "OK selected golangci-lint version is installed: "+selection.LintVersion)
 				} else {
 					lines = append(lines, "WARN selected golangci-lint version is not installed: "+selection.LintVersion)
+					if pinned && pinnedLintVersion == selection.LintVersion {
+						lines = append(lines, "WARN pinned golangci-lint version is not installed: "+selection.LintVersion)
+					}
 				}
+			}
+
+			if pinned && s.lintRemoteProvider != nil {
+				compatible, err := s.lintRemoteProvider.ListRemoteLintVersions(ctx, selection.GoVersion)
+				if err != nil {
+					return nil, err
+				}
+				if lintVersionCompatible(pinnedLintVersion, compatible) {
+					lines = append(lines, "OK pinned golangci-lint version is compatible with Go "+selection.GoVersion+": "+pinnedLintVersion)
+				} else {
+					lines = append(lines, "WARN pinned golangci-lint version is not in the compatible set for Go "+selection.GoVersion+": "+pinnedLintVersion)
+				}
+			}
+
+			if !pinned && selection.LintVersion == "" {
+				lines = append(lines, "WARN no compatible golangci-lint version is known for Go "+selection.GoVersion)
 			}
 		}
 	}
@@ -105,6 +141,29 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error
 func pathContainsDir(pathEnv string, dir string) bool {
 	for _, entry := range filepath.SplitList(pathEnv) {
 		if strings.TrimSpace(entry) == dir {
+			return true
+		}
+	}
+	return false
+}
+
+func resolvePinnedLintVersion(workDir string) (string, bool, error) {
+	config, found, err := fgmconfig.LoadNearest(workDir)
+	if err != nil || !found {
+		return "", false, err
+	}
+
+	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
+	if version == "" || version == "auto" {
+		return "", false, nil
+	}
+
+	return version, true, nil
+}
+
+func lintVersionCompatible(version string, compatible []app.LintVersion) bool {
+	for _, candidate := range compatible {
+		if candidate.Version == version {
 			return true
 		}
 	}

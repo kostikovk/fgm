@@ -74,10 +74,11 @@ func main() {
 		LintRemoteProvider: lintReleaseProvider,
 	})
 	doctorService := doctor.New(doctor.Config{
-		Resolver:  currentResolver,
-		GoStore:   goStore,
-		LintStore: lintStore,
-		PathEnv:   os.Getenv("PATH"),
+		Resolver:           currentResolver,
+		GoStore:            goStore,
+		LintStore:          lintStore,
+		LintRemoteProvider: lintReleaseProvider,
+		PathEnv:            os.Getenv("PATH"),
 	})
 	executor := execenv.New(execenv.Config{
 		Resolver:    currentResolver,
