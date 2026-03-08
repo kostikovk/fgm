@@ -116,6 +116,8 @@ fgm current
 fgm current --chdir /path/to/repo
 ```
 
+When a compatible `golangci-lint` version is known, `fgm current` also prints the selected lint version.
+
 ### List installed Go versions
 
 ```bash

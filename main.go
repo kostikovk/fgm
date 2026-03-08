@@ -9,6 +9,7 @@ import (
 
 	"github.com/koskosovu4/fgm/cmd"
 	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/koskosovu4/fgm/internal/currenttoolchain"
 	"github.com/koskosovu4/fgm/internal/doctor"
 	"github.com/koskosovu4/fgm/internal/envsetup"
 	"github.com/koskosovu4/fgm/internal/execenv"
@@ -54,6 +55,11 @@ func main() {
 		ProgressWriter: os.Stderr,
 	})
 	goImporter := goimport.New(goimport.DefaultCandidates(os.Getenv("PATH")), goStore)
+	currentResolver := currenttoolchain.New(currenttoolchain.Config{
+		GoResolver:         resolve.New(goStore),
+		LintStore:          lintStore,
+		LintRemoteProvider: lintReleaseProvider,
+	})
 	doctorService := doctor.New(goStore, os.Getenv("PATH"))
 	executor := execenv.New(resolve.New(goStore), goStore, os.Getenv("PATH"))
 	envRenderer := envsetup.New(envsetup.Config{
@@ -62,7 +68,7 @@ func main() {
 		GOOS:      runtime.GOOS,
 	})
 	application := app.New(app.Config{
-		Resolver:           resolve.New(goStore),
+		Resolver:           currentResolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		GoRemoteProvider:   goReleaseProvider,

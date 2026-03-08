@@ -82,8 +82,10 @@ type EnvRenderer interface {
 
 // Selection describes the currently selected toolchain.
 type Selection struct {
-	GoVersion string
-	GoSource  string
+	GoVersion   string
+	GoSource    string
+	LintVersion string
+	LintSource  string
 }
 
 // App holds the services used by Cobra commands.
