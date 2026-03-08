@@ -45,3 +45,25 @@ func (s *Store) ListLocalLintVersions(ctx context.Context) ([]string, error) {
 	sort.Sort(sort.Reverse(sort.StringSlice(versions)))
 	return versions, nil
 }
+
+// DeleteLintVersion removes an FGM-managed golangci-lint version from the local store.
+func (s *Store) DeleteLintVersion(ctx context.Context, version string) (string, error) {
+	_ = ctx
+
+	installDir := filepath.Join(s.root, "golangci-lint", version)
+	info, err := os.Stat(installDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("golangci-lint version %s is not managed by FGM", version)
+		}
+		return "", fmt.Errorf("stat managed golangci-lint version: %w", err)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("managed golangci-lint path for %s is invalid", version)
+	}
+	if err := os.RemoveAll(installDir); err != nil {
+		return "", fmt.Errorf("remove managed golangci-lint version: %w", err)
+	}
+
+	return installDir, nil
+}

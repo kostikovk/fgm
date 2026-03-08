@@ -14,6 +14,7 @@ func newRemoveCmd(application *app.App) *cobra.Command {
 	}
 
 	removeCmd.AddCommand(newRemoveGoCmd(application))
+	removeCmd.AddCommand(newRemoveLintCmd(application))
 
 	return removeCmd
 }
@@ -35,6 +36,28 @@ func newRemoveGoCmd(application *app.App) *cobra.Command {
 			}
 
 			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Removed Go %s from %s\n", version, removedPath)
+			return err
+		},
+	}
+}
+
+func newRemoveLintCmd(application *app.App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "golangci-lint [version]",
+		Short: "Remove an FGM-managed golangci-lint version",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if application.LintStore == nil {
+				return fmt.Errorf("local golangci-lint version store is not configured")
+			}
+
+			version := args[0]
+			removedPath, err := application.LintStore.DeleteLintVersion(cmd.Context(), version)
+			if err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Removed golangci-lint %s from %s\n", version, removedPath)
 			return err
 		},
 	}

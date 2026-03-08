@@ -41,6 +41,7 @@ type LintRemoteVersionProvider interface {
 // LintLocalVersionStore lists installed golangci-lint versions.
 type LintLocalVersionStore interface {
 	ListLocalLintVersions(ctx context.Context) ([]string, error)
+	DeleteLintVersion(ctx context.Context, version string) (string, error)
 }
 
 // GoInstaller installs Go toolchains into the local FGM-managed store.

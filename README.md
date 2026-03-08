@@ -186,6 +186,7 @@ fgm exec --chdir /path/to/repo -- go test ./...
 
 ```bash
 fgm remove go 1.25.7
+fgm remove golangci-lint v2.11.2
 ```
 
 ## Shims
@@ -237,6 +238,7 @@ fgm import auto
 fgm install go <version>
 fgm install golangci-lint <version>
 fgm remove go <version>
+fgm remove golangci-lint <version>
 fgm use go <version> --global
 fgm versions go --local
 fgm versions go --remote

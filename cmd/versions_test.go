@@ -97,10 +97,18 @@ func (s stubLintRemoteProvider) ListRemoteLintVersions(
 
 type stubLintStore struct {
 	listLocalLintVersionsFn func(ctx context.Context) ([]string, error)
+	deleteLintVersionFn     func(ctx context.Context, version string) (string, error)
 }
 
 func (s stubLintStore) ListLocalLintVersions(ctx context.Context) ([]string, error) {
 	return s.listLocalLintVersionsFn(ctx)
+}
+
+func (s stubLintStore) DeleteLintVersion(ctx context.Context, version string) (string, error) {
+	if s.deleteLintVersionFn == nil {
+		return "", nil
+	}
+	return s.deleteLintVersionFn(ctx, version)
 }
 
 func TestVersionsGoLocal_ShowsInstalledVersions(t *testing.T) {

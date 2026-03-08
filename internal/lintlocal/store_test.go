@@ -43,3 +43,29 @@ func TestStoreListLocalLintVersions_ReturnsInstalledVersions(t *testing.T) {
 		t.Fatalf("versions[1] = %q, want %q", versions[1], "v2.11.1")
 	}
 }
+
+func TestStoreDeleteLintVersion_RemovesManagedVersion(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	versionDir := filepath.Join(root, "golangci-lint", "v2.11.2")
+	if err := os.MkdirAll(versionDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(versionDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	store := New(root)
+	removedPath, err := store.DeleteLintVersion(context.Background(), "v2.11.2")
+	if err != nil {
+		t.Fatalf("DeleteLintVersion: %v", err)
+	}
+
+	if removedPath != versionDir {
+		t.Fatalf("removedPath = %q, want %q", removedPath, versionDir)
+	}
+	if _, err := os.Stat(versionDir); !os.IsNotExist(err) {
+		t.Fatalf("expected %s to be removed, err=%v", versionDir, err)
+	}
+}
