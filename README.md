@@ -193,11 +193,17 @@ fgm install go 1.25.7
 ```bash
 fgm upgrade go --global
 fgm upgrade go --project
+fgm upgrade go --global --dry-run
+fgm upgrade go --project --to 1.25.8
 ```
 
 `--global` installs the latest known Go version and switches the machine-wide default to it.
 
 `--project` installs the latest known Go version and updates the nearest `go.work` or `go.mod`, preferring the `toolchain` directive when one already exists.
+
+Use `--dry-run` to preview the selected upgrade without changing installs, global state, or repo files.
+
+Use `--to <version>` to target a specific Go version instead of the latest remote one.
 
 ### Install a golangci-lint version
 
@@ -283,6 +289,8 @@ fgm remove go <version>
 fgm remove golangci-lint <version>
 fgm upgrade go --global
 fgm upgrade go --project
+fgm upgrade go --global --dry-run
+fgm upgrade go --project --to <version>
 fgm use go <version> --global
 fgm versions go --local
 fgm versions go --remote

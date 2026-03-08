@@ -80,12 +80,20 @@ type LintImporter interface {
 type GoUpgradeResult struct {
 	Version string
 	Path    string
+	DryRun  bool
+}
+
+// GoUpgradeOptions configures a Go upgrade operation.
+type GoUpgradeOptions struct {
+	WorkDir string
+	Version string
+	DryRun  bool
 }
 
 // GoUpgrader upgrades Go at global or project scope.
 type GoUpgrader interface {
-	UpgradeGlobal(ctx context.Context) (GoUpgradeResult, error)
-	UpgradeProject(ctx context.Context, workDir string) (GoUpgradeResult, error)
+	UpgradeGlobal(ctx context.Context, options GoUpgradeOptions) (GoUpgradeResult, error)
+	UpgradeProject(ctx context.Context, options GoUpgradeOptions) (GoUpgradeResult, error)
 }
 
 // Doctor reports environment and configuration diagnostics for FGM.

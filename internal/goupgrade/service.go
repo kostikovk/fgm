@@ -50,11 +50,15 @@ func New(config Config) *Service {
 	}
 }
 
-// UpgradeGlobal installs the latest remote Go version and selects it globally.
-func (s *Service) UpgradeGlobal(ctx context.Context) (app.GoUpgradeResult, error) {
-	version, err := s.latestVersion(ctx)
+// UpgradeGlobal installs the selected Go version and selects it globally.
+func (s *Service) UpgradeGlobal(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+	version, err := s.targetVersion(ctx, options)
 	if err != nil {
 		return app.GoUpgradeResult{}, err
+	}
+
+	if options.DryRun {
+		return app.GoUpgradeResult{Version: version, Path: "global", DryRun: true}, nil
 	}
 
 	if _, err := s.installer.InstallGoVersion(ctx, version); err != nil {
@@ -70,19 +74,22 @@ func (s *Service) UpgradeGlobal(ctx context.Context) (app.GoUpgradeResult, error
 	return app.GoUpgradeResult{Version: version, Path: "global"}, nil
 }
 
-// UpgradeProject updates the nearest project Go metadata file to the latest remote version.
-func (s *Service) UpgradeProject(ctx context.Context, workDir string) (app.GoUpgradeResult, error) {
-	version, err := s.latestVersion(ctx)
+// UpgradeProject updates the nearest project Go metadata file to the selected version.
+func (s *Service) UpgradeProject(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+	version, err := s.targetVersion(ctx, options)
 	if err != nil {
 		return app.GoUpgradeResult{}, err
+	}
+
+	path, err := findProjectMetadataFile(options.WorkDir)
+	if err != nil {
+		return app.GoUpgradeResult{}, err
+	}
+	if options.DryRun {
+		return app.GoUpgradeResult{Version: version, Path: path, DryRun: true}, nil
 	}
 
 	if _, err := s.installer.InstallGoVersion(ctx, version); err != nil {
-		return app.GoUpgradeResult{}, err
-	}
-
-	path, err := findProjectMetadataFile(workDir)
-	if err != nil {
 		return app.GoUpgradeResult{}, err
 	}
 	if err := rewriteVersionMetadata(path, version); err != nil {
@@ -90,6 +97,13 @@ func (s *Service) UpgradeProject(ctx context.Context, workDir string) (app.GoUpg
 	}
 
 	return app.GoUpgradeResult{Version: version, Path: path}, nil
+}
+
+func (s *Service) targetVersion(ctx context.Context, options app.GoUpgradeOptions) (string, error) {
+	if options.Version != "" {
+		return options.Version, nil
+	}
+	return s.latestVersion(ctx)
 }
 
 func (s *Service) latestVersion(ctx context.Context) (string, error) {

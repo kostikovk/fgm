@@ -13,16 +13,16 @@ import (
 )
 
 type stubGoUpgrader struct {
-	upgradeGlobalFn  func(ctx context.Context) (app.GoUpgradeResult, error)
-	upgradeProjectFn func(ctx context.Context, workDir string) (app.GoUpgradeResult, error)
+	upgradeGlobalFn  func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error)
+	upgradeProjectFn func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error)
 }
 
-func (s stubGoUpgrader) UpgradeGlobal(ctx context.Context) (app.GoUpgradeResult, error) {
-	return s.upgradeGlobalFn(ctx)
+func (s stubGoUpgrader) UpgradeGlobal(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+	return s.upgradeGlobalFn(ctx, options)
 }
 
-func (s stubGoUpgrader) UpgradeProject(ctx context.Context, workDir string) (app.GoUpgradeResult, error) {
-	return s.upgradeProjectFn(ctx, workDir)
+func (s stubGoUpgrader) UpgradeProject(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+	return s.upgradeProjectFn(ctx, options)
 }
 
 type stubRemoteGoProvider struct {
@@ -38,10 +38,10 @@ func TestUpgradeGoCommand_UpgradesGlobalVersion(t *testing.T) {
 
 	application := app.New(app.Config{
 		GoUpgrader: stubGoUpgrader{
-			upgradeGlobalFn: func(ctx context.Context) (app.GoUpgradeResult, error) {
+			upgradeGlobalFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
 				return app.GoUpgradeResult{Version: "1.26.1", Path: "global"}, nil
 			},
-			upgradeProjectFn: func(ctx context.Context, workDir string) (app.GoUpgradeResult, error) {
+			upgradeProjectFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
 				t.Fatal("UpgradeProject should not be called")
 				return app.GoUpgradeResult{}, nil
 			},
@@ -56,6 +56,35 @@ func TestUpgradeGoCommand_UpgradesGlobalVersion(t *testing.T) {
 
 	if !strings.Contains(stdout, "Upgraded global Go to 1.26.1") {
 		t.Fatalf("stdout = %q, want global upgrade line", stdout)
+	}
+}
+
+func TestUpgradeGoCommand_DryRunGlobalVersion(t *testing.T) {
+	t.Parallel()
+
+	application := app.New(app.Config{
+		GoUpgrader: stubGoUpgrader{
+			upgradeGlobalFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				if !options.DryRun {
+					t.Fatal("DryRun = false, want true")
+				}
+				return app.GoUpgradeResult{Version: "1.26.1", Path: "global", DryRun: true}, nil
+			},
+			upgradeProjectFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				t.Fatal("UpgradeProject should not be called")
+				return app.GoUpgradeResult{}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "go", "--global", "--dry-run")
+	if err != nil {
+		t.Fatalf("execute upgrade go --global --dry-run: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "Would upgrade global Go to 1.26.1") {
+		t.Fatalf("stdout = %q, want dry-run global upgrade line", stdout)
 	}
 }
 
@@ -101,5 +130,84 @@ func TestUpgradeGoCommand_UpgradesProjectVersion(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Upgraded project Go to 1.26.1") {
 		t.Fatalf("stdout = %q, want project upgrade line", stdout)
+	}
+}
+
+func TestUpgradeGoCommand_DryRunProjectVersion(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	goModPath := filepath.Join(tempDir, "go.mod")
+	original := "module example.com/demo\n\ngo 1.25.0\n"
+	if err := os.WriteFile(goModPath, []byte(original), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	application := app.New(app.Config{
+		GoUpgrader: goupgrade.New(goupgrade.Config{
+			RemoteProvider: stubRemoteGoProvider{
+				listRemoteGoVersionsFn: func(ctx context.Context) ([]string, error) {
+					return []string{"1.26.1"}, nil
+				},
+			},
+			Installer: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					t.Fatal("InstallGoVersion should not be called during dry-run")
+					return "", nil
+				},
+			},
+		}),
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "go", "--project", "--dry-run", "--chdir", tempDir)
+	if err != nil {
+		t.Fatalf("execute upgrade go --project --dry-run: %v\nstderr:\n%s", err, stderr)
+	}
+
+	content, err := os.ReadFile(goModPath)
+	if err != nil {
+		t.Fatalf("read go.mod: %v", err)
+	}
+	if string(content) != original {
+		t.Fatalf("go.mod = %q, want original content", string(content))
+	}
+	if !strings.Contains(stdout, "Would upgrade project Go to 1.26.1") {
+		t.Fatalf("stdout = %q, want dry-run project line", stdout)
+	}
+}
+
+func TestUpgradeGoCommand_UsesExplicitVersionOverride(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	goModPath := filepath.Join(tempDir, "go.mod")
+	if err := os.WriteFile(goModPath, []byte("module example.com/demo\n\ngo 1.25.0\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	application := app.New(app.Config{
+		GoUpgrader: stubGoUpgrader{
+			upgradeGlobalFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				t.Fatal("UpgradeGlobal should not be called")
+				return app.GoUpgradeResult{}, nil
+			},
+			upgradeProjectFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+				if options.Version != "1.25.8" {
+					t.Fatalf("Version = %q, want %q", options.Version, "1.25.8")
+				}
+				return app.GoUpgradeResult{Version: "1.25.8", Path: options.WorkDir}, nil
+			},
+		},
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "go", "--project", "--to", "1.25.8", "--chdir", tempDir)
+	if err != nil {
+		t.Fatalf("execute upgrade go --project --to: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "Upgraded project Go to 1.25.8") {
+		t.Fatalf("stdout = %q, want explicit version line", stdout)
 	}
 }

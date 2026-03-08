@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/koskosovu4/fgm/internal/app"
 )
 
 type stubRemoteProvider struct {
@@ -62,7 +64,7 @@ func TestServiceUpgradeGlobal_InstallsLatestVersionAndSetsGlobalState(t *testing
 		},
 	})
 
-	result, err := service.UpgradeGlobal(context.Background())
+	result, err := service.UpgradeGlobal(context.Background(), app.GoUpgradeOptions{})
 	if err != nil {
 		t.Fatalf("UpgradeGlobal: %v", err)
 	}
@@ -104,7 +106,7 @@ func TestServiceUpgradeProject_UpdatesNearestGoWorkToolchain(t *testing.T) {
 		},
 	})
 
-	result, err := service.UpgradeProject(context.Background(), workDir)
+	result, err := service.UpgradeProject(context.Background(), app.GoUpgradeOptions{WorkDir: workDir})
 	if err != nil {
 		t.Fatalf("UpgradeProject: %v", err)
 	}
@@ -143,7 +145,7 @@ func TestServiceUpgradeProject_UpdatesGoDirectiveWhenNoToolchainExists(t *testin
 		},
 	})
 
-	if _, err := service.UpgradeProject(context.Background(), workDir); err != nil {
+	if _, err := service.UpgradeProject(context.Background(), app.GoUpgradeOptions{WorkDir: workDir}); err != nil {
 		t.Fatalf("UpgradeProject: %v", err)
 	}
 
@@ -153,5 +155,123 @@ func TestServiceUpgradeProject_UpdatesGoDirectiveWhenNoToolchainExists(t *testin
 	}
 	if string(content) != "module example.com/demo\n\ngo 1.26.1\n" {
 		t.Fatalf("go.mod = %q, want updated go directive", string(content))
+	}
+}
+
+func TestServiceUpgradeGlobal_DryRunDoesNotInstallOrSetGlobalState(t *testing.T) {
+	t.Parallel()
+
+	service := New(Config{
+		RemoteProvider: stubRemoteProvider{
+			listRemoteGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"1.26.1"}, nil
+			},
+		},
+		Installer: stubInstaller{
+			installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+				t.Fatal("InstallGoVersion should not be called during dry-run")
+				return "", nil
+			},
+		},
+		GlobalStore: stubGlobalStore{
+			setGlobalGoVersionFn: func(ctx context.Context, version string) error {
+				t.Fatal("SetGlobalGoVersion should not be called during dry-run")
+				return nil
+			},
+			ensureShimsFn: func() error {
+				t.Fatal("EnsureShims should not be called during dry-run")
+				return nil
+			},
+		},
+	})
+
+	result, err := service.UpgradeGlobal(context.Background(), app.GoUpgradeOptions{DryRun: true})
+	if err != nil {
+		t.Fatalf("UpgradeGlobal: %v", err)
+	}
+	if !result.DryRun {
+		t.Fatal("DryRun = false, want true")
+	}
+	if result.Version != "1.26.1" {
+		t.Fatalf("Version = %q, want %q", result.Version, "1.26.1")
+	}
+}
+
+func TestServiceUpgradeProject_DryRunDoesNotRewriteMetadata(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	goModPath := filepath.Join(workDir, "go.mod")
+	original := "module example.com/demo\n\ngo 1.25.0\n"
+	if err := os.WriteFile(goModPath, []byte(original), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	service := New(Config{
+		RemoteProvider: stubRemoteProvider{
+			listRemoteGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"1.26.1"}, nil
+			},
+		},
+		Installer: stubInstaller{
+			installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+				t.Fatal("InstallGoVersion should not be called during dry-run")
+				return "", nil
+			},
+		},
+	})
+
+	result, err := service.UpgradeProject(context.Background(), app.GoUpgradeOptions{
+		WorkDir: workDir,
+		DryRun:  true,
+	})
+	if err != nil {
+		t.Fatalf("UpgradeProject: %v", err)
+	}
+	if !result.DryRun {
+		t.Fatal("DryRun = false, want true")
+	}
+
+	content, err := os.ReadFile(goModPath)
+	if err != nil {
+		t.Fatalf("read go.mod: %v", err)
+	}
+	if string(content) != original {
+		t.Fatalf("go.mod = %q, want original content", string(content))
+	}
+}
+
+func TestServiceUpgradeProject_UsesExplicitVersionOverride(t *testing.T) {
+	t.Parallel()
+
+	workDir := t.TempDir()
+	goModPath := filepath.Join(workDir, "go.mod")
+	if err := os.WriteFile(goModPath, []byte("module example.com/demo\n\ngo 1.25.0\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	var installed string
+	service := New(Config{
+		RemoteProvider: stubRemoteProvider{
+			listRemoteGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"1.26.1"}, nil
+			},
+		},
+		Installer: stubInstaller{
+			installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+				installed = version
+				return "/tmp/fgm/go/" + version, nil
+			},
+		},
+	})
+
+	if _, err := service.UpgradeProject(context.Background(), app.GoUpgradeOptions{
+		WorkDir: workDir,
+		Version: "1.25.8",
+	}); err != nil {
+		t.Fatalf("UpgradeProject: %v", err)
+	}
+	if installed != "1.25.8" {
+		t.Fatalf("installed = %q, want %q", installed, "1.25.8")
 	}
 }
