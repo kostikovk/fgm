@@ -859,7 +859,7 @@ func TestProgressWriter(t *testing.T) {
 		pw := NewProgressWriter(&buf, "test", 100)
 
 		// Write 50 bytes in chunks of 10.
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			chunk := make([]byte, 10)
 			n, err := pw.Write(chunk)
 			if err != nil {

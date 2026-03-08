@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -86,13 +87,7 @@ func TestDefaultCandidates_IncludesBinaryOnPath(t *testing.T) {
 
 	candidates := DefaultCandidates(binDir)
 
-	found := false
-	for _, c := range candidates {
-		if c == binaryPath {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(candidates, binaryPath)
 	if !found {
 		t.Fatalf("expected %q in candidates %v", binaryPath, candidates)
 	}
@@ -113,13 +108,7 @@ func TestDefaultCandidates_IncludesStaticPaths(t *testing.T) {
 	}
 
 	for _, want := range wantPaths {
-		found := false
-		for _, c := range candidates {
-			if c == want {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(candidates, want)
 		if !found {
 			t.Errorf("expected static path %q in candidates %v", want, candidates)
 		}

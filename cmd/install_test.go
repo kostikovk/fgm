@@ -89,7 +89,7 @@ func TestInstallCommand_RejectsNilLintInstaller(t *testing.T) {
 				return app.Selection{GoVersion: "1.25.7"}, nil
 			},
 		},
-		GoInstaller: stubGoInstaller{installGoVersionFn: func(ctx context.Context, version string) (string, error) { return "/tmp/go", nil }},
+		GoInstaller:   stubGoInstaller{installGoVersionFn: func(ctx context.Context, version string) (string, error) { return "/tmp/go", nil }},
 		LintInstaller: nil,
 	}
 

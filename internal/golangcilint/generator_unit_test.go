@@ -455,7 +455,7 @@ func TestGenerate_PropagatesFetchError(t *testing.T) {
 		Client: newHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return newResponse(http.StatusInternalServerError, `[]`), nil
 		}),
-		BaseURL: "https://example.test",
+		BaseURL:       "https://example.test",
 		GoReleasesURL: "https://example.test",
 		Now: func() time.Time {
 			return time.Unix(0, 0)

@@ -59,8 +59,8 @@ type Provider struct {
 	goarch            string
 	compatibilityData []byte
 
-	releasesOnce sync.Once
-	cachedReleases []release
+	releasesOnce      sync.Once
+	cachedReleases    []release
 	cachedReleasesErr error
 }
 

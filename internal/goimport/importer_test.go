@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -118,13 +119,7 @@ func TestDefaultCandidates_IncludesGoOnPath(t *testing.T) {
 	// pathEnv points at the bin/ dir so gorootFromPathGo will find the binary.
 	candidates := DefaultCandidates(binDir)
 
-	found := false
-	for _, c := range candidates {
-		if c == goRoot {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(candidates, goRoot)
 	if !found {
 		t.Errorf("DefaultCandidates(%q): GOROOT %q not in candidates %v", binDir, goRoot, candidates)
 	}

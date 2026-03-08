@@ -13,10 +13,10 @@ func TestCompareVersions(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name string
-		left string
+		name  string
+		left  string
 		right string
-		want int
+		want  int
 	}{
 		{
 			name:  "equal versions",
