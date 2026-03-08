@@ -38,7 +38,7 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("provide --global or --project")
 			}
 			if application.GoUpgrader == nil {
-				return fmt.Errorf("Go upgrader is not configured")
+				return fmt.Errorf("go upgrader is not configured")
 			}
 
 			options := app.GoUpgradeOptions{

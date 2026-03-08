@@ -18,7 +18,7 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("resolver is not configured")
 			}
 			if application.GoInstaller == nil {
-				return fmt.Errorf("Go installer is not configured")
+				return fmt.Errorf("go installer is not configured")
 			}
 			if application.LintInstaller == nil {
 				return fmt.Errorf("golangci-lint installer is not configured")
@@ -68,7 +68,7 @@ func newInstallGoCmd(application *app.App) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.GoInstaller == nil {
-				return fmt.Errorf("Go installer is not configured")
+				return fmt.Errorf("go installer is not configured")
 			}
 
 			version := args[0]

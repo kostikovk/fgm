@@ -714,7 +714,7 @@ func TestSetGlobalGoVersion_WriteFileError(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		// Restore permissions so t.TempDir cleanup can succeed.
-		os.Chmod(stateDir, 0o755)
+		_ = os.Chmod(stateDir, 0o755)
 	})
 
 	store := New(root, "")
@@ -763,7 +763,7 @@ func TestDeleteGoVersion_StatError_NotIsNotExist(t *testing.T) {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() {
-		os.Chmod(goDir, 0o755)
+		_ = os.Chmod(goDir, 0o755)
 	})
 
 	store := New(root, "")
@@ -788,7 +788,7 @@ func TestDeleteGoVersion_RemoveAllError(t *testing.T) {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() {
-		os.Chmod(goDir, 0o755)
+		_ = os.Chmod(goDir, 0o755)
 	})
 
 	store := New(root, "")
@@ -871,7 +871,7 @@ func TestEnsureShims_WriteFileError(t *testing.T) {
 		t.Fatalf("chmod: %v", err)
 	}
 	t.Cleanup(func() {
-		os.Chmod(shimsDir, 0o755)
+		_ = os.Chmod(shimsDir, 0o755)
 	})
 
 	store := New(root, "")

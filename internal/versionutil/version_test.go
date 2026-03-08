@@ -263,7 +263,7 @@ func TestFindNearestFile(t *testing.T) {
 		}
 		t.Cleanup(func() {
 			// Restore permissions so t.TempDir cleanup succeeds.
-			os.Chmod(restricted, 0o755)
+			_ = os.Chmod(restricted, 0o755)
 		})
 
 		_, err := FindNearestFile(child, "target.txt")

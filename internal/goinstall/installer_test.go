@@ -378,8 +378,8 @@ func TestDownloadArchive_RewindError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Pipe: %v", err)
 	}
-	defer reader.Close()
-	defer writer.Close()
+	defer func() { _ = reader.Close() }()
+	defer func() { _ = writer.Close() }()
 
 	done := make(chan struct{})
 	go func() {
@@ -392,7 +392,7 @@ func TestDownloadArchive_RewindError(t *testing.T) {
 		Filename: "go1.25.7.darwin-arm64.tar.gz",
 		URL:      server.URL,
 	}, writer)
-	writer.Close()
+	_ = writer.Close()
 	<-done
 	if err == nil {
 		t.Fatal("expected rewind error")
@@ -576,7 +576,7 @@ func TestInstallGoVersion_RenameError(t *testing.T) {
 	if err := os.Chmod(parentDir, 0o555); err != nil {
 		t.Fatalf("Chmod: %v", err)
 	}
-	defer os.Chmod(parentDir, 0o755)
+	defer func() { _ = os.Chmod(parentDir, 0o755) }()
 
 	_, err := installer.InstallGoVersion(context.Background(), "1.99.0")
 	if err == nil {

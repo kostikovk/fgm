@@ -404,8 +404,8 @@ func TestDownloadLintArchive_RewindError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Pipe: %v", err)
 	}
-	defer reader.Close()
-	defer writer.Close()
+	defer func() { _ = reader.Close() }()
+	defer func() { _ = writer.Close() }()
 
 	done := make(chan struct{})
 	go func() {
@@ -419,7 +419,7 @@ func TestDownloadLintArchive_RewindError(t *testing.T) {
 		URL:      server.URL,
 		SHA256:   "",
 	}, writer)
-	writer.Close()
+	_ = writer.Close()
 	<-done
 	if err == nil {
 		t.Fatal("expected rewind error")
@@ -549,7 +549,7 @@ func TestInstallLintVersion_RemoveAllError(t *testing.T) {
 	if err := os.Chmod(parentDir, 0o555); err != nil {
 		t.Fatalf("Chmod: %v", err)
 	}
-	defer os.Chmod(parentDir, 0o755)
+	defer func() { _ = os.Chmod(parentDir, 0o755) }()
 
 	installer := New(Config{
 		Root:   root,
@@ -588,7 +588,7 @@ func TestFindLintBinary_ErrorWhenDirNotReadable(t *testing.T) {
 	if err := os.Chmod(subDir, 0o000); err != nil {
 		t.Fatalf("Chmod: %v", err)
 	}
-	defer os.Chmod(subDir, 0o755)
+	defer func() { _ = os.Chmod(subDir, 0o755) }()
 
 	_, err := findLintBinary(root)
 	if err == nil {

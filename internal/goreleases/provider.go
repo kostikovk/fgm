@@ -120,7 +120,7 @@ func (p *Provider) FindArchive(ctx context.Context, version string) (Archive, er
 		}
 	}
 
-	return Archive{}, fmt.Errorf("Go archive for version %s and platform %s/%s was not found", version, p.goos, p.goarch)
+	return Archive{}, fmt.Errorf("go archive for version %s and platform %s/%s was not found", version, p.goos, p.goarch)
 }
 
 func (p *Provider) fetchReleases(ctx context.Context) ([]release, error) {
@@ -133,7 +133,9 @@ func (p *Provider) fetchReleases(ctx context.Context) ([]release, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch Go releases: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch Go releases: unexpected status %s", resp.Status)

@@ -43,5 +43,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Fprintf(os.Stdout, "Updated %s\n", *output)
+	if _, err := fmt.Fprintf(os.Stdout, "Updated %s\n", *output); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

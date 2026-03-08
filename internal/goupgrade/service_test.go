@@ -1188,7 +1188,7 @@ func TestRewriteVersionMetadata_ReadFileError(t *testing.T) {
 	if err := os.Chmod(goModPath, 0o000); err != nil {
 		t.Fatalf("chmod go.mod: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(goModPath, 0o644) })
+	t.Cleanup(func() { _ = os.Chmod(goModPath, 0o644) })
 
 	err := rewriteVersionMetadata(goModPath, "1.26.1")
 	if err == nil {

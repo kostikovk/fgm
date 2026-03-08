@@ -177,16 +177,16 @@ func (p *Provider) fetchAllReleasePages(ctx context.Context) ([]release, error) 
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("fetch golangci-lint releases: unexpected status %s", resp.Status)
 		}
 
 		var page []release
 		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil, fmt.Errorf("decode golangci-lint releases: %w", err)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		allReleases = append(allReleases, page...)
 

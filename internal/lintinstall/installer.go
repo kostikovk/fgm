@@ -69,8 +69,12 @@ func (i *Installer) InstallLintVersion(ctx context.Context, version string) (str
 	if err != nil {
 		return "", fmt.Errorf("create temp archive: %w", err)
 	}
-	defer os.Remove(tempArchive.Name())
-	defer tempArchive.Close()
+	defer func() {
+		_ = os.Remove(tempArchive.Name())
+	}()
+	defer func() {
+		_ = tempArchive.Close()
+	}()
 
 	if err := i.downloadArchive(ctx, arch, tempArchive); err != nil {
 		return "", err
@@ -80,7 +84,9 @@ func (i *Installer) InstallLintVersion(ctx context.Context, version string) (str
 	if err != nil {
 		return "", fmt.Errorf("create temp extract dir: %w", err)
 	}
-	defer os.RemoveAll(tempExtractDir)
+	defer func() {
+		_ = os.RemoveAll(tempExtractDir)
+	}()
 
 	if err := archive.Extract(tempArchive.Name(), tempExtractDir); err != nil {
 		return "", err
@@ -114,7 +120,9 @@ func (i *Installer) downloadArchive(ctx context.Context, arch golangcilint.Archi
 	if err != nil {
 		return fmt.Errorf("download golangci-lint archive: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download golangci-lint archive: unexpected status %s", resp.Status)

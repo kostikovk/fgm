@@ -212,7 +212,7 @@ func TestSaveNearest_MkdirAllError(t *testing.T) {
 	if err := os.Chmod(root, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(root, 0o755) })
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
 
 	_, err := SaveNearest(workDir, File{
 		Toolchain: ToolchainConfig{GolangCILint: "v2.10.0"},
@@ -237,7 +237,7 @@ func TestSaveNearest_WriteFileError(t *testing.T) {
 	if err := os.Chmod(root, 0o555); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(root, 0o755) })
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
 
 	_, err := SaveNearest(workDir, File{
 		Toolchain: ToolchainConfig{GolangCILint: "v2.10.0"},
@@ -259,7 +259,7 @@ func TestLoadNearest_ReadFileError(t *testing.T) {
 	if err := os.Chmod(fgmPath, 0o000); err != nil {
 		t.Fatalf("chmod: %v", err)
 	}
-	t.Cleanup(func() { os.Chmod(fgmPath, 0o644) })
+	t.Cleanup(func() { _ = os.Chmod(fgmPath, 0o644) })
 
 	_, _, err := LoadNearest(workDir)
 	if err == nil {

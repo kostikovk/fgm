@@ -84,7 +84,7 @@ func parseVersionMetadata(path string) (string, bool, error) {
 	if err != nil {
 		return "", false, fmt.Errorf("open %s: %w", path, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var goDirective string
 

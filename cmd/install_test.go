@@ -75,8 +75,8 @@ func TestInstallCommand_RejectsNilGoInstaller(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error when GoInstaller is nil")
 	}
-	if !strings.Contains(err.Error(), "Go installer is not configured") {
-		t.Fatalf("err = %q, want Go installer not configured error", err)
+	if !strings.Contains(err.Error(), "go installer is not configured") {
+		t.Fatalf("err = %q, want go installer not configured error", err)
 	}
 }
 
@@ -148,7 +148,7 @@ func TestInstallGoCommand_RejectsNilGoInstaller(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error when GoInstaller is nil")
 	}
-	if !strings.Contains(err.Error(), "Go installer is not configured") {
+	if !strings.Contains(err.Error(), "go installer is not configured") {
 		t.Fatalf("err = %q, want not configured error", err)
 	}
 }

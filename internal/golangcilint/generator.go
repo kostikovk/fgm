@@ -133,7 +133,7 @@ func (g *Generator) fetchLintReleases(ctx context.Context) ([]release, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch golangci-lint releases: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch golangci-lint releases: unexpected status %s", resp.Status)
@@ -165,7 +165,7 @@ func (g *Generator) fetchSupportThresholds(ctx context.Context) ([]supportThresh
 	if err != nil {
 		return nil, fmt.Errorf("fetch golangci-lint issues: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch golangci-lint issues: unexpected status %s", resp.Status)
@@ -210,7 +210,7 @@ func (g *Generator) fetchLatestGoVersions(ctx context.Context) (map[string]strin
 	if err != nil {
 		return nil, fmt.Errorf("fetch Go releases: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch Go releases: unexpected status %s", resp.Status)

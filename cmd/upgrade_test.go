@@ -340,7 +340,7 @@ func TestUpgradeGoCommand_RejectsNilGoUpgrader(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error when GoUpgrader is nil")
 	}
-	if !strings.Contains(err.Error(), "Go upgrader is not configured") {
+	if !strings.Contains(err.Error(), "go upgrader is not configured") {
 		t.Fatalf("err = %q, want not configured error", err)
 	}
 }

@@ -76,13 +76,13 @@ func TestExtractTarGz(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
 		// Directory entry.
 		dirHdr := &tar.Header{
@@ -150,10 +150,10 @@ func TestExtractZip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create zip file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		zw := zip.NewWriter(f)
-		defer zw.Close()
+		defer func() { _ = zw.Close() }()
 
 		// Directory entry.
 		dirHdr := &zip.FileHeader{
@@ -283,13 +283,13 @@ func TestSafeJoin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("create archive: %v", err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			gw := gzip.NewWriter(f)
-			defer gw.Close()
+			defer func() { _ = gw.Close() }()
 
 			tw := tar.NewWriter(gw)
-			defer tw.Close()
+			defer func() { _ = tw.Close() }()
 
 			content := []byte("evil content")
 			hdr := &tar.Header{
@@ -325,10 +325,10 @@ func TestSafeJoin(t *testing.T) {
 			if err != nil {
 				t.Fatalf("create archive: %v", err)
 			}
-			defer f.Close()
+			defer func() { _ = f.Close() }()
 
 			zw := zip.NewWriter(f)
-			defer zw.Close()
+			defer func() { _ = zw.Close() }()
 
 			hdr := &zip.FileHeader{
 				Name:   "../../../etc/passwd",
@@ -374,13 +374,13 @@ func TestExtractTarGz_RejectsEscapingEntry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		gzipWriter := gzip.NewWriter(file)
-		defer gzipWriter.Close()
+		defer func() { _ = gzipWriter.Close() }()
 
 		tarWriter := tar.NewWriter(gzipWriter)
-		defer tarWriter.Close()
+		defer func() { _ = tarWriter.Close() }()
 
 		content := []byte("boom")
 		if err := tarWriter.WriteHeader(&tar.Header{
@@ -414,10 +414,10 @@ func TestExtractZip_RejectsEscapingEntry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		zipWriter := zip.NewWriter(file)
-		defer zipWriter.Close()
+		defer func() { _ = zipWriter.Close() }()
 
 		writer, err := zipWriter.Create("../escape.txt")
 		if err != nil {
@@ -480,13 +480,13 @@ func TestExtractTarGz_ErrorCreatingDirectory(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		gzipWriter := gzip.NewWriter(file)
-		defer gzipWriter.Close()
+		defer func() { _ = gzipWriter.Close() }()
 
 		tarWriter := tar.NewWriter(gzipWriter)
-		defer tarWriter.Close()
+		defer func() { _ = tarWriter.Close() }()
 
 		if err := tarWriter.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
@@ -520,13 +520,13 @@ func TestExtractTarGz_ErrorCreatingFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		gzipWriter := gzip.NewWriter(file)
-		defer gzipWriter.Close()
+		defer func() { _ = gzipWriter.Close() }()
 
 		tarWriter := tar.NewWriter(gzipWriter)
-		defer tarWriter.Close()
+		defer func() { _ = tarWriter.Close() }()
 
 		content := []byte("hello")
 		if err := tarWriter.WriteHeader(&tar.Header{
@@ -565,10 +565,10 @@ func TestExtractZip_ErrorCreatingDirectory(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		zipWriter := zip.NewWriter(file)
-		defer zipWriter.Close()
+		defer func() { _ = zipWriter.Close() }()
 
 		header := &zip.FileHeader{Name: "nested/"}
 		header.SetMode(0o755 | os.ModeDir)
@@ -600,10 +600,10 @@ func TestExtractZip_ErrorCreatingFile(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		zipWriter := zip.NewWriter(file)
-		defer zipWriter.Close()
+		defer func() { _ = zipWriter.Close() }()
 
 		header := &zip.FileHeader{Name: "nested", Method: zip.Deflate}
 		header.SetMode(0o644)
@@ -639,13 +639,13 @@ func TestExtractTarGz_ErrorCreatingParentDirectory(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		gzipWriter := gzip.NewWriter(file)
-		defer gzipWriter.Close()
+		defer func() { _ = gzipWriter.Close() }()
 
 		tarWriter := tar.NewWriter(gzipWriter)
-		defer tarWriter.Close()
+		defer func() { _ = tarWriter.Close() }()
 
 		content := []byte("hello")
 		if err := tarWriter.WriteHeader(&tar.Header{
@@ -684,10 +684,10 @@ func TestExtractZip_ErrorCreatingParentDirectory(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 
 		zipWriter := zip.NewWriter(file)
-		defer zipWriter.Close()
+		defer func() { _ = zipWriter.Close() }()
 
 		header := &zip.FileHeader{Name: "nested/file.txt", Method: zip.Deflate}
 		header.SetMode(0o644)
@@ -907,10 +907,10 @@ func TestExtractZip_PreservesExecutablePermissions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create zip file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		zw := zip.NewWriter(f)
-		defer zw.Close()
+		defer func() { _ = zw.Close() }()
 
 		fileHdr := &zip.FileHeader{
 			Name:   "run.sh",
@@ -974,7 +974,7 @@ func TestExtractTarGz_ErrorForCorruptTar(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
 		// Write non-tar data inside a valid gzip stream.
@@ -1037,13 +1037,13 @@ func TestExtractTarGz_HandlesSymlinks(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
 		// Directory entry.
 		if err := tw.WriteHeader(&tar.Header{
@@ -1118,13 +1118,13 @@ func TestExtractTarGz_SkipsUnknownTypes(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
 		// Regular file entry.
 		content := []byte("good file")
@@ -1198,13 +1198,13 @@ func TestExtractTarGz_SymlinkPathTraversalRejected(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
 		// Symlink with a path-traversal Name.
 		if err := tw.WriteHeader(&tar.Header{
@@ -1238,13 +1238,13 @@ func TestExtractTarGz_DirPathTraversalRejected(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
 		if err := tw.WriteHeader(&tar.Header{
 			Typeflag: tar.TypeDir,
@@ -1277,10 +1277,10 @@ func TestExtractZip_DirPathTraversalRejected(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		zw := zip.NewWriter(f)
-		defer zw.Close()
+		defer func() { _ = zw.Close() }()
 
 		hdr := &zip.FileHeader{
 			Name:   "../../../etc/evil-dir/",
@@ -1315,10 +1315,10 @@ func TestExtractZip_FilePathTraversalRejected(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		zw := zip.NewWriter(f)
-		defer zw.Close()
+		defer func() { _ = zw.Close() }()
 
 		hdr := &zip.FileHeader{
 			Name:   "../../../etc/shadow",
@@ -1364,10 +1364,10 @@ func TestExtractZip_MultipleFilesExtracted(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create zip file: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		zw := zip.NewWriter(f)
-		defer zw.Close()
+		defer func() { _ = zw.Close() }()
 
 		// Create directory entries first.
 		for _, dir := range []string{"dir/", "dir/sub/"} {
@@ -1434,13 +1434,13 @@ func TestExtractTarGz_MultipleTypesInOneArchive(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create archive: %v", err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 
 		gw := gzip.NewWriter(f)
-		defer gw.Close()
+		defer func() { _ = gw.Close() }()
 
 		tw := tar.NewWriter(gw)
-		defer tw.Close()
+		defer func() { _ = tw.Close() }()
 
 		// Directory.
 		if err := tw.WriteHeader(&tar.Header{
