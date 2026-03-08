@@ -53,6 +53,10 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if local && len(versions) == 0 {
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), "No local Go versions installed.")
+				return err
+			}
 
 			currentVersion := ""
 			if application.Resolver != nil {
@@ -105,6 +109,10 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 
 				versions, err := application.LintStore.ListLocalLintVersions(cmd.Context())
 				if err != nil {
+					return err
+				}
+				if len(versions) == 0 {
+					_, err := fmt.Fprintln(cmd.OutOrStdout(), "No local golangci-lint versions installed.")
 					return err
 				}
 				for _, version := range versions {

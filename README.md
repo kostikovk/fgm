@@ -168,6 +168,10 @@ fgm versions golangci-lint --local
 fgm versions golangci-lint --remote [--go <version>]
 ```
 
+`fgm current` shows where each selected version came from, for example `go 1.26.1 (global)` or `golangci-lint v2.11.2 (config)`.
+
+Local version listings print explicit empty-state messages when nothing has been installed yet.
+
 ## Development Workflow
 
 Local development is centered on standard Go commands plus a small Makefile wrapper:

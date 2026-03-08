@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/koskosovu4/fgm/internal/app"
 	"github.com/spf13/cobra"
@@ -19,16 +20,35 @@ func newCurrentCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "go %s\n", selection.GoVersion); err != nil {
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), formatCurrentLine("go", selection.GoVersion, selection.GoSource)); err != nil {
 				return err
 			}
 			if selection.LintVersion != "" {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "golangci-lint %s\n", selection.LintVersion); err != nil {
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), formatCurrentLine("golangci-lint", selection.LintVersion, selection.LintSource)); err != nil {
 					return err
 				}
 			}
 
 			return nil
 		},
+	}
+}
+
+func formatCurrentLine(tool string, version string, source string) string {
+	line := fmt.Sprintf("%s %s", tool, version)
+	if label := sourceLabel(source); label != "" {
+		line += " (" + label + ")"
+	}
+	return line
+}
+
+func sourceLabel(source string) string {
+	switch source {
+	case "":
+		return ""
+	case "global", "config", "local", "remote":
+		return source
+	default:
+		return filepath.Base(source)
 	}
 }

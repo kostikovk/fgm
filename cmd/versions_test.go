@@ -234,6 +234,28 @@ func TestVersionsGoLocal_ShowsInstalledVersions(t *testing.T) {
 	}
 }
 
+func TestVersionsGoLocal_ShowsEmptyStateWhenNothingIsInstalled(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		GoStore: stubGoStore{
+			listLocalGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return nil, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "versions", "go", "--local")
+	if err != nil {
+		t.Fatalf("execute versions go --local: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "No local Go versions installed.") {
+		t.Fatalf("stdout = %q, want empty-state message", stdout)
+	}
+}
+
 func TestVersionsGoRemote_ShowsAvailableVersions(t *testing.T) {
 	t.Parallel()
 
@@ -328,6 +350,28 @@ func TestVersionsGolangCILintRemote_ShowsCompatibleVersions(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "v2.6.1") {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "v2.6.1")
+	}
+}
+
+func TestVersionsGolangCILintLocal_ShowsEmptyStateWhenNothingIsInstalled(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		LintStore: stubLintStore{
+			listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+				return nil, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "versions", "golangci-lint", "--local")
+	if err != nil {
+		t.Fatalf("execute versions golangci-lint --local: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "No local golangci-lint versions installed.") {
+		t.Fatalf("stdout = %q, want empty-state message", stdout)
 	}
 }
 

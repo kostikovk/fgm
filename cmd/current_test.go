@@ -118,8 +118,8 @@ func TestCurrentCommand_FallsBackToGlobalVersionOutsideRepos(t *testing.T) {
 		t.Fatalf("execute current: %v\nstderr:\n%s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "go 1.25.7") {
-		t.Fatalf("stdout = %q, want it to contain %q", stdout, "go 1.25.7")
+	if !strings.Contains(stdout, "go 1.25.7 (global)") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "go 1.25.7 (global)")
 	}
 }
 
@@ -161,8 +161,8 @@ func TestCurrentCommand_DisplaysCompatibleLintVersion(t *testing.T) {
 	if !strings.Contains(stdout, "go 1.25.0") {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "go 1.25.0")
 	}
-	if !strings.Contains(stdout, "golangci-lint v2.11.2") {
-		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.11.2")
+	if !strings.Contains(stdout, "golangci-lint v2.11.2 (remote)") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.11.2 (remote)")
 	}
 }
 
@@ -204,7 +204,85 @@ func TestCurrentCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 		t.Fatalf("execute current: %v\nstderr:\n%s", err, stderr)
 	}
 
-	if !strings.Contains(stdout, "golangci-lint v2.10.1") {
-		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.10.1")
+	if !strings.Contains(stdout, "golangci-lint v2.10.1 (config)") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.10.1 (config)")
+	}
+}
+
+func TestCurrentCommand_ShowsGoSourceLabelsForWorkspaceFiles(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	goMod := "module example.com/demo\n\ngo 1.24.0\n"
+	if err := os.WriteFile(filepath.Join(tempDir, "go.mod"), []byte(goMod), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+
+	application := &app.App{
+		Resolver: resolve.New(nil),
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current", "--chdir", tempDir)
+	if err != nil {
+		t.Fatalf("execute current: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "go 1.24.0 (go.mod)") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "go 1.24.0 (go.mod)")
+	}
+}
+
+func TestCurrentCommand_ShowsLocalLintSourceLabel(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		Resolver: stubSelectionResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{
+					GoVersion:   "1.25.7",
+					GoSource:    "global",
+					LintVersion: "v2.11.2",
+					LintSource:  "local",
+				}, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "current")
+	if err != nil {
+		t.Fatalf("execute current: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "golangci-lint v2.11.2 (local)") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "golangci-lint v2.11.2 (local)")
+	}
+}
+
+func TestFormatCurrentLine_CoversSourceLabelBranches(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		source string
+		want   string
+	}{
+		{name: "empty", source: "", want: "go 1.25.7"},
+		{name: "global", source: "global", want: "go 1.25.7 (global)"},
+		{name: "config", source: "config", want: "go 1.25.7 (config)"},
+		{name: "local", source: "local", want: "go 1.25.7 (local)"},
+		{name: "remote", source: "remote", want: "go 1.25.7 (remote)"},
+		{name: "path", source: "/tmp/project/go.work", want: "go 1.25.7 (go.work)"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := formatCurrentLine("go", "1.25.7", tc.source)
+			if got != tc.want {
+				t.Fatalf("formatCurrentLine() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
