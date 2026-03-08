@@ -3,7 +3,7 @@ BIN_DIR := tmp
 BIN := $(BIN_DIR)/$(APP)
 CMD ?= --help
 
-.PHONY: help build run cmd test fmt fix pre-commit hook-install update-lint-compat clean
+.PHONY: help build run cmd test fmt fix tidy pre-commit hook-install update-lint-compat clean
 
 help:
 	@echo "Available targets:"
@@ -12,7 +12,8 @@ help:
 	@echo "  make cmd    - run the built CLI, override with CMD='current --chdir .'"
 	@echo "  make test   - run all tests"
 	@echo "  make fmt    - format Go files"
-	@echo "  make fix    - apply Go fixes, format Go files, and run tests"
+	@echo "  make fix    - apply Go fixes and format Go files"
+	@echo "  make tidy   - clean up go.mod and go.sum"
 	@echo "  make pre-commit - run the local pre-commit checks"
 	@echo "  make hook-install - sync Hooky hooks into .git/hooks"
 	@echo "  make update-lint-compat - regenerate golangci-lint compatibility.json"
@@ -37,9 +38,11 @@ fmt:
 fix:
 	go fix ./...
 	go fmt ./...
-	go test ./...
 
-pre-commit: fix build
+tidy:
+	go mod tidy
+
+pre-commit: fix test tidy build
 
 hook-install:
 	hooky init

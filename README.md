@@ -322,6 +322,8 @@ make pre-commit
 That currently executes:
 
 - `make fix`
+- `make test`
+- `make tidy`
 - `make build`
 
 ## Status And Next Work
