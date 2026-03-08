@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/koskosovu4/fgm/internal/currenttoolchain"
 	"github.com/koskosovu4/fgm/internal/execenv"
 	"github.com/koskosovu4/fgm/internal/resolve"
 	"github.com/koskosovu4/fgm/internal/testutil"
@@ -42,7 +43,11 @@ func TestExecCommand_RunsCommandWithSelectedGoOnPATH(t *testing.T) {
 		},
 	}
 
-	executor := execenv.New(resolve.New(store), store, "")
+	executor := execenv.New(execenv.Config{
+		Resolver:  resolve.New(store),
+		GoLocator: store,
+		PathEnv:   "",
+	})
 	application := app.New(app.Config{
 		Resolver: resolve.New(store),
 		GoStore:  store,
@@ -58,4 +63,103 @@ func TestExecCommand_RunsCommandWithSelectedGoOnPATH(t *testing.T) {
 	if !strings.Contains(stdout, "go version go1.25.7") {
 		t.Fatalf("stdout = %q, want it to contain fake go output", stdout)
 	}
+}
+
+func TestExecCommand_RunsCommandWithSelectedLintOnPATH(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	workDir := t.TempDir()
+	goBinDir := filepath.Join(t.TempDir(), "go-bin")
+	lintBinDir := filepath.Join(t.TempDir(), "lint-bin")
+	if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+		t.Fatalf("mkdir go bin dir: %v", err)
+	}
+	if err := os.MkdirAll(lintBinDir, 0o755); err != nil {
+		t.Fatalf("mkdir lint bin dir: %v", err)
+	}
+
+	goBinary := filepath.Join(goBinDir, "go")
+	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.25.7 darwin/arm64\\n'\n"), 0o755); err != nil {
+		t.Fatalf("write fake go binary: %v", err)
+	}
+	lintBinary := filepath.Join(lintBinDir, "golangci-lint")
+	if err := os.WriteFile(lintBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version v2.11.2\\n'\n"), 0o755); err != nil {
+		t.Fatalf("write fake lint binary: %v", err)
+	}
+
+	goStore := stubGoStore{
+		globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+			return "1.25.7", true, nil
+		},
+		goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+			return goBinary, nil
+		},
+	}
+	lintStore := stubLintStore{
+		listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+			return []string{"v2.11.2"}, nil
+		},
+		lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+			return lintBinary, nil
+		},
+	}
+	lintProvider := stubLintRemoteProvider{
+		listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+			return []app.LintVersion{{Version: "v2.11.2", Recommended: true}}, nil
+		},
+	}
+	locator := execLocatorStub{
+		goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+			return goBinary, nil
+		},
+		lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+			return lintBinary, nil
+		},
+	}
+
+	resolver := currenttoolchain.New(currenttoolchain.Config{
+		GoResolver:         resolve.New(goStore),
+		LintStore:          lintStore,
+		LintRemoteProvider: lintProvider,
+	})
+	executor := execenv.New(execenv.Config{
+		Resolver:    resolver,
+		GoLocator:   locator,
+		LintLocator: locator,
+		PathEnv:     "",
+	})
+	application := app.New(app.Config{
+		Resolver:           resolver,
+		GoStore:            goStore,
+		LintStore:          lintStore,
+		LintRemoteProvider: lintProvider,
+		Executor:           executor,
+	})
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "exec", "--chdir", workDir, "--", "golangci-lint", "version")
+	if err != nil {
+		t.Fatalf("execute exec command: %v\nstderr:\n%s", err, stderr)
+	}
+
+	if !strings.Contains(stdout, "golangci-lint has version v2.11.2") {
+		t.Fatalf("stdout = %q, want it to contain fake lint output", stdout)
+	}
+}
+
+type execLocatorStub struct {
+	goBinaryPathFn   func(ctx context.Context, version string) (string, error)
+	lintBinaryPathFn func(ctx context.Context, version string) (string, error)
+}
+
+func (s execLocatorStub) GoBinaryPath(ctx context.Context, version string) (string, error) {
+	return s.goBinaryPathFn(ctx, version)
+}
+
+func (s execLocatorStub) LintBinaryPath(ctx context.Context, version string) (string, error) {
+	return s.lintBinaryPathFn(ctx, version)
 }

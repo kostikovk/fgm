@@ -62,6 +62,10 @@ func (s stubGoStore) GoBinaryPath(ctx context.Context, version string) (string, 
 	return s.goBinaryPathFn(ctx, version)
 }
 
+func (s stubGoStore) LintBinaryPath(ctx context.Context, version string) (string, error) {
+	return "", nil
+}
+
 func (s stubGoStore) EnsureShims() error {
 	if s.ensureShimsFn == nil {
 		return nil
@@ -98,6 +102,7 @@ func (s stubLintRemoteProvider) ListRemoteLintVersions(
 type stubLintStore struct {
 	listLocalLintVersionsFn func(ctx context.Context) ([]string, error)
 	deleteLintVersionFn     func(ctx context.Context, version string) (string, error)
+	lintBinaryPathFn        func(ctx context.Context, version string) (string, error)
 }
 
 func (s stubLintStore) ListLocalLintVersions(ctx context.Context) ([]string, error) {
@@ -109,6 +114,13 @@ func (s stubLintStore) DeleteLintVersion(ctx context.Context, version string) (s
 		return "", nil
 	}
 	return s.deleteLintVersionFn(ctx, version)
+}
+
+func (s stubLintStore) LintBinaryPath(ctx context.Context, version string) (string, error) {
+	if s.lintBinaryPathFn == nil {
+		return "", nil
+	}
+	return s.lintBinaryPathFn(ctx, version)
 }
 
 func TestVersionsGoLocal_ShowsInstalledVersions(t *testing.T) {

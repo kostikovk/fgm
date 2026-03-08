@@ -181,8 +181,11 @@ fgm use go 1.25.7 --global
 
 ```bash
 fgm exec -- go version
+fgm exec -- golangci-lint version
 fgm exec --chdir /path/to/repo -- go test ./...
 ```
+
+When a compatible installed `golangci-lint` version is selected, `fgm exec` also prepends its binary directory to `PATH`.
 
 ### Remove an installed FGM-managed version
 

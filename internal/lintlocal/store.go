@@ -67,3 +67,15 @@ func (s *Store) DeleteLintVersion(ctx context.Context, version string) (string, 
 
 	return installDir, nil
 }
+
+// LintBinaryPath returns the executable path for the requested golangci-lint version.
+func (s *Store) LintBinaryPath(ctx context.Context, version string) (string, error) {
+	_ = ctx
+
+	binaryPath := filepath.Join(s.root, "golangci-lint", version, "golangci-lint")
+	if _, err := os.Stat(binaryPath); err == nil {
+		return binaryPath, nil
+	}
+
+	return "", fmt.Errorf("golangci-lint version %s is not installed", version)
+}

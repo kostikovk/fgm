@@ -22,19 +22,34 @@ type GoBinaryLocator interface {
 	GoBinaryPath(ctx context.Context, version string) (string, error)
 }
 
+// LintBinaryLocator returns the executable path for a golangci-lint version.
+type LintBinaryLocator interface {
+	LintBinaryPath(ctx context.Context, version string) (string, error)
+}
+
 // Executor runs commands with the selected Go version prepended to PATH.
 type Executor struct {
-	resolver SelectionResolver
-	locator  GoBinaryLocator
-	pathEnv  string
+	resolver    SelectionResolver
+	goLocator   GoBinaryLocator
+	lintLocator LintBinaryLocator
+	pathEnv     string
+}
+
+// Config configures an Executor.
+type Config struct {
+	Resolver    SelectionResolver
+	GoLocator   GoBinaryLocator
+	LintLocator LintBinaryLocator
+	PathEnv     string
 }
 
 // New constructs an Executor.
-func New(resolver SelectionResolver, locator GoBinaryLocator, pathEnv string) *Executor {
+func New(config Config) *Executor {
 	return &Executor{
-		resolver: resolver,
-		locator:  locator,
-		pathEnv:  pathEnv,
+		resolver:    config.Resolver,
+		goLocator:   config.GoLocator,
+		lintLocator: config.LintLocator,
+		pathEnv:     config.PathEnv,
 	}
 }
 
@@ -49,12 +64,21 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, stdi
 		return err
 	}
 
-	goBinaryPath, err := e.locator.GoBinaryPath(ctx, selection.GoVersion)
+	goBinaryPath, err := e.goLocator.GoBinaryPath(ctx, selection.GoVersion)
 	if err != nil {
 		return err
 	}
 
-	env := withPrependedPath(os.Environ(), filepath.Dir(goBinaryPath), e.pathEnv)
+	pathDirs := []string{filepath.Dir(goBinaryPath)}
+	if selection.LintVersion != "" && e.lintLocator != nil {
+		lintBinaryPath, err := e.lintLocator.LintBinaryPath(ctx, selection.LintVersion)
+		if err != nil {
+			return err
+		}
+		pathDirs = append(pathDirs, filepath.Dir(lintBinaryPath))
+	}
+
+	env := withPrependedPath(os.Environ(), pathDirs, e.pathEnv)
 	commandPath, err := resolveCommandPath(args[0], env)
 	if err != nil {
 		return err
@@ -70,7 +94,7 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, stdi
 	return cmd.Run()
 }
 
-func withPrependedPath(env []string, goBinDir string, fallbackPath string) []string {
+func withPrependedPath(env []string, toolDirs []string, fallbackPath string) []string {
 	pathValue := fallbackPath
 	for _, entry := range env {
 		if len(entry) > 5 && entry[:5] == "PATH=" {
@@ -79,9 +103,21 @@ func withPrependedPath(env []string, goBinDir string, fallbackPath string) []str
 		}
 	}
 
-	newPath := goBinDir
+	prefix := make([]string, 0, len(toolDirs))
+	for _, dir := range toolDirs {
+		if dir == "" {
+			continue
+		}
+		prefix = append(prefix, dir)
+	}
+
+	newPath := strings.Join(prefix, string(os.PathListSeparator))
 	if pathValue != "" {
-		newPath = goBinDir + string(os.PathListSeparator) + pathValue
+		if newPath != "" {
+			newPath = newPath + string(os.PathListSeparator) + pathValue
+		} else {
+			newPath = pathValue
+		}
 	}
 
 	filtered := make([]string, 0, len(env)+1)
