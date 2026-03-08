@@ -1,0 +1,103 @@
+package app
+
+import (
+	"context"
+	"io"
+)
+
+// Resolver returns the selected toolchain information for a workspace.
+type Resolver interface {
+	Current(ctx context.Context, workDir string) (Selection, error)
+}
+
+// GoLocalVersionStore lists installed Go toolchains for the active platform.
+type GoLocalVersionStore interface {
+	ListLocalGoVersions(ctx context.Context) ([]string, error)
+	HasGoVersion(ctx context.Context, version string) (bool, error)
+	GlobalGoVersion(ctx context.Context) (string, bool, error)
+	SetGlobalGoVersion(ctx context.Context, version string) error
+	DeleteGoVersion(ctx context.Context, version string) (string, error)
+	GoBinaryPath(ctx context.Context, version string) (string, error)
+	EnsureShims() error
+	ShimDir() string
+}
+
+// GoRemoteVersionProvider lists remotely available Go toolchains.
+type GoRemoteVersionProvider interface {
+	ListRemoteGoVersions(ctx context.Context) ([]string, error)
+}
+
+// GoInstaller installs Go toolchains into the local FGM-managed store.
+type GoInstaller interface {
+	InstallGoVersion(ctx context.Context, version string) (string, error)
+}
+
+// ImportedGo describes a Go installation imported into FGM.
+type ImportedGo struct {
+	Version string
+	Path    string
+}
+
+// GoImporter imports existing Go installations into FGM.
+type GoImporter interface {
+	ImportAuto(ctx context.Context) ([]ImportedGo, error)
+}
+
+// Doctor reports environment and configuration diagnostics for FGM.
+type Doctor interface {
+	Diagnose(ctx context.Context) ([]string, error)
+}
+
+// Executor runs commands with a selected Go toolchain on PATH.
+type Executor interface {
+	Exec(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+}
+
+// EnvRenderer prints shell-specific environment setup for FGM.
+type EnvRenderer interface {
+	Render(ctx context.Context, shell string) ([]string, error)
+}
+
+// Selection describes the currently selected toolchain.
+type Selection struct {
+	GoVersion string
+	GoSource  string
+}
+
+// App holds the services used by Cobra commands.
+type App struct {
+	Resolver         Resolver
+	GoStore          GoLocalVersionStore
+	GoRemoteProvider GoRemoteVersionProvider
+	GoInstaller      GoInstaller
+	GoImporter       GoImporter
+	Doctor           Doctor
+	Executor         Executor
+	EnvRenderer      EnvRenderer
+}
+
+// Config configures an App instance.
+type Config struct {
+	Resolver         Resolver
+	GoStore          GoLocalVersionStore
+	GoRemoteProvider GoRemoteVersionProvider
+	GoInstaller      GoInstaller
+	GoImporter       GoImporter
+	Doctor           Doctor
+	Executor         Executor
+	EnvRenderer      EnvRenderer
+}
+
+// New constructs the application service container.
+func New(config Config) *App {
+	return &App{
+		Resolver:         config.Resolver,
+		GoStore:          config.GoStore,
+		GoRemoteProvider: config.GoRemoteProvider,
+		GoInstaller:      config.GoInstaller,
+		GoImporter:       config.GoImporter,
+		Doctor:           config.Doctor,
+		Executor:         config.Executor,
+		EnvRenderer:      config.EnvRenderer,
+	}
+}
