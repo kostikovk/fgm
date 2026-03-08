@@ -137,7 +137,12 @@ fgm versions golangci-lint --remote --go 1.25.0
 fgm versions golangci-lint --remote --chdir /path/to/repo
 ```
 
-FGM filters remote releases to versions that match your platform and a curated embedded compatibility manifest, then marks the recommended version with `*`.
+FGM filters the fetched remote releases to versions that match your platform and a curated embedded compatibility manifest, then marks the recommended version with `*`.
+
+This output should be read as:
+
+- known compatible versions in FGM's generated catalog
+- not a guaranteed complete list of every historically compatible `golangci-lint` release ever published
 
 The manifest is generated from upstream `golangci-lint` releases, Go support issues, and the Go releases feed. Regenerate it with:
 
@@ -263,7 +268,7 @@ Implemented now:
 - Go resolution from `go.work` and `go.mod`
 - local and remote Go version listing
 - remote compatible `golangci-lint` version listing
-- embedded compatibility manifest for verified `golangci-lint` support ranges
+- embedded compatibility manifest for verified known `golangci-lint` support ranges
 - Go install, remove, import, global use, doctor, env, exec, and shim support
 
 Planned next:
