@@ -1,6 +1,7 @@
 package lintconfig
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -18,13 +19,7 @@ func TestPresetLinters_Standard(t *testing.T) {
 	}
 
 	// govet must be in every preset.
-	found := false
-	for _, l := range linters {
-		if l == "govet" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(linters, "govet")
 	if !found {
 		t.Fatal("govet not found in standard preset")
 	}
@@ -47,13 +42,7 @@ func TestPresetLinters_FiltersGoVersion(t *testing.T) {
 	}
 
 	linters22 := PresetLinters(catalog, PresetStandard, 22)
-	found := false
-	for _, l := range linters22 {
-		if l == "copyloopvar" {
-			found = true
-			break
-		}
-	}
+	found := slices.Contains(linters22, "copyloopvar")
 	if !found {
 		t.Fatal("copyloopvar should be included for Go 1.22")
 	}

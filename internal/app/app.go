@@ -154,17 +154,17 @@ type LintFinding struct {
 
 // App holds the services used by Cobra commands.
 type App struct {
-	Resolver           Resolver
-	GoStore            GoLocalVersionStore
-	LintStore          LintLocalVersionStore
-	GoRemoteProvider   GoRemoteVersionProvider
-	LintRemoteProvider LintRemoteVersionProvider
-	GoInstaller        GoInstaller
-	LintInstaller      LintInstaller
-	GoImporter         GoImporter
-	LintImporter       LintImporter
-	GoUpgrader         GoUpgrader
-	BuildInfo          BuildInfo
+	Resolver            Resolver
+	GoStore             GoLocalVersionStore
+	LintStore           LintLocalVersionStore
+	GoRemoteProvider    GoRemoteVersionProvider
+	LintRemoteProvider  LintRemoteVersionProvider
+	GoInstaller         GoInstaller
+	LintInstaller       LintInstaller
+	GoImporter          GoImporter
+	LintImporter        LintImporter
+	GoUpgrader          GoUpgrader
+	BuildInfo           BuildInfo
 	Doctor              Doctor
 	Executor            Executor
 	EnvRenderer         EnvRenderer
