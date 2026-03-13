@@ -21,6 +21,7 @@ import (
 	"github.com/koskosovu4/fgm/internal/golocal"
 	"github.com/koskosovu4/fgm/internal/goreleases"
 	"github.com/koskosovu4/fgm/internal/goupgrade"
+	"github.com/koskosovu4/fgm/internal/lintconfig"
 	"github.com/koskosovu4/fgm/internal/lintimport"
 	"github.com/koskosovu4/fgm/internal/lintinstall"
 	"github.com/koskosovu4/fgm/internal/lintlocal"
@@ -32,6 +33,9 @@ type rootCommand interface {
 }
 
 var (
+	buildVersion            = "dev"
+	buildCommit             = "unknown"
+	buildDate               = "unknown"
 	defaultGoRoot           = golocal.DefaultRoot
 	getEnv                  = os.Getenv
 	stderrWriter  io.Writer = os.Stderr
@@ -124,6 +128,12 @@ func run(
 		ShellPath: getenv("SHELL"),
 		GOOS:      runtime.GOOS,
 	})
+	lintConfigService, err := lintconfig.New(lintconfig.Config{
+		Resolver: currentResolver,
+	})
+	if err != nil {
+		return err
+	}
 	application := &app.App{
 		Resolver:           currentResolver,
 		GoStore:            goStore,
@@ -135,9 +145,16 @@ func run(
 		GoImporter:         goImporter,
 		LintImporter:       lintImporter,
 		GoUpgrader:         goUpgrader,
-		Doctor:             doctorService,
-		Executor:           executor,
-		EnvRenderer:        envRenderer,
+		BuildInfo: app.BuildInfo{
+			Version: buildVersion,
+			Commit:  buildCommit,
+			Date:    buildDate,
+		},
+		Doctor:              doctorService,
+		Executor:            executor,
+		EnvRenderer:         envRenderer,
+		LintConfigGenerator: lintConfigService,
+		LintDoctor:          lintConfigService,
 	}
 
 	return buildRoot(application).ExecuteContext(ctx)

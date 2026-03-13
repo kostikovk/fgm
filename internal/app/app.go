@@ -66,6 +66,13 @@ type ImportedLint struct {
 	Path    string
 }
 
+// BuildInfo describes the current FGM build metadata.
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
 // GoImporter imports existing Go installations into FGM.
 type GoImporter interface {
 	ImportAuto(ctx context.Context) ([]ImportedGo, error)
@@ -121,6 +128,30 @@ type Selection struct {
 	LintSource  string
 }
 
+// LintConfigGenerator generates golangci-lint configuration files.
+type LintConfigGenerator interface {
+	Generate(ctx context.Context, opts LintConfigOptions) ([]byte, error)
+}
+
+// LintConfigOptions configures lint config generation.
+type LintConfigOptions struct {
+	WorkDir     string
+	Preset      string // "minimal", "standard", "strict"
+	WithImports bool
+	Force       bool
+}
+
+// LintDoctor audits an existing golangci-lint configuration.
+type LintDoctor interface {
+	Diagnose(ctx context.Context, workDir string) ([]LintFinding, error)
+}
+
+// LintFinding describes a single lint config diagnostic.
+type LintFinding struct {
+	Severity string // "ERROR", "WARN", "INFO", "OK"
+	Message  string
+}
+
 // App holds the services used by Cobra commands.
 type App struct {
 	Resolver           Resolver
@@ -133,7 +164,10 @@ type App struct {
 	GoImporter         GoImporter
 	LintImporter       LintImporter
 	GoUpgrader         GoUpgrader
-	Doctor             Doctor
-	Executor           Executor
-	EnvRenderer        EnvRenderer
+	BuildInfo          BuildInfo
+	Doctor              Doctor
+	Executor            Executor
+	EnvRenderer         EnvRenderer
+	LintConfigGenerator LintConfigGenerator
+	LintDoctor          LintDoctor
 }

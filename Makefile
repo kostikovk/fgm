@@ -4,6 +4,10 @@ BIN := $(BIN_DIR)/$(APP)
 CMD ?= --help
 COVERPROFILE := $(BIN_DIR)/coverage.out
 COVERHTML := $(BIN_DIR)/coverage.html
+VERSION ?= dev
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS := -s -w -X main.buildVersion=$(VERSION) -X main.buildCommit=$(COMMIT) -X main.buildDate=$(DATE)
 
 .PHONY: help build run cmd test cover cover-html fmt fix tidy pre-commit hook-install update-lint-compat clean
 
@@ -25,7 +29,7 @@ help:
 
 build:
 	@mkdir -p $(BIN_DIR)
-	go build -o $(BIN) .
+	go build -ldflags "$(LDFLAGS)" -o $(BIN) .
 
 run:
 	go run . --help

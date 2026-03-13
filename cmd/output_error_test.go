@@ -287,3 +287,21 @@ func TestVersionsLintCmd_LocalWriteError(t *testing.T) {
 		t.Fatalf("err = %v, want write boom", err)
 	}
 }
+
+func TestVersionCmd_ReturnsWriteError(t *testing.T) {
+	t.Parallel()
+
+	cmd := newVersionCmd(&app.App{
+		BuildInfo: app.BuildInfo{
+			Version: "v0.1.0",
+			Commit:  "abc1234",
+			Date:    "2026-03-11T10:00:00Z",
+		},
+	})
+	cmd.SetOut(&failAfterWriter{failAt: 1})
+
+	err := cmd.RunE(cmd, nil)
+	if err == nil || err.Error() != "write boom" {
+		t.Fatalf("err = %v, want write boom", err)
+	}
+}

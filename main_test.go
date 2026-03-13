@@ -53,6 +53,9 @@ func TestRunBuildsApplicationAndExecutesRootCommand(t *testing.T) {
 	if capturedApp.GoStore == nil || capturedApp.LintStore == nil {
 		t.Fatal("expected application stores to be initialized")
 	}
+	if capturedApp.BuildInfo.Version != "dev" || capturedApp.BuildInfo.Commit != "unknown" || capturedApp.BuildInfo.Date != "unknown" {
+		t.Fatalf("BuildInfo = %+v, want default build metadata", capturedApp.BuildInfo)
+	}
 }
 
 func TestMainWritesDefaultRootErrorAndExits(t *testing.T) {

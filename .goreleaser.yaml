@@ -1,0 +1,56 @@
+version: 2
+
+project_name: fgm
+
+before:
+  hooks:
+    - go test ./...
+
+builds:
+  - id: fgm
+    main: .
+    binary: fgm
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.buildVersion={{ .Version }}
+      - -X main.buildCommit={{ .Commit }}
+      - -X main.buildDate={{ .Date }}
+
+archives:
+  - id: default
+    ids:
+      - fgm
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: checksums.txt
+
+release:
+  github:
+    owner: koskosovu4
+    name: fgm
+
+brews:
+  - name: fgm
+    repository:
+      owner: koskosovu4
+      name: homebrew-fgm
+    homepage: https://github.com/koskosovu4/fgm
+    description: Fast Go toolchain manager with golangci-lint compatibility support
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
