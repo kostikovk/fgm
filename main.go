@@ -159,6 +159,7 @@ func run(
 		Doctor:              doctorService,
 		Executor:            executor,
 		EnvRenderer:         envRenderer,
+		ProfileInstaller:    envRenderer,
 		LintConfigGenerator: lintConfigService,
 		LintDoctor:          lintConfigService,
 	}

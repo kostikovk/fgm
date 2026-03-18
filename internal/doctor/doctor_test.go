@@ -181,6 +181,15 @@ func TestDiagnose_LintRemoteProviderErrorIsPropagated(t *testing.T) {
 	}
 }
 
+// findingsToString formats findings as "SEVERITY message" lines for test assertions.
+func findingsToString(findings []app.DoctorFinding) string {
+	parts := make([]string, len(findings))
+	for i, f := range findings {
+		parts[i] = f.Severity + " " + f.Message
+	}
+	return strings.Join(parts, "\n")
+}
+
 func TestDiagnose_NoCompatibleLintWhenNoPinnedAndNoLintVersion(t *testing.T) {
 	t.Parallel()
 
@@ -209,12 +218,12 @@ func TestDiagnose_NoCompatibleLintWhenNoPinnedAndNoLintVersion(t *testing.T) {
 		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), workDir)
+	findings, err := service.Diagnose(context.Background(), workDir)
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
+	joined := findingsToString(findings)
 	if !strings.Contains(joined, "WARN no compatible golangci-lint version is known for Go 1.25.7") {
 		t.Fatalf("joined = %q, want no-compatible-lint warning", joined)
 	}
@@ -235,12 +244,12 @@ func TestDiagnose_ReportsGlobalVersionAndShimStatus(t *testing.T) {
 		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), ".")
+	findings, err := service.Diagnose(context.Background(), ".")
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
+	joined := findingsToString(findings)
 	if !strings.Contains(joined, "OK global Go version: 1.25.7") {
 		t.Fatalf("joined = %q, want global version line", joined)
 	}
@@ -249,7 +258,7 @@ func TestDiagnose_ReportsGlobalVersionAndShimStatus(t *testing.T) {
 	}
 }
 
-func TestDiagnose_SuggestsEnvCommandWhenShimDirMissing(t *testing.T) {
+func TestDiagnose_SetsFixKindWhenShimDirMissing(t *testing.T) {
 	t.Parallel()
 
 	service := New(Config{
@@ -264,14 +273,22 @@ func TestDiagnose_SuggestsEnvCommandWhenShimDirMissing(t *testing.T) {
 		PathEnv: "/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), ".")
+	findings, err := service.Diagnose(context.Background(), ".")
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
-	if !strings.Contains(joined, `Run: eval "$(fgm env)"`) {
-		t.Fatalf("joined = %q, want env suggestion", joined)
+	var found bool
+	for _, f := range findings {
+		if strings.Contains(f.Message, "shim dir is not on PATH") {
+			found = true
+			if f.FixKind != "shell_profile" {
+				t.Fatalf("FixKind = %q, want %q", f.FixKind, "shell_profile")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("expected shim-not-on-PATH finding")
 	}
 }
 
@@ -309,12 +326,12 @@ func TestDiagnose_ReportsSelectedToolchainAvailability(t *testing.T) {
 		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), "/repo")
+	findings, err := service.Diagnose(context.Background(), "/repo")
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
+	joined := findingsToString(findings)
 	if !strings.Contains(joined, "WARN selected Go version is not installed: 1.25.7") {
 		t.Fatalf("joined = %q, want missing Go line", joined)
 	}
@@ -369,12 +386,12 @@ func TestDiagnose_ReportsPinnedLintCompatibilityStatus(t *testing.T) {
 		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), workDir)
+	findings, err := service.Diagnose(context.Background(), workDir)
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
+	joined := findingsToString(findings)
 	if !strings.Contains(joined, "OK repo pins golangci-lint: v2.10.1") {
 		t.Fatalf("joined = %q, want pinned lint line", joined)
 	}
@@ -429,12 +446,12 @@ func TestDiagnose_WarnsWhenPinnedLintIsMissingAndIncompatible(t *testing.T) {
 		PathEnv: "/tmp/fgm/shims:/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), workDir)
+	findings, err := service.Diagnose(context.Background(), workDir)
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
+	joined := findingsToString(findings)
 	if !strings.Contains(joined, "WARN pinned golangci-lint version is not installed: v2.10.1") {
 		t.Fatalf("joined = %q, want missing pinned lint line", joined)
 	}
@@ -463,12 +480,12 @@ func TestDiagnose_IgnoresResolverErrorAndReturnsBaseDiagnostics(t *testing.T) {
 		PathEnv: "/usr/local/bin",
 	})
 
-	lines, err := service.Diagnose(context.Background(), ".")
+	findings, err := service.Diagnose(context.Background(), ".")
 	if err != nil {
 		t.Fatalf("Diagnose: %v", err)
 	}
 
-	joined := strings.Join(lines, "\n")
+	joined := findingsToString(findings)
 	if !strings.Contains(joined, "OK global Go version: 1.25.7") {
 		t.Fatalf("joined = %q, want global version line", joined)
 	}

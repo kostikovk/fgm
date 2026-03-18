@@ -61,41 +61,44 @@ func New(config Config) *Service {
 	}
 }
 
-// Diagnose returns human-readable diagnostics for the current FGM setup.
-func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error) {
-	lines := make([]string, 0, 8)
+// Diagnose returns structured diagnostics for the current FGM setup.
+func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
+	findings := make([]app.DoctorFinding, 0, 8)
 
 	version, ok, err := s.goStore.GlobalGoVersion(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		lines = append(lines, "OK global Go version: "+version)
+		findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "global Go version: " + version})
 	} else {
-		lines = append(lines, "WARN no global Go version is selected")
+		findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "no global Go version is selected"})
 	}
 
 	shimDir := s.goStore.ShimDir()
 	if pathContainsDir(s.pathEnv, shimDir) {
-		lines = append(lines, "OK shim dir is on PATH: "+shimDir)
+		findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "shim dir is on PATH: " + shimDir})
 	} else {
-		lines = append(lines, "WARN shim dir is not on PATH: "+shimDir)
-		lines = append(lines, `Run: eval "$(fgm env)"`)
+		findings = append(findings, app.DoctorFinding{
+			Severity: "WARN",
+			Message:  "shim dir is not on PATH: " + shimDir,
+			FixKind:  "shell_profile",
+		})
 	}
 
 	if _, err := exec.LookPath("fgm"); err == nil {
-		lines = append(lines, "OK fgm is available on PATH")
+		findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "fgm is available on PATH"})
 	} else {
-		lines = append(lines, "WARN fgm is not available on PATH")
+		findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "fgm is not available on PATH"})
 	}
 
 	if s.resolver != nil {
 		selection, err := s.resolver.Current(ctx, workDir)
 		if err == nil {
 			if _, err := s.goStore.GoBinaryPath(ctx, selection.GoVersion); err == nil {
-				lines = append(lines, "OK selected Go version is installed: "+selection.GoVersion)
+				findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "selected Go version is installed: " + selection.GoVersion})
 			} else {
-				lines = append(lines, "WARN selected Go version is not installed: "+selection.GoVersion)
+				findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "selected Go version is not installed: " + selection.GoVersion})
 			}
 
 			pinnedLintVersion, pinned, err := fgmconfig.ResolvePinnedLint(workDir)
@@ -103,16 +106,16 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error
 				return nil, err
 			}
 			if pinned {
-				lines = append(lines, "OK repo pins golangci-lint: "+pinnedLintVersion)
+				findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "repo pins golangci-lint: " + pinnedLintVersion})
 			}
 
 			if selection.LintVersion != "" && s.lintStore != nil {
 				if _, err := s.lintStore.LintBinaryPath(ctx, selection.LintVersion); err == nil {
-					lines = append(lines, "OK selected golangci-lint version is installed: "+selection.LintVersion)
+					findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "selected golangci-lint version is installed: " + selection.LintVersion})
 				} else {
-					lines = append(lines, "WARN selected golangci-lint version is not installed: "+selection.LintVersion)
+					findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "selected golangci-lint version is not installed: " + selection.LintVersion})
 					if pinned && pinnedLintVersion == selection.LintVersion {
-						lines = append(lines, "WARN pinned golangci-lint version is not installed: "+selection.LintVersion)
+						findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "pinned golangci-lint version is not installed: " + selection.LintVersion})
 					}
 				}
 			}
@@ -123,19 +126,19 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error
 					return nil, err
 				}
 				if lintVersionCompatible(pinnedLintVersion, compatible) {
-					lines = append(lines, "OK pinned golangci-lint version is compatible with Go "+selection.GoVersion+": "+pinnedLintVersion)
+					findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "pinned golangci-lint version is compatible with Go " + selection.GoVersion + ": " + pinnedLintVersion})
 				} else {
-					lines = append(lines, "WARN pinned golangci-lint version is not in the compatible set for Go "+selection.GoVersion+": "+pinnedLintVersion)
+					findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "pinned golangci-lint version is not in the compatible set for Go " + selection.GoVersion + ": " + pinnedLintVersion})
 				}
 			}
 
 			if !pinned && selection.LintVersion == "" {
-				lines = append(lines, "WARN no compatible golangci-lint version is known for Go "+selection.GoVersion)
+				findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "no compatible golangci-lint version is known for Go " + selection.GoVersion})
 			}
 		}
 	}
 
-	return lines, nil
+	return findings, nil
 }
 
 func pathContainsDir(pathEnv string, dir string) bool {

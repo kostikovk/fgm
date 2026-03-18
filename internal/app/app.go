@@ -126,7 +126,7 @@ type LintUpgrader interface {
 
 // Doctor reports environment and configuration diagnostics for FGM.
 type Doctor interface {
-	Diagnose(ctx context.Context, workDir string) ([]string, error)
+	Diagnose(ctx context.Context, workDir string) ([]DoctorFinding, error)
 }
 
 // Executor runs commands with a selected Go toolchain on PATH.
@@ -171,6 +171,18 @@ type LintFinding struct {
 	Message  string
 }
 
+// DoctorFinding describes a single environment diagnostic.
+type DoctorFinding struct {
+	Severity string // "OK", "WARN"
+	Message  string
+	FixKind  string // "", "shell_profile"
+}
+
+// ProfileInstaller appends shell integration to the user's shell profile.
+type ProfileInstaller interface {
+	InstallProfile(shell string) (profilePath string, modified bool, err error)
+}
+
 // App holds the services used by Cobra commands.
 type App struct {
 	Resolver            Resolver
@@ -190,4 +202,5 @@ type App struct {
 	EnvRenderer         EnvRenderer
 	LintConfigGenerator LintConfigGenerator
 	LintDoctor          LintDoctor
+	ProfileInstaller    ProfileInstaller
 }

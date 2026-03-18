@@ -3,6 +3,7 @@ package envsetup
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -47,7 +48,7 @@ func (r *Renderer) Render(ctx context.Context, shell string) ([]string, error) {
 
 	detectedShell := shell
 	if detectedShell == "" {
-		detectedShell = detectShell(r.shellPath, r.goos)
+		detectedShell = DetectShell(r.shellPath, r.goos)
 	}
 	if detectedShell == "" {
 		return nil, fmt.Errorf("could not detect shell; use --shell")
@@ -75,7 +76,8 @@ func (r *Renderer) Render(ctx context.Context, shell string) ([]string, error) {
 	}
 }
 
-func detectShell(shellPath string, goos string) string {
+// DetectShell returns the shell name from the given shell path and OS.
+func DetectShell(shellPath string, goos string) string {
 	if goos == "windows" {
 		lower := strings.ToLower(shellPath)
 		if strings.Contains(lower, "powershell") || strings.Contains(lower, "pwsh") {
@@ -91,4 +93,23 @@ func detectShell(shellPath string, goos string) string {
 	default:
 		return ""
 	}
+}
+
+// InstallProfile appends shell integration to the user's shell profile.
+// It returns the profile path and whether the file was modified.
+func (r *Renderer) InstallProfile(shell string) (string, bool, error) {
+	s := shell
+	if s == "" {
+		s = DetectShell(r.shellPath, r.goos)
+	}
+	if s == "" {
+		return "", false, fmt.Errorf("could not detect shell; use --shell")
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", false, fmt.Errorf("could not determine home directory: %w", err)
+	}
+
+	return InstallProfile(s, r.goos, homeDir)
 }

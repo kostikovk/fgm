@@ -92,8 +92,8 @@ func TestDoctorCmd_ReturnsWriteError(t *testing.T) {
 
 	cmd := newDoctorCmd(&app.App{
 		Doctor: stubDoctor{
-			diagnoseFn: func(ctx context.Context, workDir string) ([]string, error) {
-				return []string{"line"}, nil
+			diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
+				return []app.DoctorFinding{{Severity: "OK", Message: "line"}}, nil
 			},
 		},
 	}, v)

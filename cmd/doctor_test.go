@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -12,10 +13,10 @@ import (
 )
 
 type stubDoctor struct {
-	diagnoseFn func(ctx context.Context, workDir string) ([]string, error)
+	diagnoseFn func(ctx context.Context, workDir string) ([]app.DoctorFinding, error)
 }
 
-func (s stubDoctor) Diagnose(ctx context.Context, workDir string) ([]string, error) {
+func (s stubDoctor) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
 	return s.diagnoseFn(ctx, workDir)
 }
 
@@ -40,7 +41,7 @@ func TestDoctorCommand_DiagnoseErrorIsPropagated(t *testing.T) {
 	application := &app.App{
 		Resolver: resolve.New(nil),
 		Doctor: stubDoctor{
-			diagnoseFn: func(ctx context.Context, workDir string) ([]string, error) {
+			diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
 				return nil, fmt.Errorf("diagnose boom")
 			},
 		},
@@ -62,14 +63,13 @@ func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
 	application := &app.App{
 		Resolver: resolve.New(nil),
 		Doctor: stubDoctor{
-			diagnoseFn: func(ctx context.Context, workDir string) ([]string, error) {
+			diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
 				if workDir != "." {
 					t.Fatalf("workDir = %q, want %q", workDir, ".")
 				}
-				return []string{
-					"OK global Go version: 1.25.7",
-					"WARN shim dir is not on PATH: /tmp/fgm/shims",
-					`Run: eval "$(fgm env)"`,
+				return []app.DoctorFinding{
+					{Severity: "OK", Message: "global Go version: 1.25.7"},
+					{Severity: "WARN", Message: "shim dir is not on PATH: /tmp/fgm/shims", FixKind: "shell_profile"},
 				}, nil
 			},
 		},
@@ -87,7 +87,59 @@ func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
 	if !strings.Contains(stdout, "WARN shim dir is not on PATH: /tmp/fgm/shims") {
 		t.Fatalf("stdout = %q, want it to contain shim warning", stdout)
 	}
-	if !strings.Contains(stdout, `Run: eval "$(fgm env)"`) {
-		t.Fatalf("stdout = %q, want it to contain env suggestion", stdout)
+	if !strings.Contains(stdout, "--fix") {
+		t.Fatalf("stdout = %q, want it to contain --fix hint", stdout)
 	}
+}
+
+func TestDoctorCommand_FixWithProfileInstaller(t *testing.T) {
+	t.Parallel()
+
+	var installCalled bool
+
+	application := &app.App{
+		Resolver: resolve.New(nil),
+		Doctor: stubDoctor{
+			diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
+				return []app.DoctorFinding{
+					{Severity: "WARN", Message: "shim dir is not on PATH: /tmp/fgm/shims", FixKind: "shell_profile"},
+				}, nil
+			},
+		},
+		ProfileInstaller: &stubProfileInstaller{
+			installProfileFn: func(shell string) (string, bool, error) {
+				installCalled = true
+				return "/home/user/.zshrc", true, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	// Use a bytes.Buffer as stdin so isTerminal returns false (auto-apply without prompt).
+	root.SetIn(bytes.NewBufferString(""))
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.SetArgs([]string{"doctor", "--fix"})
+
+	err := root.Execute()
+	if err != nil {
+		t.Fatalf("execute doctor --fix: %v", err)
+	}
+
+	if !installCalled {
+		t.Fatal("expected InstallProfile to be called")
+	}
+	if !strings.Contains(stdout.String(), "Added shell integration to /home/user/.zshrc") {
+		t.Fatalf("stdout = %q, want added confirmation", stdout.String())
+	}
+}
+
+type stubProfileInstaller struct {
+	installProfileFn func(shell string) (string, bool, error)
+}
+
+func (s *stubProfileInstaller) InstallProfile(shell string) (string, bool, error) {
+	return s.installProfileFn(shell)
 }
