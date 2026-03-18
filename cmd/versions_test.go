@@ -433,18 +433,24 @@ func TestVersionsGo_RejectsBothLocalAndRemote(t *testing.T) {
 	}
 }
 
-func TestVersionsGo_RejectsNeitherLocalNorRemote(t *testing.T) {
+func TestVersionsGo_DefaultsToLocal(t *testing.T) {
 	t.Parallel()
 
-	application := &app.App{}
+	application := &app.App{
+		GoStore: stubGoStore{
+			listLocalGoVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"1.25.7"}, nil
+			},
+		},
+	}
 
 	root := NewRootCmd(application)
-	_, _, err := testutil.ExecuteCommand(t, root, "versions", "go")
-	if err == nil {
-		t.Fatal("expected an error when neither --local nor --remote is set")
+	stdout, _, err := testutil.ExecuteCommand(t, root, "versions", "go")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "provide --local or --remote") {
-		t.Fatalf("err = %q, want provide flag error", err)
+	if !strings.Contains(stdout, "1.25.7") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "1.25.7")
 	}
 }
 
@@ -493,18 +499,24 @@ func TestVersionsLint_RejectsBothLocalAndRemote(t *testing.T) {
 	}
 }
 
-func TestVersionsLint_RejectsNeitherLocalNorRemote(t *testing.T) {
+func TestVersionsLint_DefaultsToLocal(t *testing.T) {
 	t.Parallel()
 
-	application := &app.App{}
+	application := &app.App{
+		LintStore: stubLintStore{
+			listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+				return []string{"v2.10.1"}, nil
+			},
+		},
+	}
 
 	root := NewRootCmd(application)
-	_, _, err := testutil.ExecuteCommand(t, root, "versions", "golangci-lint")
-	if err == nil {
-		t.Fatal("expected an error when neither --local nor --remote is set")
+	stdout, _, err := testutil.ExecuteCommand(t, root, "versions", "golangci-lint")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "provide --local or --remote") {
-		t.Fatalf("err = %q, want provide flag error", err)
+	if !strings.Contains(stdout, "v2.10.1") {
+		t.Fatalf("stdout = %q, want it to contain %q", stdout, "v2.10.1")
 	}
 }
 

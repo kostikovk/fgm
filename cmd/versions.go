@@ -33,7 +33,7 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("--local and --remote are mutually exclusive")
 			}
 			if !local && !remote {
-				return fmt.Errorf("provide --local or --remote")
+				local = true
 			}
 
 			var versions []string
@@ -99,7 +99,7 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("--local and --remote are mutually exclusive")
 			}
 			if !local && !remote {
-				return fmt.Errorf("provide --local or --remote")
+				local = true
 			}
 
 			if local {
