@@ -49,6 +49,7 @@ brews:
     repository:
       owner: kostikovk
       name: homebrew-fgm
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/kostikovk/fgm
     description: Fast Go toolchain manager with golangci-lint compatibility support
     commit_author:
