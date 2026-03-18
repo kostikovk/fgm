@@ -105,6 +105,25 @@ type GoUpgrader interface {
 	UpgradeProject(ctx context.Context, options GoUpgradeOptions) (GoUpgradeResult, error)
 }
 
+// LintUpgradeResult describes a golangci-lint upgrade action.
+type LintUpgradeResult struct {
+	Version   string
+	GoVersion string
+	DryRun    bool
+}
+
+// LintUpgradeOptions configures a golangci-lint upgrade operation.
+type LintUpgradeOptions struct {
+	WorkDir string
+	Version string
+	DryRun  bool
+}
+
+// LintUpgrader upgrades golangci-lint to a compatible version.
+type LintUpgrader interface {
+	Upgrade(ctx context.Context, options LintUpgradeOptions) (LintUpgradeResult, error)
+}
+
 // Doctor reports environment and configuration diagnostics for FGM.
 type Doctor interface {
 	Diagnose(ctx context.Context, workDir string) ([]string, error)
@@ -164,6 +183,7 @@ type App struct {
 	GoImporter          GoImporter
 	LintImporter        LintImporter
 	GoUpgrader          GoUpgrader
+	LintUpgrader        LintUpgrader
 	BuildInfo           BuildInfo
 	Doctor              Doctor
 	Executor            Executor

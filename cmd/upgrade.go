@@ -15,6 +15,7 @@ func newUpgradeCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	}
 
 	upgradeCmd.AddCommand(newUpgradeGoCmd(application, v))
+	upgradeCmd.AddCommand(newUpgradeLintCmd(application, v))
 
 	return upgradeCmd
 }
@@ -99,6 +100,43 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview the selected Go upgrade without changing anything")
 	cmd.Flags().StringVar(&version, "to", "", "upgrade to a specific Go version instead of the latest remote version")
 	cmd.Flags().BoolVar(&withLint, "with-lint", false, "also install the matching or pinned golangci-lint version")
+
+	return cmd
+}
+
+func newUpgradeLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
+	var dryRun bool
+	var version string
+
+	cmd := &cobra.Command{
+		Use:   "golangci-lint",
+		Short: "Upgrade golangci-lint to the latest compatible version",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if application.LintUpgrader == nil {
+				return fmt.Errorf("golangci-lint upgrader is not configured")
+			}
+
+			result, err := application.LintUpgrader.Upgrade(cmd.Context(), app.LintUpgradeOptions{
+				WorkDir: v.GetString(flagChdir),
+				Version: version,
+				DryRun:  dryRun,
+			})
+			if err != nil {
+				return err
+			}
+
+			if result.DryRun {
+				_, err = fmt.Fprintf(cmd.OutOrStdout(), "Would install golangci-lint %s (for Go %s)\n", result.Version, result.GoVersion)
+				return err
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Installed golangci-lint %s (for Go %s)\n", result.Version, result.GoVersion)
+			return err
+		},
+	}
+
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview the selected upgrade without installing")
+	cmd.Flags().StringVar(&version, "to", "", "upgrade to a specific version instead of the latest compatible")
 
 	return cmd
 }

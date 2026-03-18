@@ -418,6 +418,119 @@ func TestUpgradeGoCommand_DryRunGlobalWithLintReportsLintInstall(t *testing.T) {
 	}
 }
 
+type stubLintUpgrader struct {
+	upgradeFn func(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error)
+}
+
+func (s stubLintUpgrader) Upgrade(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error) {
+	return s.upgradeFn(ctx, options)
+}
+
+func TestUpgradeLintCommand_InstallsLatestCompatibleVersion(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		LintUpgrader: stubLintUpgrader{
+			upgradeFn: func(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error) {
+				return app.LintUpgradeResult{Version: "v2.11.2", GoVersion: "1.26.1"}, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "golangci-lint")
+	if err != nil {
+		t.Fatalf("execute upgrade golangci-lint: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "Installed golangci-lint v2.11.2 (for Go 1.26.1)") {
+		t.Fatalf("stdout = %q, want install line", stdout)
+	}
+}
+
+func TestUpgradeLintCommand_DryRun(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		LintUpgrader: stubLintUpgrader{
+			upgradeFn: func(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error) {
+				if !options.DryRun {
+					t.Fatal("DryRun = false, want true")
+				}
+				return app.LintUpgradeResult{Version: "v2.11.2", GoVersion: "1.26.1", DryRun: true}, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "golangci-lint", "--dry-run")
+	if err != nil {
+		t.Fatalf("execute upgrade golangci-lint --dry-run: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "Would install golangci-lint v2.11.2 (for Go 1.26.1)") {
+		t.Fatalf("stdout = %q, want dry-run line", stdout)
+	}
+}
+
+func TestUpgradeLintCommand_ExplicitVersion(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		LintUpgrader: stubLintUpgrader{
+			upgradeFn: func(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error) {
+				if options.Version != "v2.10.0" {
+					t.Fatalf("Version = %q, want %q", options.Version, "v2.10.0")
+				}
+				return app.LintUpgradeResult{Version: "v2.10.0", GoVersion: "1.26.1"}, nil
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	stdout, stderr, err := testutil.ExecuteCommand(t, root, "upgrade", "golangci-lint", "--to", "v2.10.0")
+	if err != nil {
+		t.Fatalf("execute upgrade golangci-lint --to: %v\nstderr:\n%s", err, stderr)
+	}
+	if !strings.Contains(stdout, "Installed golangci-lint v2.10.0") {
+		t.Fatalf("stdout = %q, want explicit version line", stdout)
+	}
+}
+
+func TestUpgradeLintCommand_ErrorWhenUpgraderNil(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{LintUpgrader: nil}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "upgrade", "golangci-lint")
+	if err == nil {
+		t.Fatal("expected error when LintUpgrader is nil")
+	}
+	if !strings.Contains(err.Error(), "golangci-lint upgrader is not configured") {
+		t.Fatalf("err = %q, want not configured error", err)
+	}
+}
+
+func TestUpgradeLintCommand_ErrorFromUpgrader(t *testing.T) {
+	t.Parallel()
+
+	application := &app.App{
+		LintUpgrader: stubLintUpgrader{
+			upgradeFn: func(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error) {
+				return app.LintUpgradeResult{}, fmt.Errorf("upgrade boom")
+			},
+		},
+	}
+
+	root := NewRootCmd(application)
+	_, _, err := testutil.ExecuteCommand(t, root, "upgrade", "golangci-lint")
+	if err == nil {
+		t.Fatal("expected error from upgrader")
+	}
+	if !strings.Contains(err.Error(), "upgrade boom") {
+		t.Fatalf("err = %q, want upgrade boom", err)
+	}
+}
+
 func TestUpgradeGoCommand_UsesExplicitVersionOverride(t *testing.T) {
 	t.Parallel()
 

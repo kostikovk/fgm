@@ -22,6 +22,7 @@ import (
 	"github.com/kostikovk/fgm/internal/goreleases"
 	"github.com/kostikovk/fgm/internal/goupgrade"
 	"github.com/kostikovk/fgm/internal/lintconfig"
+	"github.com/kostikovk/fgm/internal/lintupgrade"
 	"github.com/kostikovk/fgm/internal/lintimport"
 	"github.com/kostikovk/fgm/internal/lintinstall"
 	"github.com/kostikovk/fgm/internal/lintlocal"
@@ -144,7 +145,12 @@ func run(
 		LintInstaller:      lintInstaller,
 		GoImporter:         goImporter,
 		LintImporter:       lintImporter,
-		GoUpgrader:         goUpgrader,
+		GoUpgrader: goUpgrader,
+		LintUpgrader: lintupgrade.New(lintupgrade.Config{
+			Resolver:       currentResolver,
+			RemoteProvider: lintReleaseProvider,
+			Installer:      lintInstaller,
+		}),
 		BuildInfo: app.BuildInfo{
 			Version: buildVersion,
 			Commit:  buildCommit,
