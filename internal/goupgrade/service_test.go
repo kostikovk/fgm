@@ -877,7 +877,7 @@ func TestUpgradeGlobal_DryRunWithLint_ResolveLintVersionError(t *testing.T) {
 	t.Parallel()
 
 	workDir := t.TempDir()
-	// Create a malformed .fgm.toml to make pinnedlint.ResolvePinned error.
+	// Create a malformed .fgm.toml to make fgmconfig.ResolvePinnedLint error.
 	if err := os.WriteFile(filepath.Join(workDir, ".fgm.toml"), []byte("[[[invalid toml"), 0o644); err != nil {
 		t.Fatalf("write .fgm.toml: %v", err)
 	}
@@ -932,7 +932,7 @@ func TestUpgradeProject_DryRunWithLint_ResolveLintVersionError(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(workDir, "go.mod"), []byte("module x\n\ngo 1.25.0\n"), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
-	// Create a malformed .fgm.toml so pinnedlint.ResolvePinned returns an error.
+	// Create a malformed .fgm.toml so fgmconfig.ResolvePinnedLint returns an error.
 	if err := os.WriteFile(filepath.Join(workDir, ".fgm.toml"), []byte("[[[invalid toml"), 0o644); err != nil {
 		t.Fatalf("write .fgm.toml: %v", err)
 	}
@@ -1035,7 +1035,7 @@ func TestResolveLintVersion_PinnedLintError(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(workDir, "go.mod"), []byte("module x\n\ngo 1.25.0\n"), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
-	// Malformed .fgm.toml causes pinnedlint.ResolvePinned to error.
+	// Malformed .fgm.toml causes fgmconfig.ResolvePinnedLint to error.
 	if err := os.WriteFile(filepath.Join(workDir, ".fgm.toml"), []byte("[[[bad toml"), 0o644); err != nil {
 		t.Fatalf("write .fgm.toml: %v", err)
 	}
@@ -1062,7 +1062,7 @@ func TestResolveLintVersion_PinnedLintError(t *testing.T) {
 		WithLint: true,
 	})
 	if err == nil {
-		t.Fatal("expected error when pinnedlint.ResolvePinned fails, got nil")
+		t.Fatal("expected error when fgmconfig.ResolvePinnedLint fails, got nil")
 	}
 }
 

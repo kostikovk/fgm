@@ -4,11 +4,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
 
 const fileName = ".fgm.toml"
+
+// ResolvePinnedLint returns the pinned golangci-lint version from the nearest .fgm.toml.
+// Returns ("", false, nil) when no config exists, the field is empty, or set to "auto".
+func ResolvePinnedLint(workDir string) (string, bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return "", false, err
+	}
+
+	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
+	if version == "" || version == "auto" {
+		return "", false, nil
+	}
+
+	return version, true, nil
+}
 
 // ToolchainConfig describes FGM-specific toolchain overrides.
 type ToolchainConfig struct {

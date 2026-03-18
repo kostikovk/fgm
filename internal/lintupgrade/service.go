@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kostikovk/fgm/internal/app"
-	"github.com/kostikovk/fgm/internal/pinnedlint"
+	"github.com/kostikovk/fgm/internal/fgmconfig"
 )
 
 // Resolver returns the selected toolchain for a workspace.
@@ -91,7 +91,7 @@ func (s *Service) targetVersion(ctx context.Context, options app.LintUpgradeOpti
 		return options.Version, nil
 	}
 
-	if pinned, ok, err := pinnedlint.ResolvePinned(options.WorkDir); err != nil {
+	if pinned, ok, err := fgmconfig.ResolvePinnedLint(options.WorkDir); err != nil {
 		return "", err
 	} else if ok {
 		return pinned, nil

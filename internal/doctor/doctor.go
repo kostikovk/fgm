@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
-	"github.com/kostikovk/fgm/internal/pinnedlint"
+	"github.com/kostikovk/fgm/internal/fgmconfig"
 )
 
 // GoStore provides the local state doctor needs to inspect.
@@ -98,7 +98,7 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]string, error
 				lines = append(lines, "WARN selected Go version is not installed: "+selection.GoVersion)
 			}
 
-			pinnedLintVersion, pinned, err := pinnedlint.ResolvePinned(workDir)
+			pinnedLintVersion, pinned, err := fgmconfig.ResolvePinnedLint(workDir)
 			if err != nil {
 				return nil, err
 			}

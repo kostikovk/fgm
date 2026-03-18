@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
-	"github.com/kostikovk/fgm/internal/pinnedlint"
+	"github.com/kostikovk/fgm/internal/fgmconfig"
 	"github.com/kostikovk/fgm/internal/versionutil"
 )
 
@@ -172,7 +172,7 @@ func (s *Service) installLint(ctx context.Context, goVersion string, workDir str
 }
 
 func (s *Service) resolveLintVersion(ctx context.Context, goVersion string, workDir string) (string, error) {
-	if pinned, ok, err := pinnedlint.ResolvePinned(workDir); err != nil {
+	if pinned, ok, err := fgmconfig.ResolvePinnedLint(workDir); err != nil {
 		return "", err
 	} else if ok {
 		return pinned, nil

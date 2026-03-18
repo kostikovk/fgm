@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/kostikovk/fgm/internal/app"
-	"github.com/kostikovk/fgm/internal/pinnedlint"
+	"github.com/kostikovk/fgm/internal/fgmconfig"
 )
 
 // GoResolver resolves the current Go toolchain selection.
@@ -42,7 +42,7 @@ func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, e
 		return app.Selection{}, err
 	}
 
-	if lintVersion, ok, err := pinnedlint.ResolvePinned(workDir); err != nil {
+	if lintVersion, ok, err := fgmconfig.ResolvePinnedLint(workDir); err != nil {
 		return app.Selection{}, err
 	} else if ok {
 		selection.LintVersion = lintVersion
