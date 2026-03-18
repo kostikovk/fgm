@@ -2,19 +2,7 @@
 
 > Set up and manage Go development environments with best-practice tooling — from a single binary.
 
-FGM is a CLI tool that manages Go toolchains, golangci-lint compatibility, and lint configuration generation. In future releases it will expand further into broader Go project setup: scaffolding, import organization workflows, and CI templates. The goal is a single command that takes a Go project from zero to production-ready best practices.
-
-**Current scope** focuses on smart Go version resolution using native metadata (`go.mod`, `go.work`, `toolchain` directives), shell shims for transparent routing, an embedded golangci-lint compatibility catalog, and project-aware lint config generation.
-
-## UI Direction
-
-FGM will adopt [`go-tui`](https://github.com/grindlemire/go-tui) as the main interactive UI layer for future releases. The existing Cobra CLI remains the automation and scripting surface, while the TUI becomes the primary guided experience for discovery, diagnostics, installs, upgrades, and project setup workflows.
-
-The intended split is:
-
-- **Cobra commands** remain the stable non-interactive interface for scripts, CI, and power users
-- **Internal services** continue to own all business logic and state changes
-- **go-tui** orchestrates those services into a richer terminal UX with menus, forms, progress views, and guided setup flows
+FGM is a CLI tool that manages Go toolchains, golangci-lint compatibility, and lint configuration generation. It handles smart Go version resolution using native metadata (`go.mod`, `go.work`, `toolchain` directives), shell shims for transparent routing, an embedded golangci-lint compatibility catalog, and project-aware lint config generation.
 
 ## Features
 
@@ -57,7 +45,7 @@ go build -o ~/.local/bin/fgm .
 fgm import auto
 
 # Set a global default
-fgm use go 1.26.1 --global
+fgm use go <version> --global
 
 # Add shell integration (add to your shell profile)
 eval "$(fgm env)"
@@ -108,14 +96,14 @@ Inside a repository, FGM resolves Go in this order:
 | `fgm version` | Show build info |
 
 > [!TIP]
-> `fgm current` shows where each version was resolved from, e.g. `go 1.26.1 (global)` or `golangci-lint v2.11.2 (config)`.
+> `fgm current` shows where each version was resolved from, e.g. `go 1.23.0 (global)` or `golangci-lint v2.1.0 (config)`.
 
 ## Configuration
 
 FGM uses `.fgm.toml` for repository-level settings. Create or update it with:
 
 ```bash
-fgm pin golangci-lint v2.11.2
+fgm pin golangci-lint <version>
 # or let FGM pick a compatible version automatically
 fgm pin golangci-lint auto
 ```
@@ -124,7 +112,7 @@ Example `.fgm.toml`:
 
 ```toml
 [toolchain]
-golangci_lint = "v2.11.2"
+golangci_lint = "v2.1.0"
 ```
 
 > [!IMPORTANT]
@@ -158,48 +146,15 @@ FGM stores managed toolchains under `$XDG_DATA_HOME/fgm` (default: `~/.local/sha
 ```text
 fgm/
   go/
-    1.25.7/bin/go
-    1.26.1/bin/go
+    1.22.0/bin/go
+    1.23.0/bin/go
   golangci-lint/
-    v2.11.2/golangci-lint
+    v2.1.0/golangci-lint
   shims/
     go
   state/
     global-go-version
 ```
-
-## Roadmap
-
-FGM is growing from a version manager into a complete Go project setup tool. Here's what's planned next:
-
-### UI Foundation — `go-tui` Adoption Plan
-
-To make FGM easier to use interactively, the next UI milestone is adopting `go-tui` as the main terminal interface.
-
-1. Add a dedicated TUI entry command such as `fgm ui` that launches the interactive app
-2. Keep all core logic in `internal/` services so the TUI stays thin and testable
-3. Start with read-heavy flows: current toolchain view, doctor results, installed versions, compatibility browsing
-4. Expand to guided actions: install, use, import, upgrade, and lint config generation
-5. Add progress and confirmation screens for long-running or destructive operations
-6. Keep feature parity by routing TUI actions through the same service layer used by Cobra commands
-
-### MVP-2 — Project Scaffolding
-
-- `fgm init` — scaffold a new Go project with recommended structure, `Makefile`, `.golangci.yml`, and `.gitignore`
-- Pre-commit hook setup (`fgm hooks init`)
-- Editorconfig and formatting defaults
-
-### MVP-3 — CI & Workflow Templates
-
-- `fgm ci init` — generate GitHub Actions workflows for Go (test, lint, release)
-- GoReleaser config generation
-- Dependency update automation templates (Dependabot / Renovate)
-
-### Future
-
-- Static analysis profile management (`go vet`, `staticcheck`)
-- Project-level tool pinning beyond lint (e.g., `buf`, `mockgen`, `sqlc`)
-- Team-shared configuration via remote presets
 
 ## Development
 

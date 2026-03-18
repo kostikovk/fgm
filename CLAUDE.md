@@ -29,22 +29,11 @@ make cmd CMD='current --chdir .'
 
 ## Project Vision
 
-FGM is growing from a Go version manager into a complete Go project setup and best-practices tool. The current codebase covers toolchain management plus lint config generation/diagnostics. Future milestones add project scaffolding and CI templates. See the Roadmap section in README.md for details.
-
-When adding new features, consider whether they fit into this progression: version management → lint configuration → project scaffolding → CI/workflow automation.
-
-FGM is also planning to adopt [`go-tui`](https://github.com/grindlemire/go-tui) as its main interactive UI. Treat that as a presentation layer on top of the existing service architecture, not as a replacement for Cobra commands or `internal/` business logic.
+FGM is a Go toolchain manager with golangci-lint compatibility and lint configuration support. The codebase covers version management, shell shims, an embedded lint compatibility catalog, and project-aware lint config generation/diagnostics.
 
 ## Architecture
 
 FGM is a single-binary CLI that manages Go toolchain versions, golangci-lint compatibility, and generated lint configuration. It resolves the correct Go version per-directory using native Go metadata (`go.mod`, `go.work`, `toolchain` directives) and routes `go` through shell shims.
-
-### UI Strategy
-
-- Cobra remains the stable scripting and automation interface
-- A future `go-tui`-based TUI should become the main interactive user experience
-- TUI code should call `internal/app.App` services rather than reimplement command logic
-- New interactive features should be designed so they can be exposed both via Cobra commands and the TUI when appropriate
 
 ### Layered Design
 
