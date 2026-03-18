@@ -38,6 +38,23 @@ cd fgm
 go build -o ~/.local/bin/fgm .
 ```
 
+## Uninstall
+
+**Homebrew:**
+
+```bash
+brew uninstall fgm
+brew untap kostikovk/fgm
+```
+
+**Remove managed toolchains and state:**
+
+```bash
+rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/fgm"
+```
+
+**Remove shell integration** — delete the `eval "$(fgm env)"` line from your shell profile (`.zshrc`, `.bashrc`, etc.).
+
 ## Quick Start
 
 ```bash
