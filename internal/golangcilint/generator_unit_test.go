@@ -356,6 +356,7 @@ func TestBuildManifestEntries_UsesThresholdFallbackAndSkipsInvalidReleases(t *te
 			{GoMinor: 24, SinceVersion: "v1.64.2"},
 			{GoMinor: 25, SinceVersion: "v2.4.0"},
 		},
+		26,
 	)
 
 	if entries["v1.54.1"].MaxGoMinor != 21 {
@@ -364,8 +365,8 @@ func TestBuildManifestEntries_UsesThresholdFallbackAndSkipsInvalidReleases(t *te
 	if entries["v1.64.2"].MaxGoMinor != 24 {
 		t.Fatalf("v1.64.2 MaxGoMinor = %d, want 24", entries["v1.64.2"].MaxGoMinor)
 	}
-	if entries["v2.4.0"].MaxGoMinor != 25 {
-		t.Fatalf("v2.4.0 MaxGoMinor = %d, want 25", entries["v2.4.0"].MaxGoMinor)
+	if entries["v2.4.0"].MaxGoMinor != 26 {
+		t.Fatalf("v2.4.0 MaxGoMinor = %d, want 26", entries["v2.4.0"].MaxGoMinor)
 	}
 	if _, ok := entries["main"]; ok {
 		t.Fatal("unexpected entry for non-semver tag")
@@ -381,7 +382,7 @@ func TestBuildManifestEntries_UsesThresholdFallbackAndSkipsInvalidReleases(t *te
 func TestBuildManifestEntries_EmptyThresholds(t *testing.T) {
 	t.Parallel()
 
-	entries := buildManifestEntries([]release{{TagName: "v1.54.1"}}, nil)
+	entries := buildManifestEntries([]release{{TagName: "v1.54.1"}}, nil, 26)
 	if len(entries) != 0 {
 		t.Fatalf("len(entries) = %d, want 0", len(entries))
 	}

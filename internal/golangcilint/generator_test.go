@@ -71,8 +71,8 @@ func TestGeneratorGenerate_BuildsManifestFromUpstreamData(t *testing.T) {
 	if manifest.SupportThresholds["25"] != "v2.4.0" {
 		t.Fatalf("SupportThresholds[25] = %q, want %q", manifest.SupportThresholds["25"], "v2.4.0")
 	}
-	if manifest.Versions["v2.11.2"].MaxGoMinor != 25 {
-		t.Fatalf("v2.11.2 MaxGoMinor = %d, want %d", manifest.Versions["v2.11.2"].MaxGoMinor, 25)
+	if manifest.Versions["v2.11.2"].MaxGoMinor != 26 {
+		t.Fatalf("v2.11.2 MaxGoMinor = %d, want %d", manifest.Versions["v2.11.2"].MaxGoMinor, 26)
 	}
 	if manifest.Versions["v1.54.1"].MaxGoMinor != 21 {
 		t.Fatalf("v1.54.1 MaxGoMinor = %d, want %d", manifest.Versions["v1.54.1"].MaxGoMinor, 21)

@@ -107,11 +107,13 @@ func (g *Generator) Generate(ctx context.Context) (Manifest, error) {
 		return Manifest{}, err
 	}
 
+	latestGoMinor := latestStableGoMinor(latestGoVersions)
+
 	return Manifest{
 		GeneratedAt:       g.now().UTC().Format(time.RFC3339),
 		LatestGoVersions:  latestGoVersions,
 		SupportThresholds: stringifyThresholds(thresholds),
-		Versions:          buildManifestEntries(releases, thresholds),
+		Versions:          buildManifestEntries(releases, thresholds, latestGoMinor),
 	}, nil
 }
 
@@ -276,7 +278,7 @@ func parseSupportThreshold(item issueItem) (supportThreshold, bool) {
 	}, true
 }
 
-func buildManifestEntries(releases []release, thresholds []supportThreshold) map[string]compatibilityEntry {
+func buildManifestEntries(releases []release, thresholds []supportThreshold, latestGoMinor int) map[string]compatibilityEntry {
 	entries := make(map[string]compatibilityEntry)
 	if len(thresholds) == 0 {
 		return entries
@@ -299,6 +301,15 @@ func buildManifestEntries(releases []release, thresholds []supportThreshold) map
 			}
 		}
 
+		// Extend the max to the latest stable Go minor for lint versions
+		// that already support the highest known threshold. This covers
+		// the gap between golangci-lint declaring explicit support and a
+		// new Go release landing.
+		highestThreshold := thresholds[len(thresholds)-1].GoMinor
+		if maxMinor >= highestThreshold && latestGoMinor > maxMinor {
+			maxMinor = latestGoMinor
+		}
+
 		entries[release.TagName] = compatibilityEntry{
 			MinGoMinor: minimumTrackedGoMinor,
 			MaxGoMinor: maxMinor,
@@ -306,6 +317,20 @@ func buildManifestEntries(releases []release, thresholds []supportThreshold) map
 	}
 
 	return entries
+}
+
+func latestStableGoMinor(latestGoVersions map[string]string) int {
+	result := 0
+	for minorStr := range latestGoVersions {
+		minor, err := strconv.Atoi(minorStr)
+		if err != nil {
+			continue
+		}
+		if minor > result {
+			result = minor
+		}
+	}
+	return result
 }
 
 func stringifyThresholds(thresholds []supportThreshold) map[string]string {
