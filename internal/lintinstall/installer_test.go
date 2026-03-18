@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/koskosovu4/fgm/internal/golangcilint"
+	"github.com/kostikovk/fgm/internal/golangcilint"
 )
 
 type stubArchiveProvider struct {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/app"
 )
 
 // Resolver provides the current toolchain selection for a workspace.

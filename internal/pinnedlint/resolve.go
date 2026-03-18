@@ -3,7 +3,7 @@ package pinnedlint
 import (
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/fgmconfig"
+	"github.com/kostikovk/fgm/internal/fgmconfig"
 )
 
 // ResolvePinned returns the pinned golangci-lint version from the nearest .fgm.toml.

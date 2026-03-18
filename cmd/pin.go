@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/fgmconfig"
+	"github.com/kostikovk/fgm/internal/fgmconfig"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

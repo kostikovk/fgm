@@ -41,15 +41,15 @@ checksum:
 
 release:
   github:
-    owner: koskosovu4
+    owner: kostikovk
     name: fgm
 
 brews:
   - name: fgm
     repository:
-      owner: koskosovu4
+      owner: kostikovk
       name: homebrew-fgm
-    homepage: https://github.com/koskosovu4/fgm
+    homepage: https://github.com/kostikovk/fgm
     description: Fast Go toolchain manager with golangci-lint compatibility support
     commit_author:
       name: github-actions[bot]

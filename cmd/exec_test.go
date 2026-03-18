@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/koskosovu4/fgm/internal/app"
-	"github.com/koskosovu4/fgm/internal/currenttoolchain"
-	"github.com/koskosovu4/fgm/internal/execenv"
-	"github.com/koskosovu4/fgm/internal/resolve"
-	"github.com/koskosovu4/fgm/internal/testutil"
+	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/currenttoolchain"
+	"github.com/kostikovk/fgm/internal/execenv"
+	"github.com/kostikovk/fgm/internal/resolve"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestExecCommand_RunsCommandWithSelectedGoOnPATH(t *testing.T) {

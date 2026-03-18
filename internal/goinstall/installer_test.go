@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/koskosovu4/fgm/internal/goreleases"
+	"github.com/kostikovk/fgm/internal/goreleases"
 )
 
 type stubArchiveProvider struct {

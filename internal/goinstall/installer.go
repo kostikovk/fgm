@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/archive"
-	"github.com/koskosovu4/fgm/internal/goreleases"
+	"github.com/kostikovk/fgm/internal/archive"
+	"github.com/kostikovk/fgm/internal/goreleases"
 )
 
 // ArchiveProvider finds downloadable Go archives for specific versions.

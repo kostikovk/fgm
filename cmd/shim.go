@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/koskosovu4/fgm/internal/app"
-	"github.com/koskosovu4/fgm/internal/shim"
+	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/shim"
 	"github.com/spf13/cobra"
 )
 

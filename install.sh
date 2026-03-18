@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-REPO="${GITHUB_REPOSITORY:-koskosovu4/fgm}"
+REPO="${GITHUB_REPOSITORY:-kostikovk/fgm}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT

@@ -21,19 +21,19 @@ FGM is a CLI tool that manages Go toolchains, golangci-lint compatibility, and l
 **Homebrew** (macOS/Linux):
 
 ```bash
-brew install koskosovu4/fgm/fgm
+brew install kostikovk/fgm/fgm
 ```
 
 **Install script:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/koskosovu4/fgm/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/install.sh | sh
 ```
 
 **From source:**
 
 ```bash
-git clone https://github.com/koskosovu4/fgm.git
+git clone https://github.com/kostikovk/fgm.git
 cd fgm
 go build -o ~/.local/bin/fgm .
 ```

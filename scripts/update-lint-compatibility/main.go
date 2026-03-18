@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/koskosovu4/fgm/internal/golangcilint"
+	"github.com/kostikovk/fgm/internal/golangcilint"
 )
 
 type manifestGenerator interface {

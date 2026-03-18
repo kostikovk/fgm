@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/versionutil"
+	"github.com/kostikovk/fgm/internal/versionutil"
 )
 
 const globalGoVersionStateFile = "global-go-version"

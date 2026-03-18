@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/archive"
-	"github.com/koskosovu4/fgm/internal/golangcilint"
+	"github.com/kostikovk/fgm/internal/archive"
+	"github.com/kostikovk/fgm/internal/golangcilint"
 )
 
 // ArchiveProvider finds downloadable golangci-lint archives for specific versions.

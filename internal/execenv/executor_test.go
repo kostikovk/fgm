@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/koskosovu4/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/app"
 )
 
 type stubResolver struct {

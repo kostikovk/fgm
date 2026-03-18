@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/koskosovu4/fgm/internal/app"
-	"github.com/koskosovu4/fgm/internal/pinnedlint"
+	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/pinnedlint"
 )
 
 // GoStore provides the local state doctor needs to inspect.

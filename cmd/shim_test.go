@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/koskosovu4/fgm/internal/app"
-	"github.com/koskosovu4/fgm/internal/testutil"
+	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestShimCommand_RejectsNotConfigured(t *testing.T) {

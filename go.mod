@@ -1,4 +1,4 @@
-module github.com/koskosovu4/fgm
+module github.com/kostikovk/fgm
 
 go 1.26.1
 
