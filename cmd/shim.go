@@ -41,8 +41,7 @@ func newShimCmd(application *app.App) *cobra.Command {
 				execCmd.Stderr = cmd.ErrOrStderr()
 				execCmd.Env = os.Environ()
 				if err := execCmd.Run(); err != nil {
-					var exitErr *exec.ExitError
-					if errors.As(err, &exitErr) {
+					if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 						os.Exit(exitErr.ExitCode())
 					}
 					return err

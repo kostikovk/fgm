@@ -748,3 +748,49 @@ func TestFindArchive_SkipsMismatchedPlatformAsset(t *testing.T) {
 		t.Fatalf("archive.URL = %q, want darwin asset URL", archive.URL)
 	}
 }
+
+func TestDefaultCompatibilityData_SupportsGo127(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should return v2.13.0 and exclude v2.12.2 when target Go version is 1.27.2", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`[
+				{
+					"tag_name": "v2.13.0",
+					"assets": [
+						{"name": "golangci-lint-2.13.0-darwin-arm64.tar.gz"}
+					]
+				},
+				{
+					"tag_name": "v2.12.2",
+					"assets": [
+						{"name": "golangci-lint-2.12.2-darwin-arm64.tar.gz"}
+					]
+				}
+			]`))
+		}))
+		defer server.Close()
+
+		provider := New(Config{
+			Client:  server.Client(),
+			BaseURL: server.URL,
+			GOOS:    "darwin",
+			GOARCH:  "arm64",
+		})
+
+		// Act
+		versions, err := provider.ListRemoteLintVersions(context.Background(), "1.27.2")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListRemoteLintVersions(1.27.2) returned unexpected error: %v", err)
+		}
+		if len(versions) != 1 || versions[0].Version != "v2.13.0" {
+			t.Fatalf("versions = %#v, want only v2.13.0 for Go 1.27.2", versions)
+		}
+	})
+}

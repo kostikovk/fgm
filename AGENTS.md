@@ -2,7 +2,7 @@
 
 ## Start here — always apply
 
-Read [CONTEXT.md](CONTEXT.md) for the project's purpose, domain glossary, layered architecture, and invariants. Inspect `go.mod` (`go 1.26.1`), `Makefile`, relevant callers, and `git status --short --branch` before changing files.
+Read [CONTEXT.md](CONTEXT.md) for the project's purpose, domain glossary, layered architecture, and invariants. Inspect `go.mod` (`go 1.27.2`), `Makefile`, relevant callers, and `git status --short --branch` before changing files.
 
 Complete clear, authorized local work and verify it; ask only when missing information materially changes the outcome or an action requires additional authority. Preserve unrelated edits and staged content. A request to edit does not authorize a commit, push, or remote publication.
 
@@ -18,7 +18,7 @@ Read the selected skill entrypoint in `.agents/skills/` and its mandatory bounda
 | Split broad scope into deliverable slices and tasks | [task-decomposition](.agents/skills/task-decomposition/SKILL.md) | Map requirements to slices, dependencies, and scenario acceptance |
 | Resolve an open architectural or technical design choice | [design-decision](.agents/skills/design-decision/SKILL.md) | Compare options against `CONTEXT.md` and existing package boundaries; design-only work does not authorize implementation |
 | Start or continue repository edits; prepare commits or PRs | [git-delivery](.agents/skills/git-delivery/SKILL.md), relevant route | Use a verified task branch/worktree before the first edit; local commits and remote publication require separate requests |
-| Write, fix, or refactor production Go code | [go-code](.agents/skills/go-code/SKILL.md), [code-change](.agents/skills/code-change/SKILL.md), [tdd-workflow](.agents/skills/tdd-workflow/SKILL.md), and [aaa-testing](.agents/skills/aaa-testing/SKILL.md) | Respect `go 1.26.1` in `go.mod`, thin `cmd/` facades, and `internal/app/app.go` interfaces; load TDD and AAA before executable edits |
+| Write, fix, or refactor production Go code | [go-code](.agents/skills/go-code/SKILL.md), [code-change](.agents/skills/code-change/SKILL.md), [tdd-workflow](.agents/skills/tdd-workflow/SKILL.md), and [aaa-testing](.agents/skills/aaa-testing/SKILL.md) | Respect `go 1.27.2` in `go.mod`, thin `cmd/` facades, and `internal/app/app.go` interfaces; load TDD and AAA before executable edits |
 | Implement or review UI, web, or landing-page code | [frontend-code](.agents/skills/frontend-code/SKILL.md), [code-change](.agents/skills/code-change/SKILL.md), [tdd-workflow](.agents/skills/tdd-workflow/SKILL.md), and [aaa-testing](.agents/skills/aaa-testing/SKILL.md) | Ground state, accessibility, responsive layout, and native web patterns in the selected frontend stack |
 | Write, edit, or review automated tests | [aaa-testing](.agents/skills/aaa-testing/SKILL.md) ([Go reference](.agents/skills/aaa-testing/references/go-tests.md)), plus [tdd-workflow](.agents/skills/tdd-workflow/SKILL.md) for executable changes | Use Arrange–Act–Assert and `should <expected outcome> when <condition>` scenario titles for new or edited subtests/table cases |
 | Investigate an unexplained failure or regression | [debugging](.agents/skills/debugging/SKILL.md) | Reproduce with a test or minimal probe and establish root cause; diagnosis alone does not authorize a fix |
@@ -60,6 +60,6 @@ make cmd CMD='current --chdir .'
 
 ## Validation and reporting
 
-- **Executable Go or frontend changes:** Follow [tdd-workflow](.agents/skills/tdd-workflow/SKILL.md) (observed RED for new/changed behavior, minimal GREEN, then REFACTOR) and [aaa-testing](.agents/skills/aaa-testing/SKILL.md). Run targeted tests first, then `make test`, `go vet ./...`, and `make build` before claiming completion. Because `make fix` and `make pre-commit` run `go fix ./...` across the whole repository (which currently rewrites `cmd/shim.go`), check `git status` / `git diff` after running `make pre-commit` and revert any out-of-scope `go fix` edits unless modernizing that file is part of the task.
+- **Executable Go or frontend changes:** Follow [tdd-workflow](.agents/skills/tdd-workflow/SKILL.md) (observed RED for new/changed behavior, minimal GREEN, then REFACTOR) and [aaa-testing](.agents/skills/aaa-testing/SKILL.md). Run targeted tests first, then `make pre-commit` (or `make test`, `go vet ./...`, and `make build`) before claiming completion. Note that `make fix` and `make pre-commit` run `go fix ./...` across the whole repository; check `git status` / `git diff` afterward to ensure no unrelated files were modified.
 - **Documentation and configuration changes:** Inspect `git diff`, verify local Markdown links and heading anchors, run `git diff --check`, and run `make test` when build/release files are touched.
 - Report changed files, checks actually executed, and any remaining verification gap. Do not claim a command passed unless it was run in the current session.
