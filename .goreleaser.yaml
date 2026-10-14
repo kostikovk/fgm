@@ -67,8 +67,10 @@ release:
     owner: kostikovk
     name: fgm
 
-brews:
+homebrew_casks:
   - name: fgm
+    binaries:
+      - fgm
     repository:
       owner: kostikovk
       name: homebrew-fgm

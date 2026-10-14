@@ -29,11 +29,15 @@ func TestGoReleaserConfigExistsAndContainsReleaseMetadata(t *testing.T) {
 			"changelog:",
 			"Features",
 			"Bug Fixes",
-			"brews:",
+			"homebrew_casks:",
+			"binaries:",
 		} {
 			if !strings.Contains(joined, want) {
 				t.Fatalf(".goreleaser.yaml = %q, want it to contain %q", joined, want)
 			}
+		}
+		if strings.Contains(joined, "\nbrews:") {
+			t.Fatalf(".goreleaser.yaml still contains deprecated brews section")
 		}
 	})
 }
