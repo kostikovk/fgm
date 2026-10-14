@@ -531,3 +531,71 @@ func TestGenerate_PropagatesLaterFetchErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratorGenerate_ExtractsSupportThresholdsFromReleaseNotes(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should extract Go support thresholds from release notes when issue body has no since version", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		client := newHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/repos/golangci/golangci-lint/releases":
+				return newResponse(http.StatusOK, `[
+					{"tag_name":"v2.13.0","body":"* 42a05302e2bbb966fc3ed0636001dbe4fc2b0c58 go1.27 support (#6642)","draft":false,"prerelease":false},
+					{"tag_name":"v2.12.2","body":"* bugfixes","draft":false,"prerelease":false},
+					{"tag_name":"v2.9.0","body":"* e9b722123bb155c751490bb4c08ba7ddfda33baf go1.26 support (#6271)","draft":false,"prerelease":false},
+					{"tag_name":"v2.8.0","body":"* minor updates","draft":false,"prerelease":false},
+					{"tag_name":"v2.4.0","body":"","draft":false,"prerelease":false}
+				]`), nil
+			case "/search/issues":
+				return newResponse(http.StatusOK, `{
+					"items": [
+						{"title":"go1.25 support","body":"EDIT: since v2.4.0 golangci-lint supports go1.25"},
+						{"title":"go1.26 support","body":"follow PR #6271"},
+						{"title":"go1.27 support","body":"follow PR #6642"}
+					]
+				}`), nil
+			case "/dl/":
+				return newResponse(http.StatusOK, `[
+					{"version":"go1.27.2","stable":true},
+					{"version":"go1.26.9","stable":true},
+					{"version":"go1.25.14","stable":true}
+				]`), nil
+			default:
+				return newResponse(http.StatusNotFound, `{}`), nil
+			}
+		})
+
+		generator := NewGenerator(GeneratorConfig{
+			Client:        client,
+			BaseURL:       "https://example.test",
+			GoReleasesURL: "https://example.test",
+			Now:           func() time.Time { return time.Date(2026, time.October, 14, 10, 0, 0, 0, time.UTC) },
+		})
+
+		// Act
+		manifest, err := generator.Generate(context.Background())
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Generate returned unexpected error: %v", err)
+		}
+		if manifest.SupportThresholds["26"] != "v2.9.0" {
+			t.Fatalf("SupportThresholds[26] = %q, want %q", manifest.SupportThresholds["26"], "v2.9.0")
+		}
+		if manifest.SupportThresholds["27"] != "v2.13.0" {
+			t.Fatalf("SupportThresholds[27] = %q, want %q", manifest.SupportThresholds["27"], "v2.13.0")
+		}
+		if manifest.Versions["v2.8.0"].MaxGoMinor != 25 {
+			t.Fatalf("v2.8.0 MaxGoMinor = %d, want 25", manifest.Versions["v2.8.0"].MaxGoMinor)
+		}
+		if manifest.Versions["v2.12.2"].MaxGoMinor != 26 {
+			t.Fatalf("v2.12.2 MaxGoMinor = %d, want 26", manifest.Versions["v2.12.2"].MaxGoMinor)
+		}
+		if manifest.Versions["v2.13.0"].MaxGoMinor != 27 {
+			t.Fatalf("v2.13.0 MaxGoMinor = %d, want 27", manifest.Versions["v2.13.0"].MaxGoMinor)
+		}
+	})
+}

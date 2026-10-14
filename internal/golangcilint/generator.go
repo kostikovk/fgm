@@ -18,6 +18,7 @@ const minimumTrackedGoMinor = 18
 
 var issueTitlePattern = regexp.MustCompile(`^go1\.(\d+)\s+support$`)
 var issueSincePattern = regexp.MustCompile(`(?i)since\s+\[?(v\d+\.\d+(?:\.\d+)?)`)
+var releaseSupportPattern = regexp.MustCompile(`(?i)\bgo1\.(\d+)\s+support\b`)
 
 type issueSearchResult struct {
 	Items []issueItem `json:"items"`
@@ -102,6 +103,7 @@ func (g *Generator) Generate(ctx context.Context) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
+	thresholds = mergeReleaseBodyThresholds(thresholds, releases)
 	latestGoVersions, err := g.fetchLatestGoVersions(ctx)
 	if err != nil {
 		return Manifest{}, err
@@ -276,6 +278,54 @@ func parseSupportThreshold(item issueItem) (supportThreshold, bool) {
 		GoMinor:      goMinor,
 		SinceVersion: sinceVersion,
 	}, true
+}
+
+func mergeReleaseBodyThresholds(thresholds []supportThreshold, releases []release) []supportThreshold {
+	highestIssueMinor := minimumTrackedGoMinor
+	knownMinors := make(map[int]bool, len(thresholds))
+	for _, t := range thresholds {
+		knownMinors[t.GoMinor] = true
+		if t.GoMinor > highestIssueMinor {
+			highestIssueMinor = t.GoMinor
+		}
+	}
+
+	fromReleases := make(map[int]string)
+	for _, rel := range releases {
+		if rel.Draft || rel.Prerelease || !strings.HasPrefix(rel.TagName, "v") {
+			continue
+		}
+		matches := releaseSupportPattern.FindAllStringSubmatch(rel.Body, -1)
+		for _, match := range matches {
+			if len(match) != 2 {
+				continue
+			}
+			goMinor, err := strconv.Atoi(match[1])
+			if err != nil || goMinor <= highestIssueMinor || knownMinors[goMinor] {
+				continue
+			}
+			if existing, ok := fromReleases[goMinor]; !ok || compareSemver(rel.TagName, existing) < 0 {
+				fromReleases[goMinor] = rel.TagName
+			}
+		}
+	}
+
+	merged := slices.Clone(thresholds)
+	for goMinor, sinceVersion := range fromReleases {
+		merged = append(merged, supportThreshold{
+			GoMinor:      goMinor,
+			SinceVersion: sinceVersion,
+		})
+	}
+
+	slices.SortFunc(merged, func(left supportThreshold, right supportThreshold) int {
+		if left.GoMinor != right.GoMinor {
+			return left.GoMinor - right.GoMinor
+		}
+		return compareSemver(left.SinceVersion, right.SinceVersion)
+	})
+
+	return merged
 }
 
 func buildManifestEntries(releases []release, thresholds []supportThreshold, latestGoMinor int) map[string]compatibilityEntry {
