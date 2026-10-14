@@ -174,6 +174,54 @@ fgm lint doctor
 
 `fgm lint doctor` walks upward from the working directory looking for `.golangci.yml` or `.golangci.yaml` (preferring `.golangci.yml` when both exist in the same directory). It reports missing `version: "2"` metadata (`ERROR`), unknown linters (`WARN`), linters incompatible with the project's Go version (`WARN`), formatter/linter conflicts (`WARN`), and `INFO` recommendations for linters from the `standard` preset that are not yet enabled.
 
+## AI Coding Agents
+
+FGM ships a standalone [Agent Skill](https://agentskills.io/specification) at [`skills/fgm/SKILL.md`](./skills/fgm/SKILL.md) so AI coding agents can inspect, bootstrap, and run project toolchains deterministically in non-interactive shells without mutating host installations or shell profiles.
+
+### Agent Quick Start
+
+In non-interactive agent sessions (where `eval "$(fgm env)"` does not persist across separate tool calls), run workspace commands through `fgm --chdir <dir> exec --`:
+
+```bash
+# 1. Inspect resolved Go and golangci-lint versions and environment health
+fgm --chdir . current
+fgm --chdir . doctor
+
+# 2. Import existing system toolchains and install any missing workspace binaries
+fgm import auto
+fgm --chdir . install
+
+# 3. Execute Go, golangci-lint, or Make targets with the resolved toolchain on PATH
+fgm --chdir . exec -- go test ./...
+fgm --chdir . exec -- golangci-lint run ./...
+
+# 4. Audit existing lint config (inspect output lines; exits 0 even on ERROR findings)
+fgm --chdir . lint doctor
+```
+
+### Installing the `fgm` Skill for Your Agent
+
+Copy the `skills/fgm` directory from a tagged release or commit into your project's agent skill directory (having the `fgm` source repository elsewhere on disk does not automatically register the skill in another project):
+
+| Agent Client | Project Skill Directory |
+|---|---|
+| [Claude Code](https://code.claude.com/docs/en/skills) | `.claude/skills/fgm/` |
+| [Codex](https://learn.chatgpt.com/docs/build-skills) | `.agents/skills/fgm/` |
+| [Pi](https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/docs/skills.md) | `.agents/skills/fgm/` (supported shared alias) |
+| [Cursor](https://cursor.com/docs/skills) | `.cursor/skills/fgm/` or `.agents/skills/fgm/` |
+| [Gemini CLI](https://geminicli.com/docs/cli/skills/) | `.gemini/skills/fgm/` or `.agents/skills/fgm/` |
+
+Example installation into a target repository's `.agents/skills/fgm/` directory:
+
+```bash
+mkdir -p .agents/skills/fgm
+curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/skills/fgm/SKILL.md \
+  -o .agents/skills/fgm/SKILL.md
+```
+
+> [!NOTE]
+> The skill directory paths above reflect each client's documented skill discovery conventions (verified against client documentation on October 14, 2026). Runtime behavior and explicit invocation syntax depend on the installed client version.
+
 ## Storage Layout
 
 FGM stores managed toolchains under `$XDG_DATA_HOME/fgm` (default: `~/.local/share/fgm`):

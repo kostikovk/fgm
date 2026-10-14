@@ -24,6 +24,7 @@ func newPinLintCmd(v *viper.Viper) *cobra.Command {
 	return &cobra.Command{
 		Use:   "golangci-lint [version|auto]",
 		Short: "Pin the repo golangci-lint version in .fgm.toml",
+		Long:  "Record the repository golangci-lint version policy (an explicit version or 'auto') in the nearest .fgm.toml. Pinning does not install the linter or validate compatibility upfront; run 'fgm install' and 'fgm doctor' afterward.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := strings.TrimSpace(args[0])

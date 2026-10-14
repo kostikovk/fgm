@@ -30,6 +30,7 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "go",
 		Short: "Upgrade Go globally or for the current project",
+		Long:  "Upgrade Go globally (--global) or in the nearest project go.work/go.mod (--project). Use --dry-run to preview the target version and --to <version> to freeze an explicit target; --with-lint preserves explicit .fgm.toml pins.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if global && project {
@@ -116,6 +117,7 @@ func newUpgradeLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "golangci-lint",
 		Short: "Upgrade golangci-lint to the latest compatible version",
+		Long:  "Install the latest compatible (or pinned) golangci-lint version for the workspace's resolved Go version, or use --to <version> to install an explicit version.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.LintUpgrader == nil {

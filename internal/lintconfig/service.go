@@ -68,7 +68,7 @@ func (s *Service) Generate(ctx context.Context, opts app.LintConfigOptions) ([]b
 
 	if !opts.Force {
 		if _, err := os.Stat(outputPath); err == nil {
-			return nil, fmt.Errorf(".golangci.yml already exists at %s; use --force to overwrite", outputDir)
+			return nil, fmt.Errorf(".golangci.yml already exists at %s; run \"fgm lint doctor\" to audit it first, or use --force to overwrite", outputDir)
 		}
 	}
 

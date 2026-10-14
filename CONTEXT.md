@@ -15,6 +15,7 @@ Fast Go Manager (`fgm`) is a single-binary Go CLI that manages Go toolchains, `g
 | Document | Responsibility |
 |---|---|
 | [AGENTS.md](AGENTS.md) | Repository operating instructions, task-to-skill navigation, verified CLI commands, and engineering boundaries |
+| [`skills/fgm/SKILL.md`](skills/fgm/SKILL.md) | Distributable standalone `fgm` skill for AI coding agents (mirrored locally in `.agents/skills/fgm/SKILL.md`) |
 | `.agents/skills/*/SKILL.md` | Task-specific engineering workflows, boundaries, and reference routing |
 | `.agents/skills/*/references/*.md` | Focused technical procedures and language/framework guidance |
 | [README.md](README.md) | User-facing CLI documentation, installation, and quick-start examples |
@@ -58,6 +59,7 @@ FGM follows a strict three-layer design:
 | `internal/shim` | Resolve the target Go binary path for shim execution |
 | `internal/execenv` | Execute external commands in the resolved working directory with `PATH` ordered as `selected Go` (required) → `installed selected golangci-lint` (prepended only when installed locally) → `inherited PATH`, without auto-installing missing toolchains |
 | `internal/doctor` | Run environment health checks and report actionable findings (including `shell_profile` fix hints handled by `fgm doctor --fix`) |
+| `internal/toolhint` | Format exact CLI recovery command hints (`fgm install go <version>`, `fgm install golangci-lint <version>`, `fgm exec -- <command>`) shared across stores, commands, and doctor diagnostics |
 | `internal/archive` | Archive extraction (`.tar.gz`, `.zip`) and download progress reporting |
 | `internal/versionutil` | Semantic/Go version parsing, comparison, normalization, and binary discovery helpers |
 | `internal/testutil` | Shared command-execution test helpers for `cmd/` and integration tests |

@@ -1,9 +1,13 @@
 package lintconfig
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/kostikovk/fgm/internal/app"
 	"gopkg.in/yaml.v3"
 )
 
@@ -165,4 +169,53 @@ func TestGenerate_InvalidPreset(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid preset")
 	}
+}
+
+func TestServiceGenerate_ExistingConfigSuggestsLintDoctorBeforeForce(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should suggest auditing with fgm lint doctor before using --force when .golangci.yml already exists", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		workDir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(workDir, ".golangci.yml"), []byte("version: \"2\"\n"), 0o644); err != nil {
+			t.Fatalf("write existing .golangci.yml: %v", err)
+		}
+		svc, err := New(Config{
+			Resolver: stubServiceResolver{
+				selection: app.Selection{
+					GoVersion:   "1.27.2",
+					LintVersion: "v2.13.0",
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+
+		// Act
+		_, err = svc.Generate(context.Background(), app.LintConfigOptions{
+			WorkDir: workDir,
+			Preset:  PresetStandard,
+			Force:   false,
+		})
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected error when .golangci.yml already exists without Force")
+		}
+		if !strings.Contains(err.Error(), "fgm lint doctor") || !strings.Contains(err.Error(), "--force") {
+			t.Fatalf("err = %q, want hint to run 'fgm lint doctor' before using --force", err.Error())
+		}
+	})
+}
+
+type stubServiceResolver struct {
+	selection app.Selection
+	err       error
+}
+
+func (s stubServiceResolver) Current(_ context.Context, _ string) (app.Selection, error) {
+	return s.selection, s.err
 }

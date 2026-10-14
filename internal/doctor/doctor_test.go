@@ -335,9 +335,62 @@ func TestDiagnose_ReportsSelectedToolchainAvailability(t *testing.T) {
 	if !strings.Contains(joined, "WARN selected Go version is not installed: 1.25.7") {
 		t.Fatalf("joined = %q, want missing Go line", joined)
 	}
+	if !strings.Contains(joined, `fgm install go 1.25.7`) {
+		t.Fatalf("joined = %q, want missing Go install hint", joined)
+	}
 	if !strings.Contains(joined, "WARN selected golangci-lint version is not installed: v2.11.2") {
 		t.Fatalf("joined = %q, want missing lint line", joined)
 	}
+	if !strings.Contains(joined, `fgm install golangci-lint v2.11.2`) {
+		t.Fatalf("joined = %q, want missing lint install hint", joined)
+	}
+}
+
+func TestDiagnose_ActionableHintsForGlobalAndShim(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should clarify global Go is for outside Go projects and suggest fgm exec when shim dir is not on PATH", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		service := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion: "1.25.7",
+						GoSource:  "/repo/go.mod",
+					}, nil
+				},
+			},
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+					return "", false, nil
+				},
+				shimDirFn: func() string {
+					return "/tmp/fgm/shims"
+				},
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return "/tmp/fgm/go/1.25.7/bin/go", nil
+				},
+			},
+			PathEnv: "/usr/local/bin",
+		})
+
+		// Act
+		findings, err := service.Diagnose(context.Background(), "/repo")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Diagnose: %v", err)
+		}
+		joined := findingsToString(findings)
+		if !strings.Contains(joined, "outside Go projects") {
+			t.Fatalf("joined = %q, want global Go warning to clarify it is needed outside Go projects", joined)
+		}
+		if !strings.Contains(joined, "fgm exec -- <command>") {
+			t.Fatalf("joined = %q, want shim warning to include non-interactive fgm exec hint", joined)
+		}
+	})
 }
 
 func TestDiagnose_ReportsPinnedLintCompatibilityStatus(t *testing.T) {

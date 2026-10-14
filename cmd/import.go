@@ -22,6 +22,7 @@ func newImportAutoCmd(application *app.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "auto",
 		Short: "Automatically import existing Go and golangci-lint installations from common locations",
+		Long:  "Discover existing Go and golangci-lint installations in standard system paths and register them as symlinks in the FGM store without modifying the global default Go selection.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.GoImporter == nil && application.LintImporter == nil {

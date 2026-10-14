@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/toolhint"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +40,7 @@ func newUseGoCmd(application *app.App) *cobra.Command {
 				return err
 			}
 			if !ok {
-				return fmt.Errorf("go version %s is not installed", version)
+				return fmt.Errorf("go version %s is not installed (run %q)", version, toolhint.InstallGoCommand(version))
 			}
 
 			if err := application.GoStore.SetGlobalGoVersion(cmd.Context(), version); err != nil {

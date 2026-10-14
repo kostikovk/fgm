@@ -2,6 +2,7 @@ package golocal
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -389,14 +390,58 @@ func TestGoBinaryPath_ErrorWhenSystemVersionMismatches(t *testing.T) {
 func TestGoBinaryPath_ErrorWhenNotInstalled(t *testing.T) {
 	t.Parallel()
 
-	store := New(t.TempDir(), "")
-	_, err := store.GoBinaryPath(context.Background(), "1.99.0")
-	if err == nil {
-		t.Fatal("expected an error when version is not installed")
-	}
-	if !strings.Contains(err.Error(), "not installed") {
-		t.Fatalf("err = %q, want it to contain %q", err, "not installed")
-	}
+	t.Run("should include install go command hint and wrap os.ErrNotExist when Go version is not installed", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		store := New(t.TempDir(), "")
+
+		// Act
+		_, err := store.GoBinaryPath(context.Background(), "1.99.0")
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected an error when version is not installed")
+		}
+		if !strings.Contains(err.Error(), "go version 1.99.0 is not installed") {
+			t.Fatalf("err = %q, want it to contain %q", err, "go version 1.99.0 is not installed")
+		}
+		if !strings.Contains(err.Error(), `fgm install go 1.99.0`) {
+			t.Fatalf("err = %q, want it to contain install hint %q", err, "fgm install go 1.99.0")
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("errors.Is(%v, os.ErrNotExist) = false, want true", err)
+		}
+	})
+
+	t.Run("should propagate non-NotExist storage error without install hint when go store root is a regular file", func(t *testing.T) {
+		t.Parallel()
+
+		if runtime.GOOS == "windows" {
+			t.Skip("ENOTDIR check is unix-specific")
+		}
+
+		// Arrange
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "go"), []byte("corrupted"), 0o644); err != nil {
+			t.Fatalf("write corrupted go root: %v", err)
+		}
+		store := New(root, "")
+
+		// Act
+		_, err := store.GoBinaryPath(context.Background(), "1.99.0")
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected storage error when go root is a regular file")
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("errors.Is(%v, os.ErrNotExist) = true, want non-NotExist error", err)
+		}
+		if strings.Contains(err.Error(), "fgm install go") {
+			t.Fatalf("err = %q, want no install hint on corrupted storage error", err)
+		}
+	})
 }
 
 func TestDeleteGoVersion_ErrorForRegularFile(t *testing.T) {

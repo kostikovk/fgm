@@ -145,6 +145,9 @@ func TestStoreLintBinaryPath_ErrorForMissingVersion(t *testing.T) {
 		if got := err.Error(); !strings.Contains(got, "not installed") {
 			t.Fatalf("error = %q, want it to contain %q", got, "not installed")
 		}
+		if got := err.Error(); !strings.Contains(got, "fgm install golangci-lint v9.9.9") {
+			t.Fatalf("error = %q, want it to contain install hint %q", got, "fgm install golangci-lint v9.9.9")
+		}
 		if !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("errors.Is(%v, os.ErrNotExist) = false, want true", err)
 		}
@@ -168,6 +171,9 @@ func TestStoreLintBinaryPath_ErrorForMissingVersion(t *testing.T) {
 		}
 		if errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("errors.Is(%v, os.ErrNotExist) = true, want non-NotExist storage error", err)
+		}
+		if strings.Contains(err.Error(), "fgm install golangci-lint") {
+			t.Fatalf("error = %q, want no install hint when storage is corrupted", err.Error())
 		}
 		if runtime.GOOS != "windows" && !errors.Is(err, syscall.ENOTDIR) {
 			t.Fatalf("errors.Is(%v, syscall.ENOTDIR) = false, want true", err)

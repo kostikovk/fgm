@@ -2,6 +2,7 @@ package golocal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kostikovk/fgm/internal/toolhint"
 	"github.com/kostikovk/fgm/internal/versionutil"
 )
 
@@ -142,8 +144,12 @@ func (s *Store) DeleteGoVersion(ctx context.Context, version string) (string, er
 // GoBinaryPath returns the executable path for the requested Go version.
 func (s *Store) GoBinaryPath(ctx context.Context, version string) (string, error) {
 	managedBinary := s.managedGoBinaryPath(version)
-	if _, err := os.Stat(managedBinary); err == nil {
+	_, statErr := os.Stat(managedBinary)
+	if statErr == nil {
 		return managedBinary, nil
+	}
+	if !errors.Is(statErr, os.ErrNotExist) {
+		return "", fmt.Errorf("stat managed Go version %s: %w", version, statErr)
 	}
 
 	systemVersion, systemBinary, err := s.systemGo(ctx)
@@ -154,7 +160,7 @@ func (s *Store) GoBinaryPath(ctx context.Context, version string) (string, error
 		return systemBinary, nil
 	}
 
-	return "", fmt.Errorf("go version %s is not installed", version)
+	return "", fmt.Errorf("go version %s is not installed (run %q): %w", version, toolhint.InstallGoCommand(version), statErr)
 }
 
 // EnsureShims writes the shell shim scripts used to dispatch go through FGM.

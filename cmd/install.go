@@ -12,6 +12,7 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	installCmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install toolchains into the local FGM store",
+		Long:  "Install the workspace's resolved Go version (and resolved golangci-lint version, when applicable) into the local FGM store without changing the global default Go selection.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.Resolver == nil {

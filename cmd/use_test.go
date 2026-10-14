@@ -178,4 +178,7 @@ func TestUseGoGlobal_RejectsMissingVersion(t *testing.T) {
 	if !strings.Contains(stderr, "go version 1.25.7 is not installed") {
 		t.Fatalf("stderr = %q, want it to contain missing-version error", stderr)
 	}
+	if !strings.Contains(stderr, "fgm install go 1.25.7") {
+		t.Fatalf("stderr = %q, want it to contain install hint", stderr)
+	}
 }

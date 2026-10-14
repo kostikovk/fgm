@@ -31,7 +31,7 @@ func newLintInitCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Generate a best-practice .golangci.yml",
-		Long:  "Generate a golangci-lint v2 configuration file tuned to the project's Go version.",
+		Long:  "Generate a golangci-lint v2 configuration file tuned to the project's Go version. Audit existing .golangci.yml or .golangci.yaml files with 'fgm lint doctor' before using --force to overwrite.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			preset, _ := cmd.Flags().GetString(flagPreset)
 			effectivePreset, err := lintconfig.NormalizePreset(preset)
@@ -76,6 +76,7 @@ func newLintDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Audit existing golangci-lint configuration",
+		Long:  "Audit an existing .golangci.yml or .golangci.yaml for v2 format metadata, Go-version compatibility, and linter conflicts. Prints ERROR, WARN, INFO, or OK findings and exits with status 0 when parsing completes.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.LintDoctor == nil {
 				return fmt.Errorf("lint doctor is not available")

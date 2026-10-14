@@ -2,11 +2,14 @@ package lintlocal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
+
+	"github.com/kostikovk/fgm/internal/toolhint"
 )
 
 // Store manages installed golangci-lint versions in the FGM data root.
@@ -78,8 +81,11 @@ func (s *Store) LintBinaryPath(ctx context.Context, version string) (string, err
 	if err == nil {
 		return binaryPath, nil
 	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", fmt.Errorf("stat managed golangci-lint version %s: %w", version, err)
+	}
 
-	return "", fmt.Errorf("golangci-lint version %s is not installed: %w", version, err)
+	return "", fmt.Errorf("golangci-lint version %s is not installed (run %q): %w", version, toolhint.InstallLintCommand(version), err)
 }
 
 // RegisterExistingLintInstallation registers an existing golangci-lint binary into the FGM-managed store.

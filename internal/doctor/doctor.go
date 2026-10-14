@@ -2,12 +2,14 @@ package doctor
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/kostikovk/fgm/internal/fgmconfig"
+	"github.com/kostikovk/fgm/internal/toolhint"
 )
 
 // GoStore provides the local state doctor needs to inspect.
@@ -72,7 +74,10 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 	if ok {
 		findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "global Go version: " + version})
 	} else {
-		findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "no global Go version is selected"})
+		findings = append(findings, app.DoctorFinding{
+			Severity: "WARN",
+			Message:  "no global Go version is selected (needed outside Go projects; run \"fgm use go <version> --global\")",
+		})
 	}
 
 	shimDir := s.goStore.ShimDir()
@@ -81,7 +86,7 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 	} else {
 		findings = append(findings, app.DoctorFinding{
 			Severity: "WARN",
-			Message:  "shim dir is not on PATH: " + shimDir,
+			Message:  fmt.Sprintf("shim dir is not on PATH: %s (for non-interactive runs, use %q)", shimDir, toolhint.ExecCommand()),
 			FixKind:  "shell_profile",
 		})
 	}
@@ -98,7 +103,10 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 			if _, err := s.goStore.GoBinaryPath(ctx, selection.GoVersion); err == nil {
 				findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "selected Go version is installed: " + selection.GoVersion})
 			} else {
-				findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "selected Go version is not installed: " + selection.GoVersion})
+				findings = append(findings, app.DoctorFinding{
+					Severity: "WARN",
+					Message:  fmt.Sprintf("selected Go version is not installed: %s (run %q)", selection.GoVersion, toolhint.InstallGoCommand(selection.GoVersion)),
+				})
 			}
 
 			pinnedLintVersion, pinned, err := fgmconfig.ResolvePinnedLint(workDir)
@@ -113,9 +121,15 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 				if _, err := s.lintStore.LintBinaryPath(ctx, selection.LintVersion); err == nil {
 					findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "selected golangci-lint version is installed: " + selection.LintVersion})
 				} else {
-					findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "selected golangci-lint version is not installed: " + selection.LintVersion})
+					findings = append(findings, app.DoctorFinding{
+						Severity: "WARN",
+						Message:  fmt.Sprintf("selected golangci-lint version is not installed: %s (run %q)", selection.LintVersion, toolhint.InstallLintCommand(selection.LintVersion)),
+					})
 					if pinned && pinnedLintVersion == selection.LintVersion {
-						findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "pinned golangci-lint version is not installed: " + selection.LintVersion})
+						findings = append(findings, app.DoctorFinding{
+							Severity: "WARN",
+							Message:  fmt.Sprintf("pinned golangci-lint version is not installed: %s (run %q)", selection.LintVersion, toolhint.InstallLintCommand(selection.LintVersion)),
+						})
 					}
 				}
 			}

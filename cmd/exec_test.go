@@ -342,6 +342,73 @@ func TestRootAndExecHelp_FlagAndDescriptionContracts(t *testing.T) {
 		if !strings.Contains(stdout, "golangci-lint") {
 			t.Fatalf("exec --help = %q, want it to mention golangci-lint", stdout)
 		}
+		if !strings.Contains(stdout, "non-interactive") {
+			t.Fatalf("exec --help = %q, want it to mention non-interactive sessions", stdout)
+		}
+	})
+
+	t.Run("should include state and workflow guidance in help for env, install, import auto, pin, upgrade, and lint commands", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		cases := []struct {
+			name string
+			args []string
+			want string
+		}{
+			{
+				name: "should suggest fgm exec for non-interactive sessions when env help is requested",
+				args: []string{"env", "--help"},
+				want: "fgm exec",
+			},
+			{
+				name: "should clarify global selection is unchanged when install help is requested",
+				args: []string{"install", "--help"},
+				want: "global",
+			},
+			{
+				name: "should explain symlink registration when import auto help is requested",
+				args: []string{"import", "auto", "--help"},
+				want: "symlink",
+			},
+			{
+				name: "should explain .fgm.toml policy recording when pin golangci-lint help is requested",
+				args: []string{"pin", "golangci-lint", "--help"},
+				want: ".fgm.toml",
+			},
+			{
+				name: "should explain --to target freezing when upgrade go help is requested",
+				args: []string{"upgrade", "go", "--help"},
+				want: "--to",
+			},
+			{
+				name: "should recommend auditing with lint doctor when lint init help is requested",
+				args: []string{"lint", "init", "--help"},
+				want: "lint doctor",
+			},
+			{
+				name: "should explain ERROR output and zero exit status when lint doctor help is requested",
+				args: []string{"lint", "doctor", "--help"},
+				want: "ERROR",
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// Act
+				stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), tc.args...)
+
+				// Assert
+				if err != nil {
+					t.Fatalf("ExecuteCommand(%v): %v", tc.args, err)
+				}
+				if !strings.Contains(stdout, tc.want) {
+					t.Fatalf("help for %v = %q, want it to contain %q", tc.args, stdout, tc.want)
+				}
+			})
+		}
 	})
 }
 

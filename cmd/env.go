@@ -13,6 +13,7 @@ func newEnvCmd(application *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "env",
 		Short: "Print shell environment setup for FGM",
+		Long:  "Print shell setup commands that prepend FGM shims to PATH in an interactive shell. In non-interactive sessions, use 'fgm exec -- <command>' for each invocation because environment changes do not persist across separate child processes.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.EnvRenderer == nil {

@@ -13,6 +13,8 @@ Read applicable project instructions, `go.mod`, relevant callers, neighboring im
 
 Treat the `go` directive as the minimum supported language and standard-library baseline; the installed toolchain and `toolchain` directive do not raise that baseline. Inspect CI and build constraints too. A task to use a newer API does not by itself authorize a version bump or dependency migration.
 
+Before running the first executable command—including the initial RED test or reproduction run—apply [Toolchain and runner detection](references/tooling.md#toolchain-and-runner-detection) to choose how Go, linter, and build commands are invoked in the workspace.
+
 ## Start implementation with tests
 
 For every Go implementation task, load [code-change](../code-change/SKILL.md), [tdd-workflow](../tdd-workflow/SKILL.md), and [aaa-testing](../aaa-testing/SKILL.md), including AAA's Go reference, before executable edits. Apply code-change's workspace preparation and discovery first. Locate these files through the skill catalog or the linked paths when the tool has no skill invocation syntax; missing required guidance is a blocker rather than permission to skip it.
@@ -37,7 +39,7 @@ Grounding, supported-version constraints, implementation rules, and verification
 | Interfaces, constructors/types, naming, or generics | The matching heading in [Design and Structure](references/design-and-structure.md) |
 | Choosing or modernizing Go features | [Version-Aware Go](references/modern-go.md); establish availability before selecting a feature |
 | Slow paths, allocations, benchmarks | [Performance](references/performance.md); establish evidence before choosing or measuring a change |
-| Formatting, lint, CI, toolchain failures | [Verification choices](references/tooling.md#verification-choices), [Version failures](references/tooling.md#version-failures), or [Handling findings](references/tooling.md#handling-findings) |
+| Selecting the runner/toolchain manager, formatting, lint, CI, or toolchain failures | [Toolchain and runner detection](references/tooling.md#toolchain-and-runner-detection), [Verification choices](references/tooling.md#verification-choices), [Version failures](references/tooling.md#version-failures), or [Handling findings](references/tooling.md#handling-findings) |
 
 ## Implement the contract
 

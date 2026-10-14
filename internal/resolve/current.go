@@ -61,6 +61,11 @@ func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, 
 					}, nil
 				}
 			}
+			return app.Selection{}, fmt.Errorf(
+				"%w (no go.work or go.mod found from %s and no global Go version is selected; pass --chdir <dir> or select a global version with \"fgm use go <version> --global\")",
+				err,
+				workDir,
+			)
 		}
 		return app.Selection{}, err
 	}

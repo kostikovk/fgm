@@ -363,13 +363,27 @@ func TestParseVersionMetadata_ScannerError(t *testing.T) {
 func TestResolverCurrent_ReturnsErrorWhenNoGoModAndNilGlobal(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
+	t.Run("should explain missing project metadata and global selection with chdir and global setup hints when neither exists", func(t *testing.T) {
+		t.Parallel()
 
-	_, err := New(nil).Current(context.Background(), tempDir)
-	if err == nil {
-		t.Fatal("expected an error when no go.mod and global resolver is nil")
-	}
-	if !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("err = %q, want it to contain %q", err, "not found")
-	}
+		// Arrange
+		tempDir := t.TempDir()
+
+		// Act
+		_, err := New(nil).Current(context.Background(), tempDir)
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected an error when no go.mod and global resolver is nil")
+		}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Fatalf("err = %q, want it to contain %q", err, "not found")
+		}
+		if !strings.Contains(err.Error(), "no global Go version is selected") {
+			t.Fatalf("err = %q, want it to explain missing global selection", err)
+		}
+		if !strings.Contains(err.Error(), "--chdir") || !strings.Contains(err.Error(), "fgm use go <version> --global") {
+			t.Fatalf("err = %q, want --chdir and global setup hints", err)
+		}
+	})
 }
