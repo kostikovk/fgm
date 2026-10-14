@@ -269,12 +269,12 @@ export const BENEFIT_CARDS: readonly BenefitCard[] = [
   {
     id: "ben-shims",
     badge: "02 · Zero-Config Switching",
-    title: "cd into any repo — the right Go & linter just work",
+    title: "cd into any repo — go & golangci-lint just work",
     beforeText:
       "Before: manually exporting PATH / GOROOT or running version-switch commands every time you jump between a Go 1.23 service and a Go 1.27 repo.",
-    afterCommand: "$ fgm doctor --fix   # enables automatic shims",
+    afterCommand: "$ fgm doctor --fix   # shims both go & golangci-lint",
     summary:
-      "Reads your existing go.work and go.mod files natively — no extra .tool-versions or .go-version file required to switch Go.",
+      "Routes plain go and golangci-lint commands to your repo's resolved versions automatically — no extra .tool-versions or .go-version file required.",
   },
   {
     id: "ben-lint-doctor",
@@ -383,7 +383,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     id: "faq-windows",
     question: "Can I use FGM on Windows?",
     answer:
-      "Yes — release archives and fgm exec work on macOS, Linux, and Windows. Automatic go shell shims (shims/go) are macOS/Linux only.",
+      "Yes — release archives and fgm exec work on macOS, Linux, and Windows. Automatic shell shims (shims/go and shims/golangci-lint) are macOS/Linux only.",
   },
   {
     id: "faq-agents",

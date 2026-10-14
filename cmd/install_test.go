@@ -445,3 +445,48 @@ func TestInstallCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "Installed golangci-lint v2.10.1")
 	}
 }
+
+func TestInstallCommand_EnsuresShimsWhenGoStoreConfigured(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should call EnsureShims when install completes with GoStore configured", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var shimsEnsured bool
+		application := &app.App{
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", LintVersion: "v2.14.0"}, nil
+				},
+			},
+			GoStore: stubGoStore{
+				ensureShimsFn: func() error {
+					shimsEnsured = true
+					return nil
+				},
+			},
+			GoInstaller: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					return "/tmp/fgm/go/" + version, nil
+				},
+			},
+			LintInstaller: stubLintInstaller{
+				installLintVersionFn: func(ctx context.Context, version string) (string, error) {
+					return "/tmp/fgm/golangci-lint/" + version, nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "install")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("execute install: %v", err)
+		}
+		if !shimsEnsured {
+			t.Fatal("expected EnsureShims to be called during install")
+		}
+	})
+}

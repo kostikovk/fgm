@@ -1,6 +1,6 @@
 # Project Domain & Architecture Context (`CONTEXT.md`)
 
-Fast Go Manager (`fgm`) is a single-binary Go CLI that manages Go toolchains, `golangci-lint` compatibility, and project-aware lint configuration. It resolves Go versions per directory from native Go metadata (`go.work`, `go.mod`, `toolchain` directives), routes `go` invocations through shell shims, and generates or audits `.golangci.yml` configurations.
+Fast Go Manager (`fgm`) is a single-binary Go CLI that manages Go toolchains, `golangci-lint` compatibility, and project-aware lint configuration. It resolves Go versions per directory from native Go metadata (`go.work`, `go.mod`, `toolchain` directives), routes `go` and `golangci-lint` invocations through shell shims, and generates or audits `.golangci.yml` configurations.
 
 ## Contents
 
@@ -31,7 +31,7 @@ Treat the working tree, `go.mod`, and `Makefile` as the source of truth for curr
 |---|---|---|
 | **Selection (Resolved Toolchain)** | The active Go and `golangci-lint` versions resolved for a working directory, paired with their resolution sources (`GoSource`: resolved `go.work`/`go.mod` file path or `"global"`; `LintSource`: `"config"`, `"local"`, or `"remote"` — `"auto"` in `.fgm.toml` defers to `"local"` or `"remote"`). | `app.Selection` in `internal/app/app.go`, produced by `internal/resolve` and `internal/currenttoolchain` |
 | **Toolchain Store** | The FGM-managed directory under `$XDG_DATA_HOME/fgm` (default `~/.local/share/fgm`) holding installed Go and `golangci-lint` binaries, shims, and global state. | `internal/golocal` and `internal/lintlocal` |
-| **Shim** | Lightweight Unix executable wrapper in the FGM store (`shims/go`) that intercepts `go` calls and dispatches them to the resolved Go binary for the current working directory (`EnsureShims` is supported on macOS/Linux and rejects Windows). | `cmd/shim.go`, `internal/shim`, and `internal/golocal` |
+| **Shim** | Lightweight Unix executable wrapper in the FGM store (`shims/go`, `shims/golangci-lint`) that intercepts `go` and `golangci-lint` calls and dispatches them to the resolved binaries for the current working directory (`EnsureShims` is supported on macOS/Linux and rejects Windows). | `cmd/shim.go`, `internal/shim`, and `internal/golocal` |
 | **Compatibility Catalog** | Embedded JSON mapping Go minor versions to compatible and recommended `golangci-lint` versions (`internal/golangcilint/compatibility.json`), combined with remote GitHub release queries in `internal/golangcilint`. | `internal/golangcilint` and generator `scripts/update-lint-compatibility` |
 | **Repo Pin Config (`.fgm.toml`)** | Repository-level TOML file pinning `toolchain.golangci_lint` to a specific version or `"auto"`. `SaveNearest` updates the nearest existing `.fgm.toml` upward, or creates one in the nearest ancestor `go.work` root, then `go.mod` root, then the working directory. Explicit pins are stored without upfront compatibility catalog filtering. | `internal/fgmconfig` |
 | **Lint Config (`.golangci.yml`)** | Generated or existing `golangci-lint` v2 YAML configuration managed through presets (`minimal`, `standard`, `strict`) and audited for version/linter compatibility. | `internal/lintconfig` (`catalog.go`, `presets.go`, `generate.go`, `imports.go`, `doctor.go`) |
@@ -58,7 +58,7 @@ FGM follows a strict three-layer design:
 | `internal/fgmconfig` | Parse and persist repository-level `.fgm.toml` configuration (`LoadNearest`, `ResolvePinnedLint`, `SaveNearest`) |
 | `internal/lintconfig` | Embedded linter catalog (`linters.json`), presets (`minimal`, `standard`, `strict`), `.golangci.yml` generation at the nearest `go.work`/`go.mod` root (checking only `.golangci.yml` unless `--force`), import ordering, and upward `lint doctor` diagnostics across `.golangci.yml`/`.golangci.yaml` (`.yml` preferred over `.yaml` in the same directory; emits `ERROR`, `WARN`, and `standard`-preset `INFO` findings) |
 | `internal/envsetup` | Render shell setup scripts (`bash`, `zsh`, `fish`, `powershell`) and install shell integration into `zsh`, `bash`, and `fish` profiles (`ProfileInstaller`) |
-| `internal/shim` | Resolve the target Go binary path for shim execution |
+| `internal/shim` | Resolve the target Go and `golangci-lint` binary paths for shim execution |
 | `internal/execenv` | Execute external commands in the resolved working directory with `PATH` ordered as `selected Go` (required) → `installed selected golangci-lint` (prepended only when installed locally) → `inherited PATH`, without auto-installing missing toolchains |
 | `internal/doctor` | Run environment health checks and report actionable findings (including `shell_profile` fix hints handled by `fgm doctor --fix`) |
 | `internal/toolhint` | Format exact CLI recovery command hints (`fgm install go <version>`, `fgm install golangci-lint <version>`, `fgm exec -- <command>`) shared across stores, commands, and doctor diagnostics |
@@ -85,6 +85,7 @@ fgm/
   go/<version>/bin/go
   golangci-lint/<version>/golangci-lint
   shims/go
+  shims/golangci-lint
   state/global-go-version
 ```
 

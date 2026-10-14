@@ -51,23 +51,24 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 
-			if selection.LintVersion == "" {
-				return nil
+			if selection.LintVersion != "" {
+				lintInstallPath, err := application.LintInstaller.InstallLintVersion(cmd.Context(), selection.LintVersion)
+				if err != nil {
+					return err
+				}
+				lintMsg := ui.FormatOutcome(
+					fmt.Sprintf("Installed golangci-lint %s to %s", selection.LintVersion, lintInstallPath),
+					"Installed",
+					"golangci-lint",
+					selection.LintVersion,
+					"to "+lintInstallPath,
+				)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), lintMsg); err != nil {
+					return err
+				}
 			}
 
-			lintInstallPath, err := application.LintInstaller.InstallLintVersion(cmd.Context(), selection.LintVersion)
-			if err != nil {
-				return err
-			}
-			lintMsg := ui.FormatOutcome(
-				fmt.Sprintf("Installed golangci-lint %s to %s", selection.LintVersion, lintInstallPath),
-				"Installed",
-				"golangci-lint",
-				selection.LintVersion,
-				"to "+lintInstallPath,
-			)
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
-			return err
+			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
 
@@ -101,8 +102,10 @@ func newInstallGoCmd(application *app.App) *cobra.Command {
 				version,
 				"to "+installPath,
 			)
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
-			return err
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
+				return err
+			}
+			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
 }
@@ -131,8 +134,10 @@ func newInstallLintCmd(application *app.App) *cobra.Command {
 				version,
 				"to "+installPath,
 			)
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
-			return err
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
+				return err
+			}
+			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
 }

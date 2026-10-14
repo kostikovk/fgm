@@ -77,7 +77,7 @@ func newImportAutoCmd(application *app.App) *cobra.Command {
 					return err
 				}
 			}
-			return nil
+			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
 }

@@ -86,7 +86,7 @@ When the shim directory is missing from `PATH`, `fgm doctor --fix` appends a she
 | Bash on Linux | `~/.bashrc` |
 | Fish | `~/.config/fish/config.fish` |
 
-It prompts for confirmation when `stdin` is an interactive terminal and applies the change automatically when `stdin` is non-terminal. `fgm env --shell powershell` renders a PowerShell `PATH` snippet, but `shims/go` generation is not implemented on Windows.
+It prompts for confirmation when `stdin` is an interactive terminal and applies the change automatically when `stdin` is non-terminal. `fgm env --shell powershell` renders a PowerShell `PATH` snippet, but `shims/go` and `shims/golangci-lint` generation is not implemented on Windows.
 
 ## Upgrade behavior
 
@@ -174,6 +174,7 @@ fgm/
     v2.1.0/golangci-lint
   shims/
     go
+    golangci-lint
   state/
     global-go-version
 ```

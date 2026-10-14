@@ -135,8 +135,14 @@ func gorootFromPathGo(pathEnv string) string {
 			continue
 		}
 		candidate := filepath.Join(dir, binaryName)
-		if _, err := os.Stat(candidate); err != nil {
+		info, err := os.Stat(candidate)
+		if err != nil || info.IsDir() {
 			continue
+		}
+		if info.Size() > 0 && info.Size() < 256 {
+			if data, readErr := os.ReadFile(candidate); readErr == nil && strings.Contains(string(data), "fgm __shim") {
+				continue
+			}
 		}
 		return filepath.Dir(filepath.Dir(candidate))
 	}

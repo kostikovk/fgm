@@ -86,20 +86,78 @@ func TestStoreEnsureShims_WritesGoShim(t *testing.T) {
 		t.Skip("shell shim generation test is unix-only")
 	}
 
-	root := t.TempDir()
-	store := New(root, "")
-	if err := store.EnsureShims(); err != nil {
-		t.Fatalf("EnsureShims: %v", err)
+	t.Run("should write executable go and golangci-lint shims when EnsureShims is called", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := t.TempDir()
+		store := New(root, "")
+
+		// Act
+		err := store.EnsureShims()
+
+		// Assert
+		if err != nil {
+			t.Fatalf("EnsureShims: %v", err)
+		}
+
+		goContent, err := os.ReadFile(filepath.Join(store.ShimDir(), "go"))
+		if err != nil {
+			t.Fatalf("read go shim: %v", err)
+		}
+		if !strings.Contains(string(goContent), "exec fgm __shim go \"$@\"") {
+			t.Fatalf("go shim content = %q, want it to contain %q", string(goContent), "exec fgm __shim go \"$@\"")
+		}
+
+		lintContent, err := os.ReadFile(filepath.Join(store.ShimDir(), "golangci-lint"))
+		if err != nil {
+			t.Fatalf("read golangci-lint shim: %v", err)
+		}
+		if !strings.Contains(string(lintContent), "exec fgm __shim golangci-lint \"$@\"") {
+			t.Fatalf("golangci-lint shim content = %q, want it to contain %q", string(lintContent), "exec fgm __shim golangci-lint \"$@\"")
+		}
+	})
+}
+
+func TestStoreSystemGo_SkipsShimDirOnPath(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("shell shim test is unix-only")
 	}
 
-	content, err := os.ReadFile(filepath.Join(store.ShimDir(), "go"))
-	if err != nil {
-		t.Fatalf("read go shim: %v", err)
-	}
+	t.Run("should skip FGM shim directory and resolve real system Go when shim dir precedes system Go on PATH", func(t *testing.T) {
+		t.Parallel()
 
-	if !strings.Contains(string(content), "exec fgm __shim go") {
-		t.Fatalf("shim content = %q, want it to contain %q", string(content), "exec fgm __shim go")
-	}
+		// Arrange
+		root := t.TempDir()
+		sysBinDir := filepath.Join(t.TempDir(), "bin")
+		if err := os.MkdirAll(sysBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir sysBinDir: %v", err)
+		}
+		sysGo := filepath.Join(sysBinDir, "go")
+		if err := os.WriteFile(sysGo, []byte("#!/bin/sh\nprintf 'go version go1.26.4 darwin/arm64\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write sysGo: %v", err)
+		}
+
+		shimDir := filepath.Join(root, "shims")
+		pathEnv := shimDir + string(os.PathListSeparator) + sysBinDir
+		store := New(root, pathEnv)
+		if err := store.EnsureShims(); err != nil {
+			t.Fatalf("EnsureShims: %v", err)
+		}
+
+		// Act
+		gotPath, err := store.GoBinaryPath(context.Background(), "1.26.4")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("GoBinaryPath: %v", err)
+		}
+		if gotPath != sysGo {
+			t.Fatalf("GoBinaryPath = %q, want %q", gotPath, sysGo)
+		}
+	})
 }
 
 func TestStoreDeleteGoVersion_RemovesManagedVersion(t *testing.T) {

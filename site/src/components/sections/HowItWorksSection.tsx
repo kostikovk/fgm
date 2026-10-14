@@ -53,8 +53,9 @@ export function HowItWorksSection() {
             <span className="pipeline-step-num">03 / RUN</span>
             <strong>Shims or fgm exec</strong>
             <span>
-              Routes <code>go</code> automatically in interactive shells or runs
-              deterministically via <code>fgm exec --</code>.
+              Routes <code>go</code> and <code>golangci-lint</code>{" "}
+              automatically in interactive shells or runs deterministically via{" "}
+              <code>fgm exec --</code>.
             </span>
           </li>
         </ol>

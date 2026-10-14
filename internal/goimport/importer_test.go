@@ -125,6 +125,49 @@ func TestDefaultCandidates_IncludesGoOnPath(t *testing.T) {
 	}
 }
 
+func TestDefaultCandidates_SkipsFgmShimOnPath(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script detection test is unix-only")
+	}
+
+	t.Run("should skip FGM go shim script and select real GOROOT when shim dir precedes real go binary on PATH", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		fgmRoot := t.TempDir()
+		shimDir := filepath.Join(fgmRoot, "shims")
+		if err := os.MkdirAll(shimDir, 0o755); err != nil {
+			t.Fatalf("mkdir shimDir: %v", err)
+		}
+		shimBinary := filepath.Join(shimDir, "go")
+		if err := os.WriteFile(shimBinary, []byte("#!/bin/sh\nexec fgm __shim go \"$@\"\n"), 0o755); err != nil {
+			t.Fatalf("write shim binary: %v", err)
+		}
+
+		goRoot := t.TempDir()
+		binDir := filepath.Join(goRoot, "bin")
+		if err := os.MkdirAll(binDir, 0o755); err != nil {
+			t.Fatalf("mkdir binDir: %v", err)
+		}
+		goBinary := filepath.Join(binDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.27.2 darwin/arm64\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write go binary: %v", err)
+		}
+
+		pathEnv := shimDir + string(os.PathListSeparator) + binDir
+
+		// Act
+		candidates := DefaultCandidates(pathEnv)
+
+		// Assert
+		if !slices.Contains(candidates, goRoot) {
+			t.Fatalf("DefaultCandidates(%q) = %v, want it to contain %q", pathEnv, candidates, goRoot)
+		}
+	})
+}
+
 func TestGorootFromPathGo_EmptyPath(t *testing.T) {
 	t.Parallel()
 

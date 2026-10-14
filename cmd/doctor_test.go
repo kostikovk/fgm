@@ -142,6 +142,93 @@ func TestDoctorCommand_FixWithProfileInstaller(t *testing.T) {
 	}
 }
 
+func TestDoctorCommand_FixEnsuresShimsWhenGoStoreConfigured(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should call EnsureShims when doctor --fix applies shell profile integration", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var shimsEnsured bool
+		application := &app.App{
+			Resolver: resolve.New(nil),
+			GoStore: stubGoStore{
+				ensureShimsFn: func() error {
+					shimsEnsured = true
+					return nil
+				},
+			},
+			Doctor: stubDoctor{
+				diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
+					return []app.DoctorFinding{
+						{Severity: "WARN", Message: "shim dir is not on PATH: /tmp/fgm/shims", FixKind: "shell_profile"},
+					}, nil
+				},
+			},
+			ProfileInstaller: &stubProfileInstaller{
+				installProfileFn: func(shell string) (string, bool, error) {
+					return "/home/user/.zshrc", true, nil
+				},
+			},
+		}
+
+		root := NewRootCmd(application)
+		root.SetIn(bytes.NewBufferString(""))
+		root.SetOut(new(bytes.Buffer))
+		root.SetErr(new(bytes.Buffer))
+		root.SetArgs([]string{"doctor", "--fix"})
+
+		// Act
+		err := root.Execute()
+
+		// Assert
+		if err != nil {
+			t.Fatalf("execute doctor --fix: %v", err)
+		}
+		if !shimsEnsured {
+			t.Fatal("expected EnsureShims to be called during doctor --fix")
+		}
+	})
+}
+
+func TestDoctorCommand_FixEnsuresShimsWhenPathAlreadyConfigured(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should call EnsureShims when doctor --fix runs even if shim dir is already on PATH", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var shimsEnsured bool
+		application := &app.App{
+			Resolver: resolve.New(nil),
+			GoStore: stubGoStore{
+				ensureShimsFn: func() error {
+					shimsEnsured = true
+					return nil
+				},
+			},
+			Doctor: stubDoctor{
+				diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
+					return []app.DoctorFinding{
+						{Severity: "OK", Message: "shim dir is on PATH: /tmp/fgm/shims"},
+					}, nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "doctor", "--fix")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("execute doctor --fix: %v", err)
+		}
+		if !shimsEnsured {
+			t.Fatal("expected EnsureShims to be called during doctor --fix when shim dir is already on PATH")
+		}
+	})
+}
+
 type stubProfileInstaller struct {
 	installProfileFn func(shell string) (string, bool, error)
 }

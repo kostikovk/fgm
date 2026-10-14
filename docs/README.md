@@ -1,6 +1,6 @@
 # FGM documentation
 
-[Back to the project](../README.md)
+[Back to the project](../README.md) · [Website](https://kostikovk.github.io/fgm/)
 
 ## Start here
 

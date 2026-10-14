@@ -222,3 +222,38 @@ func TestImportAuto_HelpDescribesGoAndLint(t *testing.T) {
 		}
 	})
 }
+
+func TestImportAuto_EnsuresShimsWhenToolchainsImported(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should call EnsureShims when import auto imports toolchains and GoStore is configured", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var shimsEnsured bool
+		application := &app.App{
+			GoStore: stubGoStore{
+				ensureShimsFn: func() error {
+					shimsEnsured = true
+					return nil
+				},
+			},
+			GoImporter: stubGoImporter{
+				importAutoFn: func(ctx context.Context) ([]app.ImportedGo, error) {
+					return []app.ImportedGo{{Version: "1.27.2", Path: "/opt/homebrew/opt/go/libexec"}}, nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "import", "auto")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("execute import auto: %v", err)
+		}
+		if !shimsEnsured {
+			t.Fatal("expected EnsureShims to be called during import auto")
+		}
+	})
+}

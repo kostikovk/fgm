@@ -163,7 +163,7 @@ func (s *Store) GoBinaryPath(ctx context.Context, version string) (string, error
 	return "", fmt.Errorf("go version %s is not installed (run %q): %w", version, toolhint.InstallGoCommand(version), statErr)
 }
 
-// EnsureShims writes the shell shim scripts used to dispatch go through FGM.
+// EnsureShims writes the shell shim scripts used to dispatch go and golangci-lint through FGM.
 func (s *Store) EnsureShims() error {
 	if runtime.GOOS == "windows" {
 		return fmt.Errorf("shim generation is not implemented on windows")
@@ -173,9 +173,11 @@ func (s *Store) EnsureShims() error {
 		return fmt.Errorf("create shim directory: %w", err)
 	}
 
-	shimContent := "#!/bin/sh\nexec fgm __shim go \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(s.ShimDir(), "go"), []byte(shimContent), 0o755); err != nil {
-		return fmt.Errorf("write go shim: %w", err)
+	for _, tool := range []string{"go", "golangci-lint"} {
+		shimContent := fmt.Sprintf("#!/bin/sh\nexec fgm __shim %s \"$@\"\n", tool)
+		if err := os.WriteFile(filepath.Join(s.ShimDir(), tool), []byte(shimContent), 0o755); err != nil {
+			return fmt.Errorf("write %s shim: %w", tool, err)
+		}
 	}
 
 	return nil
@@ -284,6 +286,11 @@ func findGoBinary(pathEnv string) (string, bool) {
 		}
 		if info.Mode()&0o111 == 0 && runtime.GOOS != "windows" {
 			continue
+		}
+		if info.Size() > 0 && info.Size() < 256 {
+			if data, readErr := os.ReadFile(candidate); readErr == nil && strings.Contains(string(data), "fgm __shim") {
+				continue
+			}
 		}
 		return candidate, true
 	}

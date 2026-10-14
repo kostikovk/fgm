@@ -85,7 +85,7 @@ fgm exec -- go version
 fgm doctor
 ```
 
-Inspect any findings. A shell integration finding is separate from running commands through `fgm exec`; follow [shell setup](installation.md#shell-integration) if you want plain `go` commands to use FGM.
+Inspect any findings. A shell integration finding is separate from running commands through `fgm exec`; follow [shell setup](installation.md#shell-integration) if you want plain `go` and `golangci-lint` commands to use FGM.
 
 ## Work from another directory
 

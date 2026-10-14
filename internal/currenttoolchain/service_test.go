@@ -30,6 +30,10 @@ func (s stubLintStore) DeleteLintVersion(ctx context.Context, version string) (s
 	return "", nil
 }
 
+func (s stubLintStore) LintBinaryPath(ctx context.Context, version string) (string, error) {
+	return "", nil
+}
+
 type stubLintRemoteProvider struct {
 	listRemoteLintVersionsFn func(ctx context.Context, goVersion string) ([]app.LintVersion, error)
 }

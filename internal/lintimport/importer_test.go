@@ -93,6 +93,47 @@ func TestDefaultCandidates_IncludesBinaryOnPath(t *testing.T) {
 	}
 }
 
+func TestDefaultCandidates_SkipsFgmShimOnPath(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-only: shell shim check not applicable on windows")
+	}
+
+	t.Run("should skip FGM golangci-lint shim script and select real binary when shim dir precedes real binary on PATH", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		shimDir := filepath.Join(t.TempDir(), "shims")
+		if err := os.MkdirAll(shimDir, 0o755); err != nil {
+			t.Fatalf("mkdir shimDir: %v", err)
+		}
+		shimBinary := filepath.Join(shimDir, "golangci-lint")
+		if err := os.WriteFile(shimBinary, []byte("#!/bin/sh\nexec fgm __shim golangci-lint \"$@\"\n"), 0o755); err != nil {
+			t.Fatalf("write shim binary: %v", err)
+		}
+
+		realDir := t.TempDir()
+		realBinary := filepath.Join(realDir, "golangci-lint")
+		if err := os.WriteFile(realBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version 2.11.2\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write real binary: %v", err)
+		}
+
+		pathEnv := shimDir + string(os.PathListSeparator) + realDir
+
+		// Act
+		candidates := DefaultCandidates(pathEnv)
+
+		// Assert
+		if slices.Contains(candidates, shimBinary) {
+			t.Fatalf("candidates %v should not include FGM shim %q", candidates, shimBinary)
+		}
+		if !slices.Contains(candidates, realBinary) {
+			t.Fatalf("candidates %v should include real binary %q", candidates, realBinary)
+		}
+	})
+}
+
 func TestDefaultCandidates_IncludesStaticPaths(t *testing.T) {
 	t.Parallel()
 

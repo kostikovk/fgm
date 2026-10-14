@@ -143,6 +143,11 @@ func binaryFromPath(pathEnv string) string {
 		if info.Mode()&0o111 == 0 && runtime.GOOS != "windows" {
 			continue
 		}
+		if info.Size() > 0 && info.Size() < 256 {
+			if data, readErr := os.ReadFile(candidate); readErr == nil && strings.Contains(string(data), "fgm __shim") {
+				continue
+			}
+		}
 		return candidate
 	}
 

@@ -7,7 +7,7 @@ FGM reads `go.work`, `go.mod`, and `toolchain` directives to select Go for each 
 - Use the Go version your project already declares.
 - Select a compatible linter automatically or keep an explicit project pin.
 - Run project commands with the selected tools through `fgm exec`.
-- Route plain `go` commands through optional shell shims on macOS and Linux.
+- Route plain `go` and `golangci-lint` commands through optional shell shims on macOS and Linux.
 
 ## Get started
 
@@ -57,7 +57,7 @@ FGM uses project metadata before the global default. This workflow requires no s
 | Look up commands, version rules, pins, or lint configuration | [CLI and configuration reference](docs/reference.md) |
 | Build or contribute to FGM | [Development](docs/development.md) |
 
-[Browse documentation](docs/README.md) · [Releases](https://github.com/kostikovk/fgm/releases) · [Report an issue](https://github.com/kostikovk/fgm/issues)
+[Website](https://kostikovk.github.io/fgm/) · [Browse documentation](docs/README.md) · [Releases](https://github.com/kostikovk/fgm/releases) · [Report an issue](https://github.com/kostikovk/fgm/issues)
 
 ## License
 

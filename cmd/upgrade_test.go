@@ -565,3 +565,38 @@ func TestUpgradeGoCommand_UsesExplicitVersionOverride(t *testing.T) {
 		t.Fatalf("stdout = %q, want explicit version line", stdout)
 	}
 }
+
+func TestUpgradeCommands_EnsureShimsWhenNotDryRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should call EnsureShims when upgrade golangci-lint completes without dry-run", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var shimsEnsured bool
+		application := &app.App{
+			GoStore: stubGoStore{
+				ensureShimsFn: func() error {
+					shimsEnsured = true
+					return nil
+				},
+			},
+			LintUpgrader: stubLintUpgrader{
+				upgradeFn: func(ctx context.Context, options app.LintUpgradeOptions) (app.LintUpgradeResult, error) {
+					return app.LintUpgradeResult{Version: "v2.14.0", GoVersion: "1.27.2"}, nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "upgrade", "golangci-lint")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("execute upgrade golangci-lint: %v", err)
+		}
+		if !shimsEnsured {
+			t.Fatal("expected EnsureShims to be called after upgrade golangci-lint")
+		}
+	})
+}

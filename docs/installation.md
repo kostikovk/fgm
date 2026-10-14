@@ -41,11 +41,11 @@ If the default directory is outside `PATH`, invoke `~/.local/bin/fgm` directly u
 curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/install.sh | INSTALL_DIR=/your/bin sh
 ```
 
-You can also download an archive and `checksums.txt` from [GitHub Releases](https://github.com/kostikovk/fgm/releases). On Windows, use `fgm exec` to run project commands; automatic `go` shim generation is supported only on macOS and Linux.
+You can also download an archive and `checksums.txt` from [GitHub Releases](https://github.com/kostikovk/fgm/releases). On Windows, use `fgm exec` to run project commands; automatic `go` and `golangci-lint` shim generation is supported only on macOS and Linux.
 
 ## Shell integration
 
-For project commands, [getting started](getting-started.md) uses `fgm exec` and requires no shell profile changes. To route plain `go` commands through FGM on macOS or Linux, first install or import your chosen default Go version:
+For project commands, [getting started](getting-started.md) uses `fgm exec` and requires no shell profile changes. To route plain `go` and `golangci-lint` commands through FGM on macOS or Linux, first install or import your chosen default Go version:
 
 ```bash
 fgm install go <version>

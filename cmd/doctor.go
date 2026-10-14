@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/spf13/cobra"
@@ -54,6 +55,9 @@ func newDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			}
 
 			// Apply fixes.
+			if err := ensureShimsIfSupported(application.GoStore); err != nil {
+				return err
+			}
 			for _, f := range findings {
 				if f.FixKind == "shell_profile" {
 					if err := applyShellProfileFix(cmd, application); err != nil {
@@ -124,4 +128,11 @@ func isTerminal(r io.Reader) bool {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice != 0
+}
+
+func ensureShimsIfSupported(goStore app.GoLocalVersionStore) error {
+	if goStore == nil || runtime.GOOS == "windows" {
+		return nil
+	}
+	return goStore.EnsureShims()
 }

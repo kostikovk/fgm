@@ -233,3 +233,99 @@ func TestShimCommand_PrefersGoResolverOverCompositeResolver(t *testing.T) {
 		}
 	})
 }
+
+func TestShimCommand_LintShimExecutesWithSelectedGoOnPath(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	t.Run("should execute resolved golangci-lint with selected Go bin directory prepended to PATH when __shim golangci-lint is called", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		goBinDir := filepath.Join(t.TempDir(), "go", "bin")
+		if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir go bin dir: %v", err)
+		}
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.27.2 darwin/arm64\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go binary: %v", err)
+		}
+
+		lintDir := filepath.Join(t.TempDir(), "lint")
+		if err := os.MkdirAll(lintDir, 0o755); err != nil {
+			t.Fatalf("mkdir lint dir: %v", err)
+		}
+		lintBinary := filepath.Join(lintDir, "golangci-lint")
+		lintScript := "#!/bin/sh\nprintf 'lint v2.14.0 using ' && go version\n"
+		if err := os.WriteFile(lintBinary, []byte(lintScript), 0o755); err != nil {
+			t.Fatalf("write fake lint binary: %v", err)
+		}
+
+		application := &app.App{
+			GoStore: stubGoStore{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintStore: stubLintStore{
+				lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return lintBinary, nil
+				},
+			},
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.27.2",
+						GoSource:    "go.mod",
+						LintVersion: "v2.14.0",
+						LintSource:  "local",
+					}, nil
+				},
+			},
+		}
+
+		// Act
+		stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "__shim", "golangci-lint", "version")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("shim golangci-lint: %v", err)
+		}
+		if !strings.Contains(stdout, "lint v2.14.0 using go version go1.27.2") {
+			t.Fatalf("stdout = %q, want it to contain lint v2.14.0 using go version go1.27.2", stdout)
+		}
+	})
+}
+
+func TestShimCommand_LintShimRejectsNilLintStore(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should return an error when LintStore is not configured for __shim golangci-lint", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		application := &app.App{
+			GoStore:   stubGoStore{},
+			LintStore: nil,
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", LintVersion: "v2.14.0"}, nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "__shim", "golangci-lint", "run")
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected an error when LintStore is nil")
+		}
+		if !strings.Contains(err.Error(), "shim dependencies are not configured") {
+			t.Fatalf("err = %q, want not configured error", err)
+		}
+	})
+}

@@ -152,9 +152,11 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 					result.LintVersion,
 					"",
 				)
-				_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
+				if _, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg); err != nil {
+					return err
+				}
 			}
-			return err
+			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
 
@@ -214,8 +216,10 @@ func newUpgradeLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				result.Version,
 				fmt.Sprintf("(for Go %s)", result.GoVersion),
 			)
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
-			return err
+			if _, err = fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
+				return err
+			}
+			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
 
