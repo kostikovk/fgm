@@ -2,6 +2,7 @@ package execenv
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -72,10 +73,12 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, stdi
 	pathDirs := []string{filepath.Dir(goBinaryPath)}
 	if selection.LintVersion != "" && e.lintLocator != nil {
 		lintBinaryPath, err := e.lintLocator.LintBinaryPath(ctx, selection.LintVersion)
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-		pathDirs = append(pathDirs, filepath.Dir(lintBinaryPath))
+		if err == nil {
+			pathDirs = append(pathDirs, filepath.Dir(lintBinaryPath))
+		}
 	}
 
 	env := withPrependedPath(os.Environ(), pathDirs, e.pathEnv)

@@ -3,14 +3,17 @@ package execenv
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/lintlocal"
 )
 
 type stubResolver struct {
@@ -480,4 +483,416 @@ func TestResolveCommandPath_SkipsDirectories(t *testing.T) {
 	if !strings.Contains(err.Error(), "resolve command") {
 		t.Fatalf("err = %q, want it to contain %q", err, "resolve command")
 	}
+}
+
+func TestExecutorExec_LintContractScenarios(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	t.Run("should run Go tests when recommended lint is not installed", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		goBinDir := filepath.Join(t.TempDir(), "go-bin")
+		if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir go bin dir: %v", err)
+		}
+		goBinary := filepath.Join(goBinDir, "go")
+		script := "#!/bin/sh\nprintf 'args=%s cwd=%s\\n' \"$*\" \"$(pwd)\"\n"
+		if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+			t.Fatalf("write fake go binary: %v", err)
+		}
+		lintStore := lintlocal.New(t.TempDir())
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.11.2",
+						LintSource:  "remote",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintLocator: lintStore,
+			PathEnv:     "/usr/bin:/bin",
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"go", "test", "./..."},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Exec: %v\nstderr:\n%s", err, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "args=test ./...") {
+			t.Fatalf("stdout = %q, want args=test ./...", stdout.String())
+		}
+		wantWorkDir, err := filepath.EvalSymlinks(workDir)
+		if err != nil {
+			wantWorkDir = workDir
+		}
+		if !strings.Contains(stdout.String(), wantWorkDir) && !strings.Contains(stdout.String(), workDir) {
+			t.Fatalf("stdout = %q, want cwd %q", stdout.String(), workDir)
+		}
+	})
+
+	t.Run("should run Go commands when pinned lint is not installed", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		goBinDir := filepath.Join(t.TempDir(), "go-bin")
+		if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir go bin dir: %v", err)
+		}
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go env ok\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go binary: %v", err)
+		}
+		lintStore := lintlocal.New(t.TempDir())
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.10.1",
+						LintSource:  "config",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintLocator: lintStore,
+			PathEnv:     "",
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"go", "env"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Exec: %v\nstderr:\n%s", err, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "go env ok") {
+			t.Fatalf("stdout = %q, want 'go env ok'", stdout.String())
+		}
+	})
+
+	t.Run("should prepend selected lint when it is installed", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		goBinDir := filepath.Join(t.TempDir(), "go-bin")
+		managedLintDir := filepath.Join(t.TempDir(), "managed-lint")
+		inheritedLintDir := filepath.Join(t.TempDir(), "inherited-lint")
+		for _, dir := range []string{goBinDir, managedLintDir, inheritedLintDir} {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatalf("mkdir %s: %v", dir, err)
+			}
+		}
+
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go: %v", err)
+		}
+		managedLint := filepath.Join(managedLintDir, "golangci-lint")
+		if err := os.WriteFile(managedLint, []byte("#!/bin/sh\nprintf 'managed v2.11.2 path=%s\\n' \"$PATH\"\n"), 0o755); err != nil {
+			t.Fatalf("write managed lint: %v", err)
+		}
+		inheritedLint := filepath.Join(inheritedLintDir, "golangci-lint")
+		if err := os.WriteFile(inheritedLint, []byte("#!/bin/sh\nprintf 'inherited v1.64.0\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write inherited lint: %v", err)
+		}
+		t.Setenv("PATH", inheritedLintDir)
+
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.11.2",
+						LintSource:  "local",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintLocator: stubLocator{
+				lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return managedLint, nil
+				},
+			},
+			PathEnv: inheritedLintDir,
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"golangci-lint", "version"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Exec: %v\nstderr:\n%s", err, stderr.String())
+		}
+		out := strings.TrimSpace(stdout.String())
+		if !strings.HasPrefix(out, "managed v2.11.2 ") {
+			t.Fatalf("stdout = %q, want prefix %q", out, "managed v2.11.2 ")
+		}
+		wantPath := strings.Join([]string{goBinDir, managedLintDir, inheritedLintDir}, string(os.PathListSeparator))
+		if !strings.Contains(out, "path="+wantPath) {
+			t.Fatalf("stdout = %q, want PATH order %q", out, wantPath)
+		}
+	})
+
+	t.Run("should use inherited lint when selected lint is absent", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		goBinDir := filepath.Join(t.TempDir(), "go-bin")
+		inheritedLintDir := filepath.Join(t.TempDir(), "inherited-lint")
+		for _, dir := range []string{goBinDir, inheritedLintDir} {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				t.Fatalf("mkdir %s: %v", dir, err)
+			}
+		}
+
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go: %v", err)
+		}
+		inheritedLint := filepath.Join(inheritedLintDir, "golangci-lint")
+		if err := os.WriteFile(inheritedLint, []byte("#!/bin/sh\nprintf 'inherited v1.64.0\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write inherited lint: %v", err)
+		}
+		t.Setenv("PATH", inheritedLintDir)
+
+		lintStore := lintlocal.New(t.TempDir())
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.11.2",
+						LintSource:  "remote",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintLocator: lintStore,
+			PathEnv:     inheritedLintDir,
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"golangci-lint", "version"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Exec: %v\nstderr:\n%s", err, stderr.String())
+		}
+		if strings.TrimSpace(stdout.String()) != "inherited v1.64.0" {
+			t.Fatalf("stdout = %q, want %q", stdout.String(), "inherited v1.64.0")
+		}
+	})
+
+	t.Run("should report command lookup failure when lint is absent everywhere", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		goBinDir := filepath.Join(t.TempDir(), "go-bin")
+		if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir go bin dir: %v", err)
+		}
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go: %v", err)
+		}
+		t.Setenv("PATH", "")
+
+		lintStore := lintlocal.New(t.TempDir())
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.11.2",
+						LintSource:  "remote",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintLocator: lintStore,
+			PathEnv:     "",
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"golangci-lint", "run"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected command lookup error when golangci-lint is absent everywhere")
+		}
+		if !strings.Contains(err.Error(), `resolve command "golangci-lint" on PATH`) {
+			t.Fatalf("err = %q, want command lookup failure", err.Error())
+		}
+	})
+
+	t.Run("should preserve storage errors when lint lookup fails for another reason", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		goBinDir := filepath.Join(t.TempDir(), "go-bin")
+		if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir go bin dir: %v", err)
+		}
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go: %v", err)
+		}
+
+		storeRoot := t.TempDir()
+		if err := os.WriteFile(filepath.Join(storeRoot, "golangci-lint"), []byte("corrupted"), 0o644); err != nil {
+			t.Fatalf("write corrupted lint root: %v", err)
+		}
+		lintStore := lintlocal.New(storeRoot)
+
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.11.2",
+						LintSource:  "remote",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			LintLocator: lintStore,
+			PathEnv:     "",
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"go", "version"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected storage error when golangci-lint store root is a regular file")
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("err = %v, want non-NotExist storage error", err)
+		}
+		if !errors.Is(err, syscall.ENOTDIR) {
+			t.Fatalf("errors.Is(%v, syscall.ENOTDIR) = false, want true", err)
+		}
+	})
+
+	t.Run("should report missing Go when selected Go is unavailable", func(t *testing.T) {
+		// Arrange
+		workDir := t.TempDir()
+		executor := New(Config{
+			Resolver: stubResolver{
+				currentFn: func(ctx context.Context, gotWorkDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.25.7",
+						GoSource:    "go.mod",
+						LintVersion: "v2.11.2",
+						LintSource:  "remote",
+					}, nil
+				},
+			},
+			GoLocator: stubLocator{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return "", fmt.Errorf("go version %s is not installed: %w", version, os.ErrNotExist)
+				},
+			},
+			PathEnv: "",
+		})
+		var stdout, stderr bytes.Buffer
+
+		// Act
+		err := executor.Exec(
+			context.Background(),
+			workDir,
+			[]string{"go", "version"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+		)
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected error when selected Go is unavailable")
+		}
+		if !strings.Contains(err.Error(), "go version 1.25.7 is not installed") {
+			t.Fatalf("err = %q, want missing Go error", err.Error())
+		}
+	})
 }

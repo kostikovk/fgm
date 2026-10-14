@@ -42,8 +42,13 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("go upgrader is not configured")
 			}
 
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
 			options := app.GoUpgradeOptions{
-				WorkDir:  v.GetString(flagChdir),
+				WorkDir:  workDir,
 				Version:  version,
 				DryRun:   dryRun,
 				WithLint: withLint,
@@ -117,8 +122,13 @@ func newUpgradeLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("golangci-lint upgrader is not configured")
 			}
 
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
 			result, err := application.LintUpgrader.Upgrade(cmd.Context(), app.LintUpgradeOptions{
-				WorkDir: v.GetString(flagChdir),
+				WorkDir: workDir,
 				Version: version,
 				DryRun:  dryRun,
 			})

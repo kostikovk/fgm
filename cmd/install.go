@@ -24,7 +24,12 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("golangci-lint installer is not configured")
 			}
 
-			selection, err := application.Resolver.Current(cmd.Context(), v.GetString(flagChdir))
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
+			selection, err := application.Resolver.Current(cmd.Context(), workDir)
 			if err != nil {
 				return err
 			}

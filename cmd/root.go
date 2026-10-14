@@ -1,16 +1,29 @@
 package cmd
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 const (
-	flagChdir   = "chdir"
-	flagConfig  = "config"
-	flagVerbose = "verbose"
+	flagChdir = "chdir"
 )
+
+func resolveWorkDir(v *viper.Viper) (string, error) {
+	dir := v.GetString(flagChdir)
+	if dir == "" {
+		dir = "."
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve working directory: %w", err)
+	}
+	return absDir, nil
+}
 
 // NewRootCmd builds the root Cobra command for fgm.
 func NewRootCmd(application *app.App) *cobra.Command {
@@ -25,12 +38,8 @@ func NewRootCmd(application *app.App) *cobra.Command {
 	}
 
 	rootCmd.PersistentFlags().String(flagChdir, ".", "working directory for repo resolution")
-	rootCmd.PersistentFlags().String(flagConfig, "", "config file path")
-	rootCmd.PersistentFlags().Bool(flagVerbose, false, "verbose output")
 
 	_ = v.BindPFlag(flagChdir, rootCmd.PersistentFlags().Lookup(flagChdir))
-	_ = v.BindPFlag(flagConfig, rootCmd.PersistentFlags().Lookup(flagConfig))
-	_ = v.BindPFlag(flagVerbose, rootCmd.PersistentFlags().Lookup(flagVerbose))
 
 	rootCmd.AddCommand(newCurrentCmd(application, v))
 	rootCmd.AddCommand(newDoctorCmd(application, v))

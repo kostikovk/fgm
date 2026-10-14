@@ -28,36 +28,36 @@ Treat the working tree, `go.mod`, and `Makefile` as the source of truth for curr
 |---|---|---|
 | **Selection (Resolved Toolchain)** | The active Go and `golangci-lint` versions resolved for a working directory, paired with their resolution sources (`GoSource`: resolved `go.work`/`go.mod` file path or `"global"`; `LintSource`: `"config"`, `"local"`, or `"remote"` — `"auto"` in `.fgm.toml` defers to `"local"` or `"remote"`). | `app.Selection` in `internal/app/app.go`, produced by `internal/resolve` and `internal/currenttoolchain` |
 | **Toolchain Store** | The FGM-managed directory under `$XDG_DATA_HOME/fgm` (default `~/.local/share/fgm`) holding installed Go and `golangci-lint` binaries, shims, and global state. | `internal/golocal` and `internal/lintlocal` |
-| **Shim** | Lightweight executable wrapper in the FGM store (`shims/go`) that intercepts `go` calls and dispatches them to the resolved Go binary for the current working directory. | `cmd/shim.go`, `internal/shim`, and `internal/golocal` |
-| **Compatibility Catalog** | Embedded JSON mapping Go minor versions to compatible and recommended `golangci-lint` versions (`internal/golangcilint/compatibility.json`). | `internal/golangcilint` and generator `scripts/update-lint-compatibility` |
-| **Repo Pin Config (`.fgm.toml`)** | Repository-level TOML file pinning `toolchain.golangci_lint` to a specific version or `"auto"`. | `internal/fgmconfig` |
+| **Shim** | Lightweight Unix executable wrapper in the FGM store (`shims/go`) that intercepts `go` calls and dispatches them to the resolved Go binary for the current working directory (`EnsureShims` is supported on macOS/Linux and rejects Windows). | `cmd/shim.go`, `internal/shim`, and `internal/golocal` |
+| **Compatibility Catalog** | Embedded JSON mapping Go minor versions to compatible and recommended `golangci-lint` versions (`internal/golangcilint/compatibility.json`), combined with remote GitHub release queries in `internal/golangcilint`. | `internal/golangcilint` and generator `scripts/update-lint-compatibility` |
+| **Repo Pin Config (`.fgm.toml`)** | Repository-level TOML file pinning `toolchain.golangci_lint` to a specific version or `"auto"`. `SaveNearest` updates the nearest existing `.fgm.toml` upward, or creates one in the nearest ancestor `go.work` root, then `go.mod` root, then the working directory. Explicit pins are stored without upfront compatibility catalog filtering. | `internal/fgmconfig` |
 | **Lint Config (`.golangci.yml`)** | Generated or existing `golangci-lint` v2 YAML configuration managed through presets (`minimal`, `standard`, `strict`) and audited for version/linter compatibility. | `internal/lintconfig` (`catalog.go`, `presets.go`, `generate.go`, `imports.go`, `doctor.go`) |
-| **Shell Integration** | Shell-specific environment snippet (`eval "$(fgm env)"`) that places FGM shims on `PATH`. | `internal/envsetup` (`renderer.go`) |
+| **Shell Integration** | Shell-specific environment snippet (`eval "$(fgm env)"` or `fgm env \| source`) for `bash`, `zsh`, `fish`, and `powershell`, plus profile auto-registration (`zsh`, `bash`, `fish`) via `app.ProfileInstaller` (interactive confirmation on terminal `stdin`, automatic application on non-terminal `stdin`). | `internal/envsetup` (`renderer.go`, `profile.go`) and `cmd/doctor.go` |
 
 ## Architecture and package ownership
 
 FGM follows a strict three-layer design:
 
-1. **`cmd/` (CLI Facade Layer)** — Thin Cobra subcommand definitions (`current`, `doctor`, `env`, `exec`, `import`, `install`, `lint`, `pin`, `remove`, hidden `__shim` in `cmd/shim.go`, `upgrade`, `use`, `version`, `versions`). Commands parse flags, bind Viper configuration where needed, delegate to services on `*app.App` (except `cmd/pin.go`, which calls `fgmconfig.SaveNearest` directly, and `cmd/shim.go`, which constructs `shim.New` and invokes `os/exec` directly), and format output. Business logic does not live in `cmd/`.
-2. **`internal/app/app.go` (Dependency Injection & Service Contracts)** — Defines the central `App` struct, domain value types (`Selection`, `LintVersion`, `LintFinding`, `GoUpgradeOptions`, `LintConfigOptions`, etc.), and service interfaces consumed by `cmd/`. `main.go` wires concrete implementations into `app.App` and passes it to `cmd.NewRootCmd()`.
+1. **`cmd/` (CLI Facade Layer)** — Thin Cobra subcommand definitions (`current`, `doctor`, `env`, `exec`, `import`, `install`, `lint`, `pin`, `remove`, hidden `__shim` in `cmd/shim.go`, `upgrade`, `use`, `version`, `versions`). Commands parse flags, normalize the effective working directory (`--chdir` / `FGM_CHDIR`, with explicit `--chdir` taking precedence) to an absolute path via `resolveWorkDir` in `cmd/root.go`, delegate to services on `*app.App` (except `cmd/pin.go`, which calls `fgmconfig.SaveNearest` directly, and `cmd/shim.go`, which constructs `shim.New` and invokes `os/exec` directly), and format output (for example, `versions go` and `versions golangci-lint` default to `--local`, while `--go` filters `golangci-lint` only with `--remote`). Business logic does not live in `cmd/`.
+2. **`internal/app/app.go` (Dependency Injection & Service Contracts)** — Defines the central `App` struct, domain value types (`Selection`, `LintVersion`, `LintFinding`, `GoUpgradeOptions`, `LintConfigOptions`, etc.), and service interfaces (`SelectionResolver`, `GoStore`, `LintStore`, `GoRemoteVersionProvider`, `LintRemoteVersionProvider`, `GoInstaller`, `LintInstaller`, `GoImporter`, `LintImporter`, `GoUpgrader`, `LintUpgrader`, `DoctorService`, `Executor`, `EnvRenderer`, `ProfileInstaller`, `LintConfigGenerator`, `LintDoctor`) consumed by `cmd/`. `main.go` wires concrete implementations into `app.App` and passes it to `cmd.NewRootCmd()`.
 3. **`internal/*` (Focused Service & Utility Packages)** — Single-responsibility packages implementing the interfaces in `internal/app/app.go`:
 
 | Package | Responsibility |
 |---|---|
 | `internal/resolve` | Walks directory ancestors to locate `go.work` or `go.mod`, parses `toolchain` and `go` directives, and falls back to the global Go version |
-| `internal/currenttoolchain` | Combines resolved Go version with `.fgm.toml` pinning and `golangci-lint` compatibility into a unified `app.Selection` |
-| `internal/golocal` / `internal/lintlocal` | Manage installed Go and `golangci-lint` versions in the FGM store, global Go default state, and shim creation |
+| `internal/currenttoolchain` | Combines resolved Go version with `.fgm.toml` pinning and `golangci-lint` compatibility (local store or remote provider) into a unified `app.Selection` |
+| `internal/golocal` / `internal/lintlocal` | Manage installed Go and `golangci-lint` versions in the FGM store (including symlinked imported installations, which depend on the external source remaining on disk), global Go default state, and Unix shim creation |
 | `internal/goreleases` | Fetches remotely available Go releases from the official `go.dev` API |
-| `internal/golangcilint` | Serves the embedded compatibility catalog (`compatibility.json`) and queries remote `golangci-lint` releases |
+| `internal/golangcilint` | Serves the embedded compatibility catalog (`compatibility.json`) and queries remote `golangci-lint` releases on GitHub |
 | `internal/goinstall` / `internal/lintinstall` | Download, verify, extract, and register Go and `golangci-lint` archives into the local store |
-| `internal/goimport` / `internal/lintimport` | Detect and import existing Go and `golangci-lint` installations from standard system paths |
-| `internal/goupgrade` / `internal/lintupgrade` | Upgrade Go (global or project `go.mod`/`go.work`) and `golangci-lint` with `--dry-run` and `--with-lint` support |
-| `internal/fgmconfig` | Parse and persist repository-level `.fgm.toml` configuration |
-| `internal/lintconfig` | Embedded linter catalog (`linters.json`), presets (`minimal`, `standard`, `strict`), `.golangci.yml` generation, import ordering, and `lint doctor` diagnostics |
-| `internal/envsetup` | Render shell setup scripts (`bash`, `zsh`, `fish`, `powershell`) |
+| `internal/goimport` / `internal/lintimport` | Detect and import existing Go (`GOROOT` directory symlinks) and `golangci-lint` (binary symlinks) installations from standard system paths |
+| `internal/goupgrade` / `internal/lintupgrade` | Upgrade Go (requiring exactly one of `--global` or `--project`, with `--dry-run`, `--to`, and Go-only `--with-lint`) and `golangci-lint` (`--dry-run` and unvalidated `--to`, without rewriting `.fgm.toml` pins) |
+| `internal/fgmconfig` | Parse and persist repository-level `.fgm.toml` configuration (`LoadNearest`, `ResolvePinnedLint`, `SaveNearest`) |
+| `internal/lintconfig` | Embedded linter catalog (`linters.json`), presets (`minimal`, `standard`, `strict`), `.golangci.yml` generation at the nearest `go.work`/`go.mod` root (checking only `.golangci.yml` unless `--force`), import ordering, and upward `lint doctor` diagnostics across `.golangci.yml`/`.golangci.yaml` (`.yml` preferred over `.yaml` in the same directory; emits `ERROR`, `WARN`, and `standard`-preset `INFO` findings) |
+| `internal/envsetup` | Render shell setup scripts (`bash`, `zsh`, `fish`, `powershell`) and install shell integration into `zsh`, `bash`, and `fish` profiles (`ProfileInstaller`) |
 | `internal/shim` | Resolve the target Go binary path for shim execution |
-| `internal/execenv` | Execute external commands with the resolved toolchain prepended to `PATH` |
-| `internal/doctor` | Run environment health checks and report actionable findings |
+| `internal/execenv` | Execute external commands in the resolved working directory with `PATH` ordered as `selected Go` (required) → `installed selected golangci-lint` (prepended only when installed locally) → `inherited PATH`, without auto-installing missing toolchains |
+| `internal/doctor` | Run environment health checks and report actionable findings (including `shell_profile` fix hints handled by `fgm doctor --fix`) |
 | `internal/archive` | Archive extraction (`.tar.gz`, `.zip`) and download progress reporting |
 | `internal/versionutil` | Semantic/Go version parsing, comparison, normalization, and binary discovery helpers |
 | `internal/testutil` | Shared command-execution test helpers for `cmd/` and integration tests |

@@ -15,7 +15,12 @@ func newCurrentCmd(application *app.App, v *viper.Viper) *cobra.Command {
 		Short: "Show the resolved toolchain for the current workspace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			selection, err := application.Resolver.Current(cmd.Context(), v.GetString(flagChdir))
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
+			selection, err := application.Resolver.Current(cmd.Context(), workDir)
 			if err != nil {
 				return err
 			}

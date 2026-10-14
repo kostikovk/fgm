@@ -200,3 +200,25 @@ func TestImportAuto_ReportsImportedVersions(t *testing.T) {
 		t.Fatalf("stdout = %q, want it to contain lint import line", stdout)
 	}
 }
+
+func TestImportAuto_HelpDescribesGoAndLint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should describe importing both Go and golangci-lint when import auto help is requested", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := NewRootCmd(&app.App{})
+
+		// Act
+		stdout, _, err := testutil.ExecuteCommand(t, root, "import", "auto", "--help")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("import auto --help: %v", err)
+		}
+		if !strings.Contains(stdout, "Go and golangci-lint") {
+			t.Fatalf("stdout = %q, want it to contain %q", stdout, "Go and golangci-lint")
+		}
+	})
+}

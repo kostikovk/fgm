@@ -43,7 +43,10 @@ func newLintInitCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("lint config generator is not available")
 			}
 
-			workDir := v.GetString(flagChdir)
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
 			withImports, _ := cmd.Flags().GetBool(flagWithImports)
 			force, _ := cmd.Flags().GetBool(flagForce)
 
@@ -78,7 +81,10 @@ func newLintDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("lint doctor is not available")
 			}
 
-			workDir := v.GetString(flagChdir)
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
 			findings, err := application.LintDoctor.Diagnose(cmd.Context(), workDir)
 			if err != nil {
 				return err

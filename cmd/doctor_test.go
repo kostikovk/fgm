@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -60,12 +61,17 @@ func TestDoctorCommand_DiagnoseErrorIsPropagated(t *testing.T) {
 func TestDoctorCommand_PrintsDiagnostics(t *testing.T) {
 	t.Parallel()
 
+	wantWorkDir, err := filepath.Abs(".")
+	if err != nil {
+		t.Fatalf("filepath.Abs('.'): %v", err)
+	}
+
 	application := &app.App{
 		Resolver: resolve.New(nil),
 		Doctor: stubDoctor{
 			diagnoseFn: func(ctx context.Context, workDir string) ([]app.DoctorFinding, error) {
-				if workDir != "." {
-					t.Fatalf("workDir = %q, want %q", workDir, ".")
+				if workDir != wantWorkDir {
+					t.Fatalf("workDir = %q, want %q", workDir, wantWorkDir)
 				}
 				return []app.DoctorFinding{
 					{Severity: "OK", Message: "global Go version: 1.25.7"},
@@ -142,4 +148,29 @@ type stubProfileInstaller struct {
 
 func (s *stubProfileInstaller) InstallProfile(shell string) (string, bool, error) {
 	return s.installProfileFn(shell)
+}
+
+func TestDoctorCommand_HelpDescribesShellProfileFix(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should describe shell profile integration in fix flag help when doctor help is requested", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := NewRootCmd(&app.App{})
+
+		// Act
+		stdout, _, err := testutil.ExecuteCommand(t, root, "doctor", "--help")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("doctor --help: %v", err)
+		}
+		if !strings.Contains(stdout, "shell") || !strings.Contains(stdout, "profile") {
+			t.Fatalf("doctor --help = %q, want --fix description to mention shell profile integration", stdout)
+		}
+		if strings.Contains(stdout, "auto-fix detected issues") {
+			t.Fatalf("doctor --help = %q, want it not to claim generic auto-fix of all issues", stdout)
+		}
+	})
 }

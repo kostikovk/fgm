@@ -1149,3 +1149,114 @@ func createManagedGoVersion(t *testing.T, root string, version string) {
 		t.Fatalf("write managed go binary: %v", err)
 	}
 }
+
+func TestStoreListLocalGoVersions_ImportedSymlinkScenarios(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test is unix-only")
+	}
+
+	t.Run("should list imported Go when its source is not on PATH", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := t.TempDir()
+		externalGoroot := filepath.Join(t.TempDir(), "go1.25.7")
+		externalBin := filepath.Join(externalGoroot, "bin", "go")
+		if err := os.MkdirAll(filepath.Dir(externalBin), 0o755); err != nil {
+			t.Fatalf("mkdir external bin: %v", err)
+		}
+		if err := os.WriteFile(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatalf("write external go binary: %v", err)
+		}
+
+		store := New(root, "")
+		if _, err := store.RegisterExistingGoInstallation("1.25.7", externalGoroot); err != nil {
+			t.Fatalf("RegisterExistingGoInstallation: %v", err)
+		}
+
+		// Act
+		versions, err := store.ListLocalGoVersions(context.Background())
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListLocalGoVersions: %v", err)
+		}
+		if len(versions) != 1 || versions[0] != "1.25.7" {
+			t.Fatalf("versions = %v, want [1.25.7]", versions)
+		}
+	})
+
+	t.Run("should list regular directories and valid symlinks while skipping broken symlinks and files when listing local Go versions", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := t.TempDir()
+		createManagedGoVersion(t, root, "1.24.3")
+
+		externalGoroot := filepath.Join(t.TempDir(), "go1.25.7")
+		externalBin := filepath.Join(externalGoroot, "bin", "go")
+		if err := os.MkdirAll(filepath.Dir(externalBin), 0o755); err != nil {
+			t.Fatalf("mkdir external bin: %v", err)
+		}
+		if err := os.WriteFile(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatalf("write external go binary: %v", err)
+		}
+
+		store := New(root, "")
+		if _, err := store.RegisterExistingGoInstallation("1.25.7", externalGoroot); err != nil {
+			t.Fatalf("RegisterExistingGoInstallation: %v", err)
+		}
+
+		// Broken symlink and stray regular file inside <root>/go.
+		if err := os.Symlink(filepath.Join(t.TempDir(), "missing-goroot"), filepath.Join(root, "go", "1.26.0")); err != nil {
+			t.Fatalf("create broken symlink: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "go", "stray-file"), []byte("junk"), 0o644); err != nil {
+			t.Fatalf("write stray file: %v", err)
+		}
+
+		// Act
+		versions, err := store.ListLocalGoVersions(context.Background())
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListLocalGoVersions: %v", err)
+		}
+		if len(versions) != 2 || versions[0] != "1.25.7" || versions[1] != "1.24.3" {
+			t.Fatalf("versions = %v, want [1.25.7 1.24.3]", versions)
+		}
+	})
+
+	t.Run("should preserve external Go installation when deleting an imported version", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := t.TempDir()
+		externalGoroot := filepath.Join(t.TempDir(), "go1.25.7")
+		externalBin := filepath.Join(externalGoroot, "bin", "go")
+		if err := os.MkdirAll(filepath.Dir(externalBin), 0o755); err != nil {
+			t.Fatalf("mkdir external bin: %v", err)
+		}
+		if err := os.WriteFile(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatalf("write external go binary: %v", err)
+		}
+
+		store := New(root, "")
+		if _, err := store.RegisterExistingGoInstallation("1.25.7", externalGoroot); err != nil {
+			t.Fatalf("RegisterExistingGoInstallation: %v", err)
+		}
+
+		// Act
+		_, err := store.DeleteGoVersion(context.Background(), "1.25.7")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("DeleteGoVersion: %v", err)
+		}
+		if _, err := os.Stat(externalBin); err != nil {
+			t.Fatalf("expected original external binary %s to remain intact, stat err = %v", externalBin, err)
+		}
+	})
+}

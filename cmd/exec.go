@@ -11,7 +11,7 @@ import (
 func newExecCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	return &cobra.Command{
 		Use:   "exec -- [command] [args...]",
-		Short: "Run a command with the resolved Go toolchain on PATH",
+		Short: "Run a command with the resolved Go and installed selected golangci-lint on PATH",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -21,9 +21,14 @@ func newExecCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("executor is not configured")
 			}
 
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
 			return application.Executor.Exec(
 				cmd.Context(),
-				v.GetString(flagChdir),
+				workDir,
 				args,
 				cmd.InOrStdin(),
 				cmd.OutOrStdout(),

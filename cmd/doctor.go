@@ -22,7 +22,12 @@ func newDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("doctor service is not configured")
 			}
 
-			findings, err := application.Doctor.Diagnose(cmd.Context(), v.GetString(flagChdir))
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
+			findings, err := application.Doctor.Diagnose(cmd.Context(), workDir)
 			if err != nil {
 				return err
 			}
@@ -57,7 +62,7 @@ func newDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&fix, "fix", false, "auto-fix detected issues")
+	cmd.Flags().BoolVar(&fix, "fix", false, "add shell integration to your shell profile when missing")
 	return cmd
 }
 

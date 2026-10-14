@@ -256,6 +256,95 @@ func TestExecCommand_RejectsNilExecutor(t *testing.T) {
 	}
 }
 
+func TestRootAndExecHelp_FlagAndDescriptionContracts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should omit config and verbose flags from root and subcommand help when help is requested", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := NewRootCmd(&app.App{})
+
+		// Act
+		rootHelp, _, rootErr := testutil.ExecuteCommand(t, root, "--help")
+		subRoot := NewRootCmd(&app.App{})
+		subHelp, _, subErr := testutil.ExecuteCommand(t, subRoot, "current", "--help")
+
+		// Assert
+		if rootErr != nil {
+			t.Fatalf("root --help error: %v", rootErr)
+		}
+		if subErr != nil {
+			t.Fatalf("current --help error: %v", subErr)
+		}
+		for _, flagName := range []string{"--config", "--verbose"} {
+			if strings.Contains(rootHelp, flagName) {
+				t.Errorf("root help = %q, want it not to contain %q", rootHelp, flagName)
+			}
+			if strings.Contains(subHelp, flagName) {
+				t.Errorf("subcommand help = %q, want it not to contain %q", subHelp, flagName)
+			}
+		}
+	})
+
+	t.Run("should reject removed config and verbose flags when passed on CLI", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		cases := []struct {
+			name string
+			args []string
+		}{
+			{
+				name: "should reject config flag when passed to root command",
+				args: []string{"--config", "/tmp/config.toml", "version"},
+			},
+			{
+				name: "should reject verbose flag when passed to subcommand",
+				args: []string{"version", "--verbose"},
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// Arrange
+				root := NewRootCmd(&app.App{})
+
+				// Act
+				_, _, err := testutil.ExecuteCommand(t, root, tc.args...)
+
+				// Assert
+				if err == nil {
+					t.Fatalf("ExecuteCommand(%v) succeeded; want unknown flag error", tc.args)
+				}
+				if !strings.Contains(err.Error(), "unknown flag") {
+					t.Fatalf("err = %q, want unknown flag error", err.Error())
+				}
+			})
+		}
+	})
+
+	t.Run("should describe resolved Go and installed selected golangci-lint in exec help when help is requested", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := NewRootCmd(&app.App{})
+
+		// Act
+		stdout, _, err := testutil.ExecuteCommand(t, root, "exec", "--help")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("exec --help: %v", err)
+		}
+		if !strings.Contains(stdout, "golangci-lint") {
+			t.Fatalf("exec --help = %q, want it to mention golangci-lint", stdout)
+		}
+	})
+}
+
 type execLocatorStub struct {
 	goBinaryPathFn   func(ctx context.Context, version string) (string, error)
 	lintBinaryPathFn func(ctx context.Context, version string) (string, error)

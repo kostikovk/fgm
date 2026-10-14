@@ -594,3 +594,36 @@ func TestVersionsGolangCILintLocal_ShowsInstalledVersions(t *testing.T) {
 		t.Fatalf("stdout = %q, want it to contain %q", stdout, "v2.11.1")
 	}
 }
+
+func TestVersionsCommand_HelpDescribesDefaultsAndRemoteGoFilter(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should describe local default and remote-only go flag in versions help when help is requested", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		goRoot := NewRootCmd(&app.App{})
+		lintRoot := NewRootCmd(&app.App{})
+
+		// Act
+		goHelp, _, goErr := testutil.ExecuteCommand(t, goRoot, "versions", "go", "--help")
+		lintHelp, _, lintErr := testutil.ExecuteCommand(t, lintRoot, "versions", "golangci-lint", "--help")
+
+		// Assert
+		if goErr != nil {
+			t.Fatalf("versions go --help: %v", goErr)
+		}
+		if lintErr != nil {
+			t.Fatalf("versions golangci-lint --help: %v", lintErr)
+		}
+		if !strings.Contains(goHelp, "(default)") {
+			t.Fatalf("versions go --help = %q, want --local description to indicate (default)", goHelp)
+		}
+		if !strings.Contains(lintHelp, "(default)") {
+			t.Fatalf("versions golangci-lint --help = %q, want --local description to indicate (default)", lintHelp)
+		}
+		if !strings.Contains(lintHelp, "--remote") || !strings.Contains(lintHelp, "with --remote") {
+			t.Fatalf("versions golangci-lint --help = %q, want --go description to clarify it applies with --remote", lintHelp)
+		}
+	})
+}

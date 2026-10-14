@@ -60,7 +60,11 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 
 			currentVersion := ""
 			if application.Resolver != nil {
-				selection, err := application.Resolver.Current(cmd.Context(), v.GetString(flagChdir))
+				workDir, err := resolveWorkDir(v)
+				if err != nil {
+					return err
+				}
+				selection, err := application.Resolver.Current(cmd.Context(), workDir)
 				if err == nil {
 					currentVersion = selection.GoVersion
 				}
@@ -79,7 +83,7 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&local, "local", false, "list locally installed Go versions")
+	cmd.Flags().BoolVar(&local, "local", false, "list locally installed Go versions (default)")
 	cmd.Flags().BoolVar(&remote, "remote", false, "list remotely available Go versions")
 
 	return cmd
@@ -128,7 +132,11 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 
 			targetGoVersion := goVersion
 			if targetGoVersion == "" && application.Resolver != nil {
-				selection, err := application.Resolver.Current(cmd.Context(), v.GetString(flagChdir))
+				workDir, err := resolveWorkDir(v)
+				if err != nil {
+					return err
+				}
+				selection, err := application.Resolver.Current(cmd.Context(), workDir)
 				if err == nil {
 					targetGoVersion = selection.GoVersion
 				}
@@ -156,9 +164,9 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&local, "local", false, "list locally installed golangci-lint versions")
+	cmd.Flags().BoolVar(&local, "local", false, "list locally installed golangci-lint versions (default)")
 	cmd.Flags().BoolVar(&remote, "remote", false, "list remotely available golangci-lint versions")
-	cmd.Flags().StringVar(&goVersion, "go", "", "target Go version for compatibility filtering")
+	cmd.Flags().StringVar(&goVersion, "go", "", "target Go version for remote compatibility filtering (with --remote)")
 
 	return cmd
 }

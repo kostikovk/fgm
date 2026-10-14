@@ -2,9 +2,12 @@ package lintlocal
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -127,16 +130,49 @@ func TestStoreLintBinaryPath_ReturnsBinaryPath(t *testing.T) {
 func TestStoreLintBinaryPath_ErrorForMissingVersion(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
-	store := New(root)
+	t.Run("should wrap os.ErrNotExist when lint version is not installed", func(t *testing.T) {
+		// Arrange
+		root := t.TempDir()
+		store := New(root)
 
-	_, err := store.LintBinaryPath(context.Background(), "v9.9.9")
-	if err == nil {
-		t.Fatalf("expected error for missing version, got nil")
-	}
-	if got := err.Error(); !strings.Contains(got, "not installed") {
-		t.Fatalf("error = %q, want it to contain %q", got, "not installed")
-	}
+		// Act
+		_, err := store.LintBinaryPath(context.Background(), "v9.9.9")
+
+		// Assert
+		if err == nil {
+			t.Fatalf("expected error for missing version, got nil")
+		}
+		if got := err.Error(); !strings.Contains(got, "not installed") {
+			t.Fatalf("error = %q, want it to contain %q", got, "not installed")
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("errors.Is(%v, os.ErrNotExist) = false, want true", err)
+		}
+	})
+
+	t.Run("should preserve storage errors when lint lookup fails for another reason", func(t *testing.T) {
+		// Arrange
+		root := t.TempDir()
+		lintRootFile := filepath.Join(root, "golangci-lint")
+		if err := os.WriteFile(lintRootFile, []byte("not a dir"), 0o644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		store := New(root)
+
+		// Act
+		_, err := store.LintBinaryPath(context.Background(), "v2.11.2")
+
+		// Assert
+		if err == nil {
+			t.Fatalf("expected error when golangci-lint root is a file, got nil")
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("errors.Is(%v, os.ErrNotExist) = true, want non-NotExist storage error", err)
+		}
+		if runtime.GOOS != "windows" && !errors.Is(err, syscall.ENOTDIR) {
+			t.Fatalf("errors.Is(%v, syscall.ENOTDIR) = false, want true", err)
+		}
+	})
 }
 
 func TestStoreDeleteLintVersion_ErrorForNonExistentVersion(t *testing.T) {

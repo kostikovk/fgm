@@ -191,7 +191,7 @@ func (s *Store) listManagedGoVersions() ([]string, error) {
 
 	versions := make(map[string]struct{})
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 {
 			continue
 		}
 

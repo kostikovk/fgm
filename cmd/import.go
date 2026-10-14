@@ -21,7 +21,7 @@ func newImportCmd(application *app.App) *cobra.Command {
 func newImportAutoCmd(application *app.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "auto",
-		Short: "Automatically import existing Go installations from common locations",
+		Short: "Automatically import existing Go and golangci-lint installations from common locations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.GoImporter == nil && application.LintImporter == nil {

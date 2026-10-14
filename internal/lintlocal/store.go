@@ -74,11 +74,12 @@ func (s *Store) LintBinaryPath(ctx context.Context, version string) (string, err
 	_ = ctx
 
 	binaryPath := filepath.Join(s.root, "golangci-lint", version, lintBinaryName())
-	if _, err := os.Stat(binaryPath); err == nil {
+	_, err := os.Stat(binaryPath)
+	if err == nil {
 		return binaryPath, nil
 	}
 
-	return "", fmt.Errorf("golangci-lint version %s is not installed", version)
+	return "", fmt.Errorf("golangci-lint version %s is not installed: %w", version, err)
 }
 
 // RegisterExistingLintInstallation registers an existing golangci-lint binary into the FGM-managed store.

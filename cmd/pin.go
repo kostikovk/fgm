@@ -31,7 +31,12 @@ func newPinLintCmd(v *viper.Viper) *cobra.Command {
 				return fmt.Errorf("version must not be empty")
 			}
 
-			path, err := fgmconfig.SaveNearest(v.GetString(flagChdir), fgmconfig.File{
+			workDir, err := resolveWorkDir(v)
+			if err != nil {
+				return err
+			}
+
+			path, err := fgmconfig.SaveNearest(workDir, fgmconfig.File{
 				Toolchain: fgmconfig.ToolchainConfig{GolangCILint: version},
 			})
 			if err != nil {
