@@ -1,0 +1,3 @@
+interface:
+  display_name: "AAA Testing"
+  short_description: "AAA tests for Go, JS/TS, React, and Vue with clear names"
