@@ -31,6 +31,7 @@ func TestGoReleaserConfigExistsAndContainsReleaseMetadata(t *testing.T) {
 			"Bug Fixes",
 			"homebrew_casks:",
 			"binaries:",
+			"postflight_steps do",
 			"com.apple.quarantine",
 		} {
 			if !strings.Contains(joined, want) {
