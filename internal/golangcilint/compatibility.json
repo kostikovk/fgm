@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-18T10:39:08Z",
+  "generated_at": "2026-10-14T10:01:55Z",
   "latest_go_versions": {
     "18": "1.18.10",
     "19": "1.19.13",
@@ -8,49 +8,20 @@
     "22": "1.22.12",
     "23": "1.23.12",
     "24": "1.24.13",
-    "25": "1.25.8",
-    "26": "1.26.1"
+    "25": "1.25.14",
+    "26": "1.26.9",
+    "27": "1.27.2"
   },
   "support_thresholds": {
     "21": "v1.54.1",
     "22": "v1.56.0",
     "23": "v1.60.0",
     "24": "v1.64",
-    "25": "v2.4.0"
+    "25": "v2.4.0",
+    "26": "v2.9.0",
+    "27": "v2.13.0"
   },
   "versions": {
-    "v1.40.0": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.40.1": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.41.0": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.41.1": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.42.0": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.42.1": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.43.0": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
-    "v1.44.0": {
-      "min_go_minor": 18,
-      "max_go_minor": 20
-    },
     "v1.44.1": {
       "min_go_minor": 18,
       "max_go_minor": 20
@@ -359,6 +330,38 @@
       "min_go_minor": 18,
       "max_go_minor": 26
     },
+    "v2.11.4": {
+      "min_go_minor": 18,
+      "max_go_minor": 26
+    },
+    "v2.12.0": {
+      "min_go_minor": 18,
+      "max_go_minor": 26
+    },
+    "v2.12.1": {
+      "min_go_minor": 18,
+      "max_go_minor": 26
+    },
+    "v2.12.2": {
+      "min_go_minor": 18,
+      "max_go_minor": 26
+    },
+    "v2.13.0": {
+      "min_go_minor": 18,
+      "max_go_minor": 27
+    },
+    "v2.13.1": {
+      "min_go_minor": 18,
+      "max_go_minor": 27
+    },
+    "v2.13.2": {
+      "min_go_minor": 18,
+      "max_go_minor": 27
+    },
+    "v2.14.0": {
+      "min_go_minor": 18,
+      "max_go_minor": 27
+    },
     "v2.2.0": {
       "min_go_minor": 18,
       "max_go_minor": 24
@@ -381,39 +384,39 @@
     },
     "v2.4.0": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.5.0": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.6.0": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.6.1": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.6.2": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.7.0": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.7.1": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.7.2": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.8.0": {
       "min_go_minor": 18,
-      "max_go_minor": 26
+      "max_go_minor": 25
     },
     "v2.9.0": {
       "min_go_minor": 18,

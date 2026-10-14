@@ -1,0 +1,3 @@
+interface:
+  display_name: "TDD Workflow"
+  short_description: "Test first with AAA, then RED, GREEN, and REFACTOR"
