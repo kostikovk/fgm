@@ -31,6 +31,7 @@ func TestGoReleaserConfigExistsAndContainsReleaseMetadata(t *testing.T) {
 			"Bug Fixes",
 			"homebrew_casks:",
 			"binaries:",
+			"com.apple.quarantine",
 		} {
 			if !strings.Contains(joined, want) {
 				t.Fatalf(".goreleaser.yaml = %q, want it to contain %q", joined, want)
