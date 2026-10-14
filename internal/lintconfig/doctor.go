@@ -2,8 +2,10 @@ package lintconfig
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -86,8 +88,10 @@ func Diagnose(catalog *Catalog, workDir string, goVersion string) ([]Finding, er
 		allEnabled[name] = true
 	}
 
+	enabledList := slices.Sorted(maps.Keys(allEnabled))
+
 	// Check each enabled linter.
-	for name := range allEnabled {
+	for _, name := range enabledList {
 		l, exists := catalog.Lookup(name)
 		if !exists {
 			findings = append(findings, Finding{
@@ -105,11 +109,7 @@ func Diagnose(catalog *Catalog, workDir string, goVersion string) ([]Finding, er
 	}
 
 	// Check for conflicts.
-	enabledList := make([]string, 0, len(allEnabled))
-	for name := range allEnabled {
-		enabledList = append(enabledList, name)
-	}
-	for i := 0; i < len(enabledList); i++ {
+	for i := range enabledList {
 		for j := i + 1; j < len(enabledList); j++ {
 			if msg := catalog.ConflictsWith(enabledList[i], enabledList[j]); msg != "" {
 				findings = append(findings, Finding{

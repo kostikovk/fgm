@@ -382,3 +382,27 @@ func TestGorootFromPathGo_SkipsMissingBinary(t *testing.T) {
 		t.Fatalf("gorootFromPathGo(%q) = %q, want empty string when dir has no go binary", emptyDir, got)
 	}
 }
+
+func TestDefaultCandidates_PreservesPathPriorityOrder(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-only PATH test")
+	}
+
+	t.Run("should place PATH Go installation first across repeated calls when PATH contains a Go binary", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		goRoot := createExistingGoInstallation(t, "1.27.2")
+		pathEnv := filepath.Join(goRoot, "bin")
+
+		// Act & Assert
+		for range 10 {
+			candidates := DefaultCandidates(pathEnv)
+			if len(candidates) == 0 || candidates[0] != goRoot {
+				t.Fatalf("DefaultCandidates(%q)[0] = %v, want %q first", pathEnv, candidates, goRoot)
+			}
+		}
+	})
+}

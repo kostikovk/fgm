@@ -200,6 +200,9 @@ func (s *Store) listManagedGoVersions() ([]string, error) {
 		if !entry.IsDir() && entry.Type()&os.ModeSymlink == 0 {
 			continue
 		}
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
 
 		version := entry.Name()
 		if _, err := os.Stat(s.managedGoBinaryPath(version)); err == nil {

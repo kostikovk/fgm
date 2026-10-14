@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -73,9 +74,13 @@ func applyShellProfileFix(cmd *cobra.Command, application *app.App) error {
 
 	// Prompt if stdin is a terminal.
 	if isTerminal(cmd.InOrStdin()) {
-		fmt.Fprint(cmd.OutOrStdout(), "Add shell integration to your profile? [y/N] ")
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), "Add shell integration to your profile? [y/N] "); err != nil {
+			return err
+		}
 		var answer string
-		fmt.Fscanln(cmd.InOrStdin(), &answer)
+		if _, err := fmt.Fscanln(cmd.InOrStdin(), &answer); err != nil && !errors.Is(err, io.EOF) {
+			return err
+		}
 		if answer != "y" && answer != "Y" {
 			return nil
 		}
@@ -87,12 +92,14 @@ func applyShellProfileFix(cmd *cobra.Command, application *app.App) error {
 	}
 
 	if modified {
-		fmt.Fprintf(cmd.OutOrStdout(), "Added shell integration to %s\n", profilePath)
-		fmt.Fprintf(cmd.OutOrStdout(), "Restart your shell or run: source %s\n", profilePath)
-	} else {
-		fmt.Fprintf(cmd.OutOrStdout(), "Shell integration already present in %s\n", profilePath)
+		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Added shell integration to %s\n", profilePath); err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(cmd.OutOrStdout(), "Restart your shell or run: source %s\n", profilePath)
+		return err
 	}
-	return nil
+	_, err = fmt.Fprintf(cmd.OutOrStdout(), "Shell integration already present in %s\n", profilePath)
+	return err
 }
 
 func isTerminal(r io.Reader) bool {

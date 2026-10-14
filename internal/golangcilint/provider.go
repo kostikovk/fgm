@@ -91,6 +91,40 @@ func New(config Config) *Provider {
 	}
 }
 
+// ListCatalogLintVersions returns compatible golangci-lint versions from the embedded catalog without network I/O.
+func (p *Provider) ListCatalogLintVersions(
+	ctx context.Context,
+	goVersion string,
+) ([]app.LintVersion, error) {
+	_ = ctx
+
+	targetMinor, err := parseGoMinor(goVersion)
+	if err != nil {
+		return nil, err
+	}
+	manifest, err := p.loadCompatibilityManifest()
+	if err != nil {
+		return nil, err
+	}
+
+	versions := make([]app.LintVersion, 0, len(manifest.Versions))
+	for version, entry := range manifest.Versions {
+		if targetMinor < entry.MinGoMinor || targetMinor > entry.MaxGoMinor {
+			continue
+		}
+		versions = append(versions, app.LintVersion{Version: version})
+	}
+
+	slices.SortFunc(versions, func(a app.LintVersion, b app.LintVersion) int {
+		return compareSemverDesc(a.Version, b.Version)
+	})
+	if len(versions) > 0 {
+		versions[0].Recommended = true
+	}
+
+	return versions, nil
+}
+
 // ListRemoteLintVersions returns compatible golangci-lint versions for a target Go version.
 func (p *Provider) ListRemoteLintVersions(
 	ctx context.Context,

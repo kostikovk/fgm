@@ -186,6 +186,7 @@ type ProfileInstaller interface {
 // App holds the services used by Cobra commands.
 type App struct {
 	Resolver            Resolver
+	GoResolver          Resolver
 	GoStore             GoLocalVersionStore
 	LintStore           LintLocalVersionStore
 	GoRemoteProvider    GoRemoteVersionProvider

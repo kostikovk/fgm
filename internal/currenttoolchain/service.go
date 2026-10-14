@@ -12,26 +12,34 @@ type GoResolver interface {
 	Current(ctx context.Context, workDir string) (app.Selection, error)
 }
 
+// LintCatalogVersionProvider lists compatible golangci-lint versions from the embedded catalog.
+type LintCatalogVersionProvider interface {
+	ListCatalogLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
 // Config configures a composite current toolchain resolver.
 type Config struct {
-	GoResolver         GoResolver
-	LintStore          app.LintLocalVersionStore
-	LintRemoteProvider app.LintRemoteVersionProvider
+	GoResolver          GoResolver
+	LintStore           app.LintLocalVersionStore
+	LintCatalogProvider LintCatalogVersionProvider
+	LintRemoteProvider  app.LintRemoteVersionProvider
 }
 
 // Service resolves the current Go selection and enriches it with golangci-lint.
 type Service struct {
-	goResolver         GoResolver
-	lintStore          app.LintLocalVersionStore
-	lintRemoteProvider app.LintRemoteVersionProvider
+	goResolver          GoResolver
+	lintStore           app.LintLocalVersionStore
+	lintCatalogProvider LintCatalogVersionProvider
+	lintRemoteProvider  app.LintRemoteVersionProvider
 }
 
 // New constructs a composite current toolchain resolver.
 func New(config Config) *Service {
 	return &Service{
-		goResolver:         config.GoResolver,
-		lintStore:          config.LintStore,
-		lintRemoteProvider: config.LintRemoteProvider,
+		goResolver:          config.GoResolver,
+		lintStore:           config.LintStore,
+		lintCatalogProvider: config.LintCatalogProvider,
+		lintRemoteProvider:  config.LintRemoteProvider,
 	}
 }
 
@@ -50,15 +58,23 @@ func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, e
 		return selection, nil
 	}
 
-	if s.lintRemoteProvider == nil {
+	var compatibleVersions []app.LintVersion
+	switch {
+	case s.lintCatalogProvider != nil:
+		compatibleVersions, err = s.lintCatalogProvider.ListCatalogLintVersions(ctx, selection.GoVersion)
+		if err != nil {
+			return app.Selection{}, err
+		}
+	case s.lintRemoteProvider != nil:
+		compatibleVersions, err = s.lintRemoteProvider.ListRemoteLintVersions(ctx, selection.GoVersion)
+		if err != nil {
+			return app.Selection{}, err
+		}
+	default:
 		return selection, nil
 	}
 
-	remoteVersions, err := s.lintRemoteProvider.ListRemoteLintVersions(ctx, selection.GoVersion)
-	if err != nil {
-		return app.Selection{}, err
-	}
-	if len(remoteVersions) == 0 {
+	if len(compatibleVersions) == 0 {
 		return selection, nil
 	}
 
@@ -67,14 +83,14 @@ func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, e
 		if err != nil {
 			return app.Selection{}, err
 		}
-		if version, ok := pickInstalledLintVersion(localVersions, remoteVersions); ok {
+		if version, ok := pickInstalledLintVersion(localVersions, compatibleVersions); ok {
 			selection.LintVersion = version
 			selection.LintSource = "local"
 			return selection, nil
 		}
 	}
 
-	selection.LintVersion = remoteVersions[0].Version
+	selection.LintVersion = compatibleVersions[0].Version
 	selection.LintSource = "remote"
 	return selection, nil
 }

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -1528,4 +1529,81 @@ func TestExtractTarGz_MultipleTypesInOneArchive(t *testing.T) {
 			t.Errorf("expected %q to not be created, but it exists", name)
 		}
 	}
+}
+
+func TestMoveAtomically_CrossDeviceFallback(t *testing.T) {
+	t.Run("should stage directory in destination parent and rename atomically when Rename returns EXDEV", func(t *testing.T) {
+		// Arrange
+		srcDir := filepath.Join(t.TempDir(), "go")
+		if err := os.MkdirAll(filepath.Join(srcDir, "bin"), 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(srcDir, "bin", "go"), []byte("#!/bin/sh\necho go\n"), 0o755); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		dstParent := t.TempDir()
+		dstDir := filepath.Join(dstParent, "1.27.2")
+
+		oldRename := renamePath
+		renamePath = func(oldpath, newpath string) error {
+			return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+		}
+		t.Cleanup(func() {
+			renamePath = oldRename
+		})
+
+		// Act
+		err := MoveAtomically(srcDir, dstDir)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("MoveAtomically directory on EXDEV: %v", err)
+		}
+		got, err := os.ReadFile(filepath.Join(dstDir, "bin", "go"))
+		if err != nil {
+			t.Fatalf("ReadFile moved go binary: %v", err)
+		}
+		if string(got) != "#!/bin/sh\necho go\n" {
+			t.Fatalf("moved binary content = %q, want %q", string(got), "#!/bin/sh\necho go\n")
+		}
+		if _, err := os.Stat(srcDir); !os.IsNotExist(err) {
+			t.Fatalf("expected source directory %s to be removed after MoveAtomically, stat err = %v", srcDir, err)
+		}
+	})
+
+	t.Run("should stage file in destination parent and rename atomically when Rename returns EXDEV", func(t *testing.T) {
+		// Arrange
+		srcFile := filepath.Join(t.TempDir(), "golangci-lint")
+		if err := os.WriteFile(srcFile, []byte("#!/bin/sh\necho lint\n"), 0o755); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		dstParent := t.TempDir()
+		dstFile := filepath.Join(dstParent, "golangci-lint")
+
+		oldRename := renamePath
+		renamePath = func(oldpath, newpath string) error {
+			return &os.LinkError{Op: "rename", Old: oldpath, New: newpath, Err: syscall.EXDEV}
+		}
+		t.Cleanup(func() {
+			renamePath = oldRename
+		})
+
+		// Act
+		err := MoveAtomically(srcFile, dstFile)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("MoveAtomically file on EXDEV: %v", err)
+		}
+		got, err := os.ReadFile(dstFile)
+		if err != nil {
+			t.Fatalf("ReadFile moved lint binary: %v", err)
+		}
+		if string(got) != "#!/bin/sh\necho lint\n" {
+			t.Fatalf("moved binary content = %q, want %q", string(got), "#!/bin/sh\necho lint\n")
+		}
+		if _, err := os.Stat(srcFile); !os.IsNotExist(err) {
+			t.Fatalf("expected source file %s to be removed after MoveAtomically, stat err = %v", srcFile, err)
+		}
+	})
 }

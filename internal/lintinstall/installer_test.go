@@ -704,6 +704,36 @@ func TestFindLintBinary_WalkDirError(t *testing.T) {
 	}
 }
 
+func TestFindLintBinary_SupportsWindowsExe(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should locate golangci-lint.exe inside extracted archive directory when present", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		extractDir := t.TempDir()
+		nestedDir := filepath.Join(extractDir, "golangci-lint-2.13.0-windows-amd64")
+		if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		exePath := filepath.Join(nestedDir, "golangci-lint.exe")
+		if err := os.WriteFile(exePath, []byte("MZ"), 0o755); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+
+		// Act
+		got, err := findLintBinary(extractDir)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("findLintBinary: %v", err)
+		}
+		if got != exePath {
+			t.Fatalf("findLintBinary = %q, want %q", got, exePath)
+		}
+	})
+}
+
 func buildTarGzArchive(t *testing.T, name string, content []byte) []byte {
 	t.Helper()
 

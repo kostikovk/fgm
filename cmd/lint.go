@@ -60,8 +60,8 @@ func newLintInitCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Generated .golangci.yml (preset: %s)\n", effectivePreset)
-			return nil
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Generated .golangci.yml (preset: %s)\n", effectivePreset)
+			return err
 		},
 	}
 
@@ -92,7 +92,9 @@ func newLintDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			}
 
 			for _, f := range findings {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", f.Severity, f.Message)
+				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", f.Severity, f.Message); err != nil {
+					return err
+				}
 			}
 			return nil
 		},

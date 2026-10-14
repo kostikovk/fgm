@@ -4,12 +4,16 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
+
+var renamePath = os.Rename
 
 // FilenameSuffix returns the archive extension for a filename.
 func FilenameSuffix(filename string) string {
@@ -156,4 +160,76 @@ func safeJoin(base string, name string) (string, error) {
 		return "", fmt.Errorf("archive entry %q escapes destination", name)
 	}
 	return targetPath, nil
+}
+
+// MoveAtomically moves src to dst using os.Rename, falling back to staging in
+// filepath.Dir(dst) + atomic rename when src and dst are on different filesystems (EXDEV).
+func MoveAtomically(src string, dst string) error {
+	err := renamePath(src, dst)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, syscall.EXDEV) {
+		return err
+	}
+
+	info, statErr := os.Stat(src)
+	if statErr != nil {
+		return statErr
+	}
+	parentDir := filepath.Dir(dst)
+	if info.IsDir() {
+		stageDir, err := os.MkdirTemp(parentDir, ".fgm-stage-*")
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = os.RemoveAll(stageDir)
+		}()
+		if err := os.CopyFS(stageDir, os.DirFS(src)); err != nil {
+			return err
+		}
+		if err := os.Rename(stageDir, dst); err != nil {
+			return err
+		}
+		_ = os.RemoveAll(src)
+		return nil
+	}
+
+	stageFile, err := os.CreateTemp(parentDir, ".fgm-stage-*")
+	if err != nil {
+		return err
+	}
+	stagePath := stageFile.Name()
+	defer func() {
+		_ = os.Remove(stagePath)
+	}()
+
+	srcFile, err := os.Open(src)
+	if err != nil {
+		_ = stageFile.Close()
+		return err
+	}
+	if _, err := io.Copy(stageFile, srcFile); err != nil {
+		_ = srcFile.Close()
+		_ = stageFile.Close()
+		return err
+	}
+	if err := srcFile.Close(); err != nil {
+		_ = stageFile.Close()
+		return err
+	}
+	if err := stageFile.Chmod(info.Mode().Perm()); err != nil {
+		_ = stageFile.Close()
+		return err
+	}
+	if err := stageFile.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(stagePath, dst); err != nil {
+		return err
+	}
+	_ = os.Remove(src)
+	return nil
 }

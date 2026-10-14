@@ -438,3 +438,27 @@ func TestBinaryName_ReturnsCorrectName(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultCandidates_PreservesPathPriorityOrder(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-only PATH test")
+	}
+
+	t.Run("should place PATH golangci-lint binary first across repeated calls when PATH contains golangci-lint", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		lintBinary := createExistingLintBinary(t, "2.13.0")
+		pathEnv := filepath.Dir(lintBinary)
+
+		// Act & Assert
+		for range 10 {
+			candidates := DefaultCandidates(pathEnv)
+			if len(candidates) == 0 || candidates[0] != lintBinary {
+				t.Fatalf("DefaultCandidates(%q)[0] = %v, want %q first", pathEnv, candidates, lintBinary)
+			}
+		}
+	})
+}

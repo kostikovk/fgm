@@ -45,8 +45,8 @@ FGM follows a strict three-layer design:
 
 | Package | Responsibility |
 |---|---|
-| `internal/resolve` | Walks directory ancestors to locate `go.work` or `go.mod`, parses `toolchain` and `go` directives, and falls back to the global Go version |
-| `internal/currenttoolchain` | Combines resolved Go version with `.fgm.toml` pinning and `golangci-lint` compatibility (local store or remote provider) into a unified `app.Selection` |
+| `internal/resolve` | Walks directory ancestors to locate `go.work` or `go.mod`, parses `toolchain` and `go` directives, and falls back to the global Go version (wired directly as `App.GoResolver` for `cmd/shim.go` so `go` shims never resolve `golangci-lint`) |
+| `internal/currenttoolchain` | Combines resolved Go version with `.fgm.toml` pinning and `golangci-lint` compatibility (using the embedded compatibility catalog via `LintCatalogProvider` for offline local selection, or `LintRemoteProvider` when configured) into a unified `app.Selection` |
 | `internal/golocal` / `internal/lintlocal` | Manage installed Go and `golangci-lint` versions in the FGM store (including symlinked imported installations, which depend on the external source remaining on disk), global Go default state, and Unix shim creation |
 | `internal/goreleases` | Fetches remotely available Go releases from the official `go.dev` API |
 | `internal/golangcilint` | Serves the embedded compatibility catalog (`compatibility.json`) and queries remote `golangci-lint` releases on GitHub |
@@ -60,7 +60,7 @@ FGM follows a strict three-layer design:
 | `internal/execenv` | Execute external commands in the resolved working directory with `PATH` ordered as `selected Go` (required) → `installed selected golangci-lint` (prepended only when installed locally) → `inherited PATH`, without auto-installing missing toolchains |
 | `internal/doctor` | Run environment health checks and report actionable findings (including `shell_profile` fix hints handled by `fgm doctor --fix`) |
 | `internal/toolhint` | Format exact CLI recovery command hints (`fgm install go <version>`, `fgm install golangci-lint <version>`, `fgm exec -- <command>`) shared across stores, commands, and doctor diagnostics |
-| `internal/archive` | Archive extraction (`.tar.gz`, `.zip`) and download progress reporting |
+| `internal/archive` | Archive extraction (`.tar.gz`, `.zip`), cross-filesystem atomic move fallback (`MoveAtomically` on `EXDEV`), and download progress reporting |
 | `internal/versionutil` | Semantic/Go version parsing, comparison, normalization, and binary discovery helpers |
 | `internal/testutil` | Shared command-execution test helpers for `cmd/` and integration tests |
 

@@ -18,7 +18,11 @@ func newShimCmd(application *app.App) *cobra.Command {
 		Hidden: true,
 		Args:   cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if application.GoStore == nil || application.Resolver == nil {
+			goResolver := application.GoResolver
+			if goResolver == nil {
+				goResolver = application.Resolver
+			}
+			if application.GoStore == nil || goResolver == nil {
 				return fmt.Errorf("shim dependencies are not configured")
 			}
 
@@ -29,7 +33,7 @@ func newShimCmd(application *app.App) *cobra.Command {
 					return fmt.Errorf("resolve working directory: %w", err)
 				}
 
-				resolver := shim.New(application.Resolver, application.GoStore)
+				resolver := shim.New(goResolver, application.GoStore)
 				binaryPath, err := resolver.ResolveGoBinary(cmd.Context(), workDir)
 				if err != nil {
 					return err

@@ -431,3 +431,35 @@ func TestStoreRegisterExisting_SymlinkError(t *testing.T) {
 		t.Fatalf("error = %q, want it to contain %q", err.Error(), "symlink existing golangci-lint installation")
 	}
 }
+
+func TestStoreListLocalLintVersions_SkipsHiddenStagingDirs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should ignore hidden dot-prefixed staging directories when listing local lint versions", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := t.TempDir()
+		for _, dirName := range []string{"v2.13.0", ".fgm-stage-999"} {
+			binPath := filepath.Join(root, "golangci-lint", dirName, lintBinaryName())
+			if err := os.MkdirAll(filepath.Dir(binPath), 0o755); err != nil {
+				t.Fatalf("MkdirAll: %v", err)
+			}
+			if err := os.WriteFile(binPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+				t.Fatalf("WriteFile: %v", err)
+			}
+		}
+		store := New(root)
+
+		// Act
+		versions, err := store.ListLocalLintVersions(context.Background())
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListLocalLintVersions: %v", err)
+		}
+		if len(versions) != 1 || versions[0] != "v2.13.0" {
+			t.Fatalf("versions = %v, want [v2.13.0]", versions)
+		}
+	})
+}

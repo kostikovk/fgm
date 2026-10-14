@@ -72,18 +72,27 @@ func (i *Importer) ImportAuto(ctx context.Context) ([]app.ImportedGo, error) {
 
 // DefaultCandidates returns common locations that may already contain Go installations.
 func DefaultCandidates(pathEnv string) []string {
-	candidates := make(map[string]struct{})
-
-	if goroot := gorootFromPathGo(pathEnv); goroot != "" {
-		candidates[goroot] = struct{}{}
+	seen := make(map[string]struct{})
+	var ordered []string
+	addCandidate := func(path string) {
+		if path == "" {
+			return
+		}
+		if _, exists := seen[path]; exists {
+			return
+		}
+		seen[path] = struct{}{}
+		ordered = append(ordered, path)
 	}
+
+	addCandidate(gorootFromPathGo(pathEnv))
 
 	for _, path := range []string{
 		"/usr/local/go",
 		"/opt/homebrew/opt/go/libexec",
 		"/usr/local/opt/go/libexec",
 	} {
-		candidates[path] = struct{}{}
+		addCandidate(path)
 	}
 
 	for _, pattern := range []string{
@@ -92,13 +101,8 @@ func DefaultCandidates(pathEnv string) []string {
 	} {
 		matches, _ := filepath.Glob(pattern)
 		for _, match := range matches {
-			candidates[match] = struct{}{}
+			addCandidate(match)
 		}
-	}
-
-	ordered := make([]string, 0, len(candidates))
-	for candidate := range candidates {
-		ordered = append(ordered, candidate)
 	}
 
 	return ordered

@@ -181,3 +181,55 @@ func TestShimCommand_GoShimReturnsGoBinaryPathError(t *testing.T) {
 		t.Fatalf("err = %q, want binary path boom", err)
 	}
 }
+
+func TestShimCommand_PrefersGoResolverOverCompositeResolver(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	t.Run("should resolve Go via GoResolver without calling composite Resolver when GoResolver is configured", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		goBinDir := filepath.Join(t.TempDir(), "bin")
+		if err := os.MkdirAll(goBinDir, 0o755); err != nil {
+			t.Fatalf("mkdir go bin dir: %v", err)
+		}
+		goBinary := filepath.Join(goBinDir, "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go1.27.2\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write fake go binary: %v", err)
+		}
+
+		application := &app.App{
+			GoStore: stubGoStore{
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return goBinary, nil
+				},
+			},
+			GoResolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", GoSource: "go.mod"}, nil
+				},
+			},
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					t.Fatal("composite Resolver should not be called by __shim go when GoResolver is set")
+					return app.Selection{}, nil
+				},
+			},
+		}
+
+		// Act
+		stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "__shim", "go", "version")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("shim go: %v", err)
+		}
+		if !strings.Contains(stdout, "go1.27.2") {
+			t.Fatalf("stdout = %q, want go1.27.2", stdout)
+		}
+	})
+}

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -55,7 +56,7 @@ func New(config Config) *Installer {
 // InstallLintVersion downloads and extracts the requested golangci-lint version into the managed store.
 func (i *Installer) InstallLintVersion(ctx context.Context, version string) (string, error) {
 	installDir := filepath.Join(i.root, "golangci-lint", version)
-	binaryPath := filepath.Join(installDir, "golangci-lint")
+	binaryPath := filepath.Join(installDir, lintBinaryName())
 	if _, err := os.Stat(binaryPath); err == nil {
 		return installDir, nil
 	}
@@ -69,15 +70,17 @@ func (i *Installer) InstallLintVersion(ctx context.Context, version string) (str
 	if err != nil {
 		return "", fmt.Errorf("create temp archive: %w", err)
 	}
+	tempArchivePath := tempArchive.Name()
 	defer func() {
-		_ = os.Remove(tempArchive.Name())
-	}()
-	defer func() {
-		_ = tempArchive.Close()
+		_ = os.Remove(tempArchivePath)
 	}()
 
 	if err := i.downloadArchive(ctx, arch, tempArchive); err != nil {
+		_ = tempArchive.Close()
 		return "", err
+	}
+	if err := tempArchive.Close(); err != nil {
+		return "", fmt.Errorf("close temp archive: %w", err)
 	}
 
 	tempExtractDir, err := os.MkdirTemp("", "fgm-lint-extract-*")
@@ -88,7 +91,7 @@ func (i *Installer) InstallLintVersion(ctx context.Context, version string) (str
 		_ = os.RemoveAll(tempExtractDir)
 	}()
 
-	if err := archive.Extract(tempArchive.Name(), tempExtractDir); err != nil {
+	if err := archive.Extract(tempArchivePath, tempExtractDir); err != nil {
 		return "", err
 	}
 
@@ -103,7 +106,7 @@ func (i *Installer) InstallLintVersion(ctx context.Context, version string) (str
 	if err := os.MkdirAll(installDir, 0o755); err != nil {
 		return "", fmt.Errorf("create install directory: %w", err)
 	}
-	if err := os.Rename(extractedBinary, binaryPath); err != nil {
+	if err := archive.MoveAtomically(extractedBinary, binaryPath); err != nil {
 		return "", fmt.Errorf("move golangci-lint into place: %w", err)
 	}
 
@@ -170,7 +173,7 @@ func findLintBinary(root string) (string, error) {
 		if entry.IsDir() {
 			return nil
 		}
-		if entry.Name() == "golangci-lint" {
+		if entry.Name() == "golangci-lint" || entry.Name() == "golangci-lint.exe" {
 			match = path
 			return io.EOF
 		}
@@ -183,4 +186,11 @@ func findLintBinary(root string) (string, error) {
 		return "", fmt.Errorf("find extracted golangci-lint binary: binary not found")
 	}
 	return match, nil
+}
+
+func lintBinaryName() string {
+	if runtime.GOOS == "windows" {
+		return "golangci-lint.exe"
+	}
+	return "golangci-lint"
 }

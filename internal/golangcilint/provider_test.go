@@ -793,4 +793,44 @@ func TestDefaultCompatibilityData_SupportsGo127(t *testing.T) {
 			t.Fatalf("versions = %#v, want only v2.13.0 for Go 1.27.2", versions)
 		}
 	})
+
+	t.Run("should list compatible versions from embedded catalog without HTTP requests when ListCatalogLintVersions is called", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var httpRequests atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			httpRequests.Add(1)
+			http.Error(w, "network disabled", http.StatusServiceUnavailable)
+		}))
+		defer server.Close()
+
+		provider := New(Config{
+			Client:  server.Client(),
+			BaseURL: server.URL,
+			GOOS:    "darwin",
+			GOARCH:  "arm64",
+			CompatibilityData: []byte(`{
+				"versions": {
+					"v2.11.1": {"min_go_minor": 18, "max_go_minor": 26},
+					"v2.11.2": {"min_go_minor": 18, "max_go_minor": 26},
+					"v2.13.0": {"min_go_minor": 18, "max_go_minor": 27}
+				}
+			}`),
+		})
+
+		// Act
+		versions, err := provider.ListCatalogLintVersions(context.Background(), "1.26.1")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListCatalogLintVersions: %v", err)
+		}
+		if httpRequests.Load() != 0 {
+			t.Fatalf("httpRequests = %d, want 0", httpRequests.Load())
+		}
+		if len(versions) != 3 || versions[0].Version != "v2.13.0" || !versions[0].Recommended {
+			t.Fatalf("versions = %#v, want sorted [v2.13.0 (Recommended), v2.11.2, v2.11.1]", versions)
+		}
+	})
 }

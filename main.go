@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/kostikovk/fgm/cmd"
@@ -47,10 +49,13 @@ var (
 )
 
 func main() {
-	if err := run(context.Background(), stderrWriter, getEnv, defaultGoRoot, newRootCmd); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	if err := run(ctx, stderrWriter, getEnv, defaultGoRoot, newRootCmd); err != nil {
+		stop()
 		_, _ = fmt.Fprintln(stderrWriter, err)
 		exitMain(1)
 	}
+	stop()
 }
 
 func run(
@@ -81,13 +86,13 @@ func run(
 	})
 	goInstaller := goinstall.New(goinstall.Config{
 		Root:           goRoot,
-		Client:         http.DefaultClient,
+		Client:         httpClient,
 		Provider:       goReleaseProvider,
 		ProgressWriter: stderr,
 	})
 	lintInstaller := lintinstall.New(lintinstall.Config{
 		Root:           goRoot,
-		Client:         http.DefaultClient,
+		Client:         httpClient,
 		Provider:       lintReleaseProvider,
 		ProgressWriter: stderr,
 	})
@@ -106,10 +111,12 @@ func run(
 		LintInstaller:      lintInstaller,
 		GlobalStore:        goStore,
 	})
+	goResolver := resolve.New(goStore)
 	currentResolver := currenttoolchain.New(currenttoolchain.Config{
-		GoResolver:         resolve.New(goStore),
-		LintStore:          lintStore,
-		LintRemoteProvider: lintReleaseProvider,
+		GoResolver:          goResolver,
+		LintStore:           lintStore,
+		LintCatalogProvider: lintReleaseProvider,
+		LintRemoteProvider:  lintReleaseProvider,
 	})
 	doctorService := doctor.New(doctor.Config{
 		Resolver:           currentResolver,
@@ -137,6 +144,7 @@ func run(
 	}
 	application := &app.App{
 		Resolver:           currentResolver,
+		GoResolver:         goResolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		GoRemoteProvider:   goReleaseProvider,

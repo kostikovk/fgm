@@ -1254,13 +1254,14 @@ func TestStoreListLocalGoVersions_ImportedSymlinkScenarios(t *testing.T) {
 			t.Fatalf("RegisterExistingGoInstallation: %v", err)
 		}
 
-		// Broken symlink and stray regular file inside <root>/go.
+		// Broken symlink, stray regular file, and hidden staging directory inside <root>/go.
 		if err := os.Symlink(filepath.Join(t.TempDir(), "missing-goroot"), filepath.Join(root, "go", "1.26.0")); err != nil {
 			t.Fatalf("create broken symlink: %v", err)
 		}
 		if err := os.WriteFile(filepath.Join(root, "go", "stray-file"), []byte("junk"), 0o644); err != nil {
 			t.Fatalf("write stray file: %v", err)
 		}
+		createManagedGoVersion(t, root, ".fgm-stage-12345")
 
 		// Act
 		versions, err := store.ListLocalGoVersions(context.Background())

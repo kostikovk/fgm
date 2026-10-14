@@ -207,3 +207,38 @@ func TestDiagnose_GoodConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestDiagnose_DeterministicUnknownLinterOrder(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should emit unknown linter findings in deterministic sorted order when multiple unknown linters are configured", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		catalog, err := LoadCatalog()
+		if err != nil {
+			t.Fatalf("LoadCatalog: %v", err)
+		}
+		workDir := t.TempDir()
+		config := "version: \"2\"\nlinters:\n  enable:\n    - zzzunknown\n    - mmmunknown\n    - aaaunknown\n"
+		if err := os.WriteFile(filepath.Join(workDir, ".golangci.yml"), []byte(config), 0o644); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+
+		// Act & Assert
+		for range 10 {
+			findings, err := Diagnose(catalog, workDir, "1.27.2")
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if len(findings) < 3 {
+				t.Fatalf("len(findings) = %d, want at least 3", len(findings))
+			}
+			if findings[0].Message != `unknown linter "aaaunknown"; check for typos` ||
+				findings[1].Message != `unknown linter "mmmunknown"; check for typos` ||
+				findings[2].Message != `unknown linter "zzzunknown"; check for typos` {
+				t.Fatalf("findings[0..2] = %#v, want alphabetical order aaaunknown, mmmunknown, zzzunknown", findings[:3])
+			}
+		}
+	})
+}

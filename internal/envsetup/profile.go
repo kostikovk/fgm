@@ -64,11 +64,14 @@ func InstallProfile(shell string, goos string, homeDir string) (string, bool, er
 	if err != nil {
 		return profilePath, false, fmt.Errorf("open %s: %w", profilePath, err)
 	}
-	defer f.Close()
 
 	line := "\n# FGM shell integration\n" + evalLine + "\n"
 	if _, err := f.WriteString(line); err != nil {
+		_ = f.Close()
 		return profilePath, false, fmt.Errorf("write %s: %w", profilePath, err)
+	}
+	if err := f.Close(); err != nil {
+		return profilePath, false, fmt.Errorf("close %s: %w", profilePath, err)
 	}
 
 	return profilePath, true, nil

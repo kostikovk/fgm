@@ -394,3 +394,115 @@ func TestCurrent_FallsBackToRemoteWhenNoStore(t *testing.T) {
 		t.Fatalf("LintSource = %q, want %q", selection.LintSource, "remote")
 	}
 }
+
+type stubLintCatalogProvider struct {
+	listCatalogLintVersionsFn func(ctx context.Context, goVersion string) ([]app.LintVersion, error)
+}
+
+func (s stubLintCatalogProvider) ListCatalogLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+	return s.listCatalogLintVersionsFn(ctx, goVersion)
+}
+
+func TestCurrent_UsesCatalogProviderWithoutCallingRemoteProvider(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should resolve compatible lint version from catalog without invoking remote provider when catalog provider is configured", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		service := New(Config{
+			GoResolver: stubGoResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", GoSource: "go.mod"}, nil
+				},
+			},
+			LintStore: stubLintStore{
+				listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+					return []string{"v2.13.0"}, nil
+				},
+			},
+			LintCatalogProvider: stubLintCatalogProvider{
+				listCatalogLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+					return []app.LintVersion{{Version: "v2.13.0", Recommended: true}}, nil
+				},
+			},
+			LintRemoteProvider: stubLintRemoteProvider{
+				listRemoteLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+					t.Fatal("LintRemoteProvider should not be called when LintCatalogProvider is configured")
+					return nil, nil
+				},
+			},
+		})
+
+		// Act
+		selection, err := service.Current(context.Background(), ".")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Current: %v", err)
+		}
+		if selection.LintVersion != "v2.13.0" || selection.LintSource != "local" {
+			t.Fatalf("selection = %+v, want LintVersion=v2.13.0 LintSource=local", selection)
+		}
+	})
+
+	t.Run("should propagate error when catalog provider fails", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		service := New(Config{
+			GoResolver: stubGoResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", GoSource: "go.mod"}, nil
+				},
+			},
+			LintCatalogProvider: stubLintCatalogProvider{
+				listCatalogLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+					return nil, fmt.Errorf("catalog decode failed")
+				},
+			},
+		})
+
+		// Act
+		_, err := service.Current(context.Background(), ".")
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected error from LintCatalogProvider, got nil")
+		}
+	})
+
+	t.Run("should return recommended catalog version with remote source when not installed locally", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		service := New(Config{
+			GoResolver: stubGoResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", GoSource: "go.mod"}, nil
+				},
+			},
+			LintStore: stubLintStore{
+				listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+					return nil, nil
+				},
+			},
+			LintCatalogProvider: stubLintCatalogProvider{
+				listCatalogLintVersionsFn: func(ctx context.Context, goVersion string) ([]app.LintVersion, error) {
+					return []app.LintVersion{{Version: "v2.13.0", Recommended: true}}, nil
+				},
+			},
+		})
+
+		// Act
+		selection, err := service.Current(context.Background(), ".")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Current: %v", err)
+		}
+		if selection.LintVersion != "v2.13.0" || selection.LintSource != "remote" {
+			t.Fatalf("selection = %+v, want LintVersion=v2.13.0 LintSource=remote", selection)
+		}
+	})
+}

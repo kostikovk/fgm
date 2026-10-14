@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 
 	"github.com/kostikovk/fgm/internal/toolhint"
 )
@@ -36,7 +37,7 @@ func (s *Store) ListLocalLintVersions(ctx context.Context) ([]string, error) {
 
 	versions := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 

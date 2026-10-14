@@ -13,16 +13,8 @@ func FindModulePath(workDir string) string {
 	dir := workDir
 	for {
 		modPath := filepath.Join(dir, "go.mod")
-		if f, err := os.Open(modPath); err == nil {
-			defer f.Close()
-			scanner := bufio.NewScanner(f)
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if strings.HasPrefix(line, "module ") {
-					return strings.TrimSpace(strings.TrimPrefix(line, "module"))
-				}
-			}
-			return ""
+		if modulePath, ok := readModulePathFile(modPath); ok {
+			return modulePath
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -30,4 +22,23 @@ func FindModulePath(workDir string) string {
 		}
 		dir = parent
 	}
+}
+
+func readModulePathFile(modPath string) (string, bool) {
+	f, err := os.Open(modPath)
+	if err != nil {
+		return "", false
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "module ") {
+			return strings.TrimSpace(strings.TrimPrefix(line, "module")), true
+		}
+	}
+	return "", true
 }

@@ -68,15 +68,17 @@ func (i *Installer) InstallGoVersion(ctx context.Context, version string) (strin
 	if err != nil {
 		return "", fmt.Errorf("create temp archive: %w", err)
 	}
+	tempArchivePath := tempArchive.Name()
 	defer func() {
-		_ = os.Remove(tempArchive.Name())
-	}()
-	defer func() {
-		_ = tempArchive.Close()
+		_ = os.Remove(tempArchivePath)
 	}()
 
 	if err := i.downloadArchive(ctx, arch, tempArchive); err != nil {
+		_ = tempArchive.Close()
 		return "", err
+	}
+	if err := tempArchive.Close(); err != nil {
+		return "", fmt.Errorf("close temp archive: %w", err)
 	}
 
 	tempExtractDir, err := os.MkdirTemp("", "fgm-go-extract-*")
@@ -87,7 +89,7 @@ func (i *Installer) InstallGoVersion(ctx context.Context, version string) (strin
 		_ = os.RemoveAll(tempExtractDir)
 	}()
 
-	if err := archive.Extract(tempArchive.Name(), tempExtractDir); err != nil {
+	if err := archive.Extract(tempArchivePath, tempExtractDir); err != nil {
 		return "", err
 	}
 
@@ -102,7 +104,7 @@ func (i *Installer) InstallGoVersion(ctx context.Context, version string) (strin
 	if err := os.RemoveAll(installDir); err != nil {
 		return "", fmt.Errorf("prepare install directory: %w", err)
 	}
-	if err := os.Rename(extractedGoDir, installDir); err != nil {
+	if err := archive.MoveAtomically(extractedGoDir, installDir); err != nil {
 		return "", fmt.Errorf("move Go installation into place: %w", err)
 	}
 
