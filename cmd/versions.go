@@ -53,8 +53,9 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			ui := uiFromCmd(cmd)
 			if local && len(versions) == 0 {
-				_, err := fmt.Fprintln(cmd.OutOrStdout(), "No local Go versions installed.")
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatEmptyNotice("No local Go versions installed."))
 				return err
 			}
 
@@ -71,10 +72,7 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			}
 
 			for _, version := range versions {
-				line := version
-				if version == currentVersion {
-					line = "* " + version
-				}
+				line := ui.FormatVersionLine(version, version == currentVersion, "current")
 				if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
 					return err
 				}
@@ -106,6 +104,7 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				local = true
 			}
 
+			ui := uiFromCmd(cmd)
 			if local {
 				if application.LintStore == nil {
 					return fmt.Errorf("local golangci-lint version store is not configured")
@@ -116,11 +115,11 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 					return err
 				}
 				if len(versions) == 0 {
-					_, err := fmt.Fprintln(cmd.OutOrStdout(), "No local golangci-lint versions installed.")
+					_, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatEmptyNotice("No local golangci-lint versions installed."))
 					return err
 				}
 				for _, version := range versions {
-					if _, err := fmt.Fprintln(cmd.OutOrStdout(), version); err != nil {
+					if _, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatVersionLine(version, false, "")); err != nil {
 						return err
 					}
 				}
@@ -151,10 +150,7 @@ func newVersionsLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			}
 
 			for _, version := range versions {
-				line := version.Version
-				if version.Recommended {
-					line = "* " + line
-				}
+				line := ui.FormatVersionLine(version.Version, version.Recommended, "recommended")
 				if _, err := fmt.Fprintln(cmd.OutOrStdout(), line); err != nil {
 					return err
 				}

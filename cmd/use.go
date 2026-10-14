@@ -50,12 +50,8 @@ func newUseGoCmd(application *app.App) *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintf(
-				cmd.OutOrStdout(),
-				"Selected Go %s as the global default.\nAdd %s to PATH ahead of other Go installations.\n",
-				version,
-				application.GoStore.ShimDir(),
-			)
+			ui := uiFromCmd(cmd)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), ui.FormatUseGoGlobal(version, application.GoStore.ShimDir()))
 			return err
 		},
 	}

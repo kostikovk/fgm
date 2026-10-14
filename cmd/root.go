@@ -27,14 +27,26 @@ func resolveWorkDir(v *viper.Viper) (string, error) {
 
 // NewRootCmd builds the root Cobra command for fgm.
 func NewRootCmd(application *app.App) *cobra.Command {
+	return NewRootCmdWithUI(application, UIOptions{})
+}
+
+// NewRootCmdWithUI builds the root Cobra command with explicit UI capability options.
+func NewRootCmdWithUI(application *app.App, opts UIOptions) *cobra.Command {
 	v := viper.New()
 	v.SetEnvPrefix("FGM")
 	v.AutomaticEnv()
 	v.SetDefault(flagChdir, ".")
 
 	rootCmd := &cobra.Command{
-		Use:   "fgm",
-		Short: "Manage Go and golangci-lint toolchains",
+		Use:          "fgm",
+		Short:        "Manage Go and golangci-lint toolchains",
+		SilenceUsage: true,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
+		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
+			cmd.SetContext(withUIOptions(cmd.Context(), opts))
+		},
 	}
 
 	rootCmd.PersistentFlags().String(flagChdir, ".", "working directory for repo resolution")
@@ -55,6 +67,8 @@ func NewRootCmd(application *app.App) *cobra.Command {
 	rootCmd.AddCommand(newVersionsCmd(application, v))
 	rootCmd.AddCommand(newShimCmd(application))
 	rootCmd.AddCommand(newLintCmd(application, v))
+
+	configureFangHelp(rootCmd, opts)
 
 	return rootCmd
 }

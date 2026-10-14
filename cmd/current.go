@@ -25,11 +25,19 @@ func newCurrentCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 
-			if _, err := fmt.Fprintln(cmd.OutOrStdout(), formatCurrentLine("go", selection.GoVersion, selection.GoSource)); err != nil {
+			ui := uiFromCmd(cmd)
+			colWidth := len("go")
+			if selection.LintVersion != "" {
+				colWidth = len("golangci-lint")
+			}
+
+			goLine := ui.FormatCurrentLine("go", selection.GoVersion, sourceLabel(selection.GoSource), colWidth)
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), goLine); err != nil {
 				return err
 			}
 			if selection.LintVersion != "" {
-				if _, err := fmt.Fprintln(cmd.OutOrStdout(), formatCurrentLine("golangci-lint", selection.LintVersion, selection.LintSource)); err != nil {
+				lintLine := ui.FormatCurrentLine("golangci-lint", selection.LintVersion, sourceLabel(selection.LintSource), colWidth)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), lintLine); err != nil {
 					return err
 				}
 			}

@@ -35,7 +35,15 @@ func newRemoveGoCmd(application *app.App) *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Removed Go %s from %s\n", version, removedPath)
+			ui := uiFromCmd(cmd)
+			msg := ui.FormatOutcome(
+				fmt.Sprintf("Removed Go %s from %s", version, removedPath),
+				"Removed",
+				"Go",
+				version,
+				"from "+removedPath,
+			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return err
 		},
 	}
@@ -57,7 +65,15 @@ func newRemoveLintCmd(application *app.App) *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Removed golangci-lint %s from %s\n", version, removedPath)
+			ui := uiFromCmd(cmd)
+			msg := ui.FormatOutcome(
+				fmt.Sprintf("Removed golangci-lint %s from %s", version, removedPath),
+				"Removed",
+				"golangci-lint",
+				version,
+				"from "+removedPath,
+			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return err
 		},
 	}

@@ -33,8 +33,9 @@ func newDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 
+			ui := uiFromCmd(cmd)
 			for _, f := range findings {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", f.Severity, f.Message); err != nil {
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatFinding(f.Severity, f.Message)); err != nil {
 					return err
 				}
 			}
@@ -43,7 +44,8 @@ func newDoctorCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				// Print hint for fixable issues.
 				for _, f := range findings {
 					if f.FixKind == "shell_profile" {
-						if _, err := fmt.Fprintln(cmd.OutOrStdout(), `Run: eval "$(fgm env)" or use --fix to add it to your shell profile`); err != nil {
+						hint := `Run: eval "$(fgm env)" or use --fix to add it to your shell profile`
+						if _, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatEmptyNotice(hint)); err != nil {
 							return err
 						}
 					}
@@ -91,14 +93,24 @@ func applyShellProfileFix(cmd *cobra.Command, application *app.App) error {
 		return fmt.Errorf("failed to install shell profile: %w", err)
 	}
 
+	ui := uiFromCmd(cmd)
 	if modified {
-		if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Added shell integration to %s\n", profilePath); err != nil {
+		addedLine := ui.FormatOutcome(
+			fmt.Sprintf("Added shell integration to %s", profilePath),
+			"Added",
+			"shell integration",
+			"",
+			"to "+profilePath,
+		)
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), addedLine); err != nil {
 			return err
 		}
-		_, err = fmt.Fprintf(cmd.OutOrStdout(), "Restart your shell or run: source %s\n", profilePath)
+		restartLine := ui.FormatEmptyNotice(fmt.Sprintf("Restart your shell or run: source %s", profilePath))
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), restartLine)
 		return err
 	}
-	_, err = fmt.Fprintf(cmd.OutOrStdout(), "Shell integration already present in %s\n", profilePath)
+	presentLine := ui.FormatEmptyNotice(fmt.Sprintf("Shell integration already present in %s", profilePath))
+	_, err = fmt.Fprintln(cmd.OutOrStdout(), presentLine)
 	return err
 }
 

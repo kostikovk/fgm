@@ -44,7 +44,15 @@ func newPinLintCmd(v *viper.Viper) *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Pinned golangci-lint %s in %s\n", version, path)
+			ui := uiFromCmd(cmd)
+			msg := ui.FormatOutcome(
+				fmt.Sprintf("Pinned golangci-lint %s in %s", version, path),
+				"Pinned",
+				"golangci-lint",
+				version,
+				"in "+path,
+			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return err
 		},
 	}

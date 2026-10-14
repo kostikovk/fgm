@@ -31,6 +31,29 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 > [!TIP]
 > `fgm current` shows where each version was resolved from, e.g. `go 1.25.0 (go.mod)` or `golangci-lint v2.11.2 (config)`.
 
+## Terminal output and script compatibility
+
+When writing to an interactive TTY (with `NO_COLOR` and `CI` unset and `TERM != dumb`), `fgm` renders styled help (via [Fang](https://github.com/charmbracelet/fang)) and aligned, status-tagged output (via [Lip Gloss](https://github.com/charmbracelet/lipgloss)):
+
+```text
+$ fgm current
+go             1.27.2  (go.mod)
+golangci-lint  v2.13.0  (local)
+
+$ fgm versions go --local
+* 1.27.2  (current)
+  1.26.9
+
+$ fgm doctor
+✓ OK  global Go version is installed: 1.27.2
+✓ OK  shim dir is on PATH: ~/.local/share/fgm/shims
+✓ OK  fgm is available on PATH
+✓ OK  selected Go version is installed: 1.27.2
+✓ OK  selected golangci-lint version is installed: v2.13.0
+```
+
+When `stdout` or `stderr` is piped/redirected, or when `NO_COLOR` is non-empty, `CI` is non-empty, or `TERM=dumb`, `fgm` automatically disables ANSI sequences and preserves the exact machine-readable plain-text format (`go 1.27.2 (go.mod)`, `* 1.27.2`, `OK ...` / `WARN ...`). `fgm env`, `fgm version`, `fgm exec`, and `fgm __shim` never add UI styling to their payload streams.
+
 ## Execution and imports
 
 ### Execution PATH

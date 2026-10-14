@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"testing"
 
+	"github.com/kostikovk/fgm/cmd"
 	"github.com/kostikovk/fgm/internal/app"
 )
 
@@ -103,6 +105,41 @@ func TestMainWritesExecuteErrorAndExits(t *testing.T) {
 	if got := stderr.String(); got != "execute failed\n" {
 		t.Fatalf("stderr = %q, want %q", got, "execute failed\n")
 	}
+}
+
+func TestMainDoesNotDuplicateAlreadyPrintedError(t *testing.T) {
+	t.Run("should print error only once and exit with status 1 when RootRunner already rendered the error", func(t *testing.T) {
+		// Arrange
+		var stderr bytes.Buffer
+		restore := stubMainGlobals(
+			func() (string, error) { return t.TempDir(), nil },
+			func(application *app.App) rootCommand {
+				opts := cmd.UIOptions{
+					Getenv:     func(string) string { return "" },
+					IsTerminal: func(io.Writer) bool { return false },
+				}
+				root := cmd.NewRootCmdWithUI(application, opts)
+				root.SetOut(&bytes.Buffer{})
+				root.SetErr(&stderr)
+				root.SetArgs([]string{"use", "go", "1.27.2"})
+				return cmd.NewRootRunner(root, opts)
+			},
+			func(string) string { return "" },
+		)
+		defer restore()
+		stderrWriter = &stderr
+
+		// Act
+		exitCode := runMainAndCaptureExit(t)
+
+		// Assert
+		if exitCode != 1 {
+			t.Fatalf("exitCode = %d, want 1", exitCode)
+		}
+		if got := stderr.String(); got != "only --global is supported for now\n" {
+			t.Fatalf("stderr = %q, want exact single error line", got)
+		}
+	})
 }
 
 func stubMainGlobals(

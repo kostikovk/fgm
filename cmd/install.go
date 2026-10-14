@@ -39,7 +39,15 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Installed Go %s to %s\n", selection.GoVersion, goInstallPath); err != nil {
+			ui := uiFromCmd(cmd)
+			goMsg := ui.FormatOutcome(
+				fmt.Sprintf("Installed Go %s to %s", selection.GoVersion, goInstallPath),
+				"Installed",
+				"Go",
+				selection.GoVersion,
+				"to "+goInstallPath,
+			)
+			if _, err := fmt.Fprintln(cmd.OutOrStdout(), goMsg); err != nil {
 				return err
 			}
 
@@ -51,12 +59,14 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(
-				cmd.OutOrStdout(),
-				"Installed golangci-lint %s to %s\n",
+			lintMsg := ui.FormatOutcome(
+				fmt.Sprintf("Installed golangci-lint %s to %s", selection.LintVersion, lintInstallPath),
+				"Installed",
+				"golangci-lint",
 				selection.LintVersion,
-				lintInstallPath,
+				"to "+lintInstallPath,
 			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
 			return err
 		},
 	}
@@ -83,7 +93,15 @@ func newInstallGoCmd(application *app.App) *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Installed Go %s to %s\n", version, installPath)
+			ui := uiFromCmd(cmd)
+			msg := ui.FormatOutcome(
+				fmt.Sprintf("Installed Go %s to %s", version, installPath),
+				"Installed",
+				"Go",
+				version,
+				"to "+installPath,
+			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return err
 		},
 	}
@@ -105,7 +123,15 @@ func newInstallLintCmd(application *app.App) *cobra.Command {
 				return err
 			}
 
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Installed golangci-lint %s to %s\n", version, installPath)
+			ui := uiFromCmd(cmd)
+			msg := ui.FormatOutcome(
+				fmt.Sprintf("Installed golangci-lint %s to %s", version, installPath),
+				"Installed",
+				"golangci-lint",
+				version,
+				"to "+installPath,
+			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return err
 		},
 	}

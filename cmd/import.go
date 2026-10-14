@@ -47,18 +47,33 @@ func newImportAutoCmd(application *app.App) *cobra.Command {
 				}
 			}
 
+			ui := uiFromCmd(cmd)
 			if len(importedGo) == 0 && len(importedLint) == 0 {
-				_, err := fmt.Fprintln(cmd.OutOrStdout(), "No Go or golangci-lint installations were imported.")
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatEmptyNotice("No Go or golangci-lint installations were imported."))
 				return err
 			}
 
 			for _, item := range importedGo {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Imported Go %s from %s\n", item.Version, item.Path); err != nil {
+				msg := ui.FormatOutcome(
+					fmt.Sprintf("Imported Go %s from %s", item.Version, item.Path),
+					"Imported",
+					"Go",
+					item.Version,
+					"from "+item.Path,
+				)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
 					return err
 				}
 			}
 			for _, item := range importedLint {
-				if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Imported golangci-lint %s from %s\n", item.Version, item.Path); err != nil {
+				msg := ui.FormatOutcome(
+					fmt.Sprintf("Imported golangci-lint %s from %s", item.Version, item.Path),
+					"Imported",
+					"golangci-lint",
+					item.Version,
+					"from "+item.Path,
+				)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
 					return err
 				}
 			}

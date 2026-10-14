@@ -43,7 +43,12 @@ var (
 	getEnv                  = os.Getenv
 	stderrWriter  io.Writer = os.Stderr
 	newRootCmd              = func(application *app.App) rootCommand {
-		return cmd.NewRootCmd(application)
+		opts := cmd.UIOptions{Getenv: getEnv}
+		root := cmd.NewRootCmdWithUI(application, opts)
+		if stderrWriter != nil {
+			root.SetErr(stderrWriter)
+		}
+		return cmd.NewRootRunner(root, opts)
 	}
 	exitMain = os.Exit
 )
@@ -52,7 +57,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	if err := run(ctx, stderrWriter, getEnv, defaultGoRoot, newRootCmd); err != nil {
 		stop()
-		_, _ = fmt.Fprintln(stderrWriter, err)
+		if !cmd.IsPrintedError(err) {
+			_, _ = fmt.Fprintln(stderrWriter, err)
+		}
 		exitMain(1)
 	}
 	stop()

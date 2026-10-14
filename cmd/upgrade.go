@@ -55,25 +55,54 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				WithLint: withLint,
 			}
 
+			ui := uiFromCmd(cmd)
 			if global {
 				result, err := application.GoUpgrader.UpgradeGlobal(cmd.Context(), options)
 				if err != nil {
 					return err
 				}
 				if result.DryRun {
-					if _, err = fmt.Fprintf(cmd.OutOrStdout(), "Would upgrade global Go to %s\n", result.Version); err != nil {
+					goMsg := ui.FormatOutcome(
+						fmt.Sprintf("Would upgrade global Go to %s", result.Version),
+						"Would upgrade global to",
+						"Go",
+						result.Version,
+						"",
+					)
+					if _, err = fmt.Fprintln(cmd.OutOrStdout(), goMsg); err != nil {
 						return err
 					}
 					if result.LintVersion != "" {
-						_, err = fmt.Fprintf(cmd.OutOrStdout(), "Would install golangci-lint %s\n", result.LintVersion)
+						lintMsg := ui.FormatOutcome(
+							fmt.Sprintf("Would install golangci-lint %s", result.LintVersion),
+							"Would install",
+							"golangci-lint",
+							result.LintVersion,
+							"",
+						)
+						_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
 					}
 					return err
 				}
-				if _, err = fmt.Fprintf(cmd.OutOrStdout(), "Upgraded global Go to %s\n", result.Version); err != nil {
+				goMsg := ui.FormatOutcome(
+					fmt.Sprintf("Upgraded global Go to %s", result.Version),
+					"Upgraded global to",
+					"Go",
+					result.Version,
+					"",
+				)
+				if _, err = fmt.Fprintln(cmd.OutOrStdout(), goMsg); err != nil {
 					return err
 				}
 				if result.LintVersion != "" {
-					_, err = fmt.Fprintf(cmd.OutOrStdout(), "Installed golangci-lint %s\n", result.LintVersion)
+					lintMsg := ui.FormatOutcome(
+						fmt.Sprintf("Installed golangci-lint %s", result.LintVersion),
+						"Installed",
+						"golangci-lint",
+						result.LintVersion,
+						"",
+					)
+					_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
 				}
 				return err
 			}
@@ -83,19 +112,47 @@ func newUpgradeGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 			if result.DryRun {
-				if _, err = fmt.Fprintf(cmd.OutOrStdout(), "Would upgrade project Go to %s in %s\n", result.Version, result.Path); err != nil {
+				goMsg := ui.FormatOutcome(
+					fmt.Sprintf("Would upgrade project Go to %s in %s", result.Version, result.Path),
+					"Would upgrade project to",
+					"Go",
+					result.Version,
+					"in "+result.Path,
+				)
+				if _, err = fmt.Fprintln(cmd.OutOrStdout(), goMsg); err != nil {
 					return err
 				}
 				if result.LintVersion != "" {
-					_, err = fmt.Fprintf(cmd.OutOrStdout(), "Would install golangci-lint %s\n", result.LintVersion)
+					lintMsg := ui.FormatOutcome(
+						fmt.Sprintf("Would install golangci-lint %s", result.LintVersion),
+						"Would install",
+						"golangci-lint",
+						result.LintVersion,
+						"",
+					)
+					_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
 				}
 				return err
 			}
-			if _, err = fmt.Fprintf(cmd.OutOrStdout(), "Upgraded project Go to %s in %s\n", result.Version, result.Path); err != nil {
+			goMsg := ui.FormatOutcome(
+				fmt.Sprintf("Upgraded project Go to %s in %s", result.Version, result.Path),
+				"Upgraded project to",
+				"Go",
+				result.Version,
+				"in "+result.Path,
+			)
+			if _, err = fmt.Fprintln(cmd.OutOrStdout(), goMsg); err != nil {
 				return err
 			}
 			if result.LintVersion != "" {
-				_, err = fmt.Fprintf(cmd.OutOrStdout(), "Installed golangci-lint %s\n", result.LintVersion)
+				lintMsg := ui.FormatOutcome(
+					fmt.Sprintf("Installed golangci-lint %s", result.LintVersion),
+					"Installed",
+					"golangci-lint",
+					result.LintVersion,
+					"",
+				)
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), lintMsg)
 			}
 			return err
 		},
@@ -138,11 +195,26 @@ func newUpgradeLintCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 
+			ui := uiFromCmd(cmd)
 			if result.DryRun {
-				_, err = fmt.Fprintf(cmd.OutOrStdout(), "Would install golangci-lint %s (for Go %s)\n", result.Version, result.GoVersion)
+				msg := ui.FormatOutcome(
+					fmt.Sprintf("Would install golangci-lint %s (for Go %s)", result.Version, result.GoVersion),
+					"Would install",
+					"golangci-lint",
+					result.Version,
+					fmt.Sprintf("(for Go %s)", result.GoVersion),
+				)
+				_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "Installed golangci-lint %s (for Go %s)\n", result.Version, result.GoVersion)
+			msg := ui.FormatOutcome(
+				fmt.Sprintf("Installed golangci-lint %s (for Go %s)", result.Version, result.GoVersion),
+				"Installed",
+				"golangci-lint",
+				result.Version,
+				fmt.Sprintf("(for Go %s)", result.GoVersion),
+			)
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return err
 		},
 	}
