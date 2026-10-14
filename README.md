@@ -1,257 +1,64 @@
 # Fast Go Manager (fgm)
 
-> Set up and manage Go development environments with best-practice tooling — from a single binary.
+Manage project Go versions and compatible `golangci-lint` toolchains from one CLI.
 
-FGM is a CLI tool that manages Go toolchains, golangci-lint compatibility, and lint configuration generation. It handles smart Go version resolution using native metadata (`go.mod`, `go.work`, `toolchain` directives), shell shims for transparent routing, an embedded golangci-lint compatibility catalog, and project-aware lint config generation.
+FGM reads `go.work`, `go.mod`, and `toolchain` directives to select Go for each repository. It installs missing toolchains, imports existing installations, and generates or audits lint configuration.
 
-## Features
+- Use the Go version your project already declares.
+- Select a compatible linter automatically or keep an explicit project pin.
+- Run project commands with the selected tools through `fgm exec`.
+- Route plain `go` commands through optional shell shims on macOS and Linux.
 
-- **Smart version resolution** from `go.work`, `go.mod`, and `toolchain` directives — no custom version files
-- **Global default** for directories outside Go projects
-- **Shell environment & Unix shims** — `fgm env` renders setup snippets for `bash`, `zsh`, `fish`, and `powershell`, while `go` shim script generation (`shims/go`) is supported on macOS and Linux
-- **golangci-lint compatibility** — combines an embedded catalog with remote GitHub release lookups to pair Go versions with compatible lint versions
-- **Lint config generation** via `fgm lint init` with preset and import-ordering support
-- **Lint config diagnostics** via `fgm lint doctor`
-- **Import existing installs** from common system locations via symlinks
-- **Upgrade workflows** with `--dry-run` preview, `--to` target selection, and optional `--with-lint` matching
-- **Health diagnostics** via `fgm doctor` (including `--fix` for shell profile integration on `zsh`, `bash`, and `fish`)
+## Get started
 
-## Install
+Choose manual installation or let your AI coding agent set up the project.
 
-**Homebrew** (macOS/Linux):
+### Install manually
+
+With Homebrew on macOS or Linux:
 
 ```bash
 brew install kostikovk/fgm/fgm
 ```
 
-**Install script:**
+Or use the install script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/install.sh | sh
 ```
 
-**From source:**
+The script installs to `~/.local/bin`; ensure that directory is on `PATH`. See [installation](docs/installation.md) for requirements, release downloads, building from source, shell setup, and removal.
+
+### Set up your project with one prompt
+
+Open your Go repository in an AI coding agent and copy the [setup prompt](docs/ai-agents.md#set-up-your-project-with-one-prompt). It asks the agent to install FGM and its skill, inspect the repository, configure Go and lint tooling, run checks, and report each stage's results or blockers. The agent needs terminal, file, and network access.
+
+## Quick start
+
+From an existing Go module or workspace:
 
 ```bash
-git clone https://github.com/kostikovk/fgm.git
-cd fgm
-go build -o ~/.local/bin/fgm .
+cd /path/to/your-go-project
+fgm import auto                 # Reuse existing Go and linter installations
+fgm current                     # Inspect selected versions and their sources
+fgm install                     # Install missing selected toolchains
+fgm exec -- go test ./...        # Run with the project's Go version
 ```
 
-## Uninstall
+FGM uses project metadata before the global default. This workflow requires no shell profile changes. [Getting started](docs/getting-started.md) covers lint setup, verification, and workspace directories.
 
-**Homebrew:**
+## Documentation
 
-```bash
-brew uninstall fgm
-brew untap kostikovk/fgm
-```
-
-**Remove managed toolchains and state:**
-
-```bash
-rm -rf "${XDG_DATA_HOME:-$HOME/.local/share}/fgm"
-```
-
-**Remove shell integration** — delete the `eval "$(fgm env)"` line from your shell profile (`.zshrc`, `.bashrc`, etc.).
-
-## Quick Start
-
-```bash
-# Import existing Go and golangci-lint installations
-fgm import auto
-
-# Set a global default (and generate Unix shims)
-fgm use go <version> --global
-
-# Add shell integration (or run: fgm doctor --fix)
-eval "$(fgm env)"
-
-# Verify setup
-fgm doctor
-
-# Install the resolved Go and golangci-lint versions for the current repo
-fgm install
-
-# Generate a starter golangci-lint config for the current project
-fgm lint init --preset standard
-```
-
-Inside a repository, FGM automatically resolves the correct Go version:
-
-```bash
-cd /path/to/repo
-fgm current        # Show resolved Go and lint versions
-fgm exec -- go test ./...
-```
-
-## Version Resolution
-
-Inside a repository, FGM resolves Go in this order:
-
-1. Nearest `go.work` (`toolchain` directive takes precedence over `go`)
-2. Nearest `go.mod` (`toolchain` directive takes precedence over `go`)
-3. Global default when no project metadata is found
-
-### Working Directory (`--chdir` and `FGM_CHDIR`)
-
-All workspace-aware commands accept `--chdir <dir>` (or the `FGM_CHDIR` environment variable when `--chdir` is omitted; an explicit `--chdir` flag takes precedence over `FGM_CHDIR`). FGM normalizes the working directory to an absolute path before walking ancestor directories for `go.work`, `go.mod`, `.fgm.toml`, and `.golangci.yml`/`.golangci.yaml`, and uses that directory as the child process working directory in `fgm exec`.
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `fgm current` | Show resolved Go and lint versions with source labels |
-| `fgm doctor [--fix]` | Check installation health and environment (`--fix` adds shell integration to `zsh`/`bash`/`fish` profile) |
-| `fgm env` | Print shell setup (`--shell zsh\|bash\|fish\|powershell`) |
-| `fgm exec -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` |
-| `fgm import auto` | Auto-import existing Go and `golangci-lint` installations from system locations |
-| `fgm install` | Install resolved Go (and selected `golangci-lint`, if resolved) for the workspace |
-| `fgm install go <version>` | Install a specific Go version |
-| `fgm install golangci-lint <version>` | Install a specific `golangci-lint` version |
-| `fgm use go <version> --global` | Set global Go version and generate Unix shims |
-| `fgm versions go [--local\|--remote]` | List Go versions (defaults to `--local`) |
-| `fgm versions golangci-lint [--local\|--remote] [--go <ver>]` | List lint versions (defaults to `--local`; `--go` filters only with `--remote`) |
-| `fgm remove go <version>` | Remove an FGM-managed Go version |
-| `fgm remove golangci-lint <version>` | Remove an FGM-managed lint version |
-| `fgm pin golangci-lint <version\|auto>` | Pin lint version in `.fgm.toml` |
-| `fgm lint init` | Generate a `.golangci.yml` for the resolved Go version |
-| `fgm lint doctor` | Audit an existing `.golangci.yml` or `.golangci.yaml` for issues |
-| `fgm upgrade go (--global\|--project)` | Upgrade Go (`--dry-run`, `--to <ver>`, `--with-lint`) |
-| `fgm upgrade golangci-lint` | Upgrade `golangci-lint` (`--dry-run`, `--to <ver>`) |
-| `fgm version` | Show build info |
-
-> [!TIP]
-> `fgm current` shows where each version was resolved from, e.g. `go 1.25.0 (go.mod)` or `golangci-lint v2.11.2 (config)`.
-
-### Execution, Import, and Upgrade Notes
-
-- **`fgm exec` `PATH` contract:** The resolved Go version must be installed locally. If the workspace also selects a `golangci-lint` version and that binary is installed in the FGM store, its directory is prepended after Go (`selected Go` → `installed selected golangci-lint` → `inherited PATH`). If the selected `golangci-lint` version is not installed locally, `fgm exec` does not auto-install it and does not block unrelated commands; running `fgm exec -- golangci-lint ...` in that state will fall back to another `golangci-lint` on the inherited `PATH` or fail with a command lookup error if none is found.
-- **Importing existing installations (`fgm import auto`):** Imported Go installations are registered as directory symlinks (`go/<version>` → external `GOROOT`) and imported `golangci-lint` installations as binary symlinks (`golangci-lint/<version>/golangci-lint` → external binary). Imported versions remain valid only while the external source installation exists on disk; `fgm remove` removes only the symlink inside the FGM store.
-- **Shell profile auto-setup (`fgm doctor --fix`):** When the FGM shim directory is missing from `PATH`, `fgm doctor --fix` appends the shell integration snippet to `~/.zshrc` (`zsh`), `~/.bash_profile` on macOS or `~/.bashrc` on Linux (`bash`), or `~/.config/fish/config.fish` (`fish`). It prompts for confirmation when `stdin` is an interactive terminal and applies the change automatically when `stdin` is non-terminal. Note that `fgm env --shell powershell` renders a PowerShell `PATH` snippet, but shim generation (`shims/go`) is not implemented on Windows.
-- **Upgrading Go and `golangci-lint`:** `fgm upgrade go` requires exactly one scope flag (`--global` or `--project`) and supports `--to <version>`, `--dry-run`, and `--with-lint` (`--with-lint` belongs only to `fgm upgrade go`). `fgm upgrade golangci-lint` supports `--dry-run` and `--to <version>`. Neither upgrade command rewrites `.fgm.toml` pins, and an explicit `--to <version>` on `fgm upgrade golangci-lint` is installed directly without catalog compatibility filtering.
-
-## Configuration
-
-FGM uses `.fgm.toml` for repository-level settings. Create or update it with:
-
-```bash
-fgm pin golangci-lint <version>
-# or let FGM pick a compatible version automatically
-fgm pin golangci-lint auto
-```
-
-`fgm pin` writes to the nearest existing `.fgm.toml` walking upward from the working directory; if none exists yet, it writes `.fgm.toml` in the nearest ancestor directory containing `go.work`, then `go.mod`, or the working directory itself. Pinning a specific version records that string directly without checking the compatibility catalog upfront (use `fgm doctor` to verify compatibility against the resolved Go version).
-
-Example `.fgm.toml`:
-
-```toml
-[toolchain]
-golangci_lint = "v2.11.2"
-```
-
-> [!IMPORTANT]
-> Remote `golangci-lint` compatibility resolution combines FGM's generated catalog in [`internal/golangcilint/compatibility.json`](./internal/golangcilint/compatibility.json) with live GitHub release lookups, rather than a complete offline historical matrix.
-
-## Lint Configuration
-
-Use `fgm lint init` to generate a `golangci-lint` v2 config at the project root:
-
-```bash
-fgm lint init
-fgm lint init --preset strict
-fgm lint init --with-imports
-fgm lint init --force
-```
-
-Available presets are `minimal`, `standard`, and `strict`. `fgm lint init` writes `.golangci.yml` in the nearest ancestor directory containing `go.work` or `go.mod` (or the working directory when neither exists) and checks only for an existing `.golangci.yml` unless `--force` is set.
-
-Use `fgm lint doctor` to inspect an existing YAML config:
-
-```bash
-fgm lint doctor
-```
-
-`fgm lint doctor` walks upward from the working directory looking for `.golangci.yml` or `.golangci.yaml` (preferring `.golangci.yml` when both exist in the same directory). It reports missing `version: "2"` metadata (`ERROR`), unknown linters (`WARN`), linters incompatible with the project's Go version (`WARN`), formatter/linter conflicts (`WARN`), and `INFO` recommendations for linters from the `standard` preset that are not yet enabled.
-
-## AI Coding Agents
-
-FGM ships a standalone [Agent Skill](https://agentskills.io/specification) at [`skills/fgm/SKILL.md`](./skills/fgm/SKILL.md) so AI coding agents can inspect, bootstrap, and run project toolchains deterministically in non-interactive shells without mutating host installations or shell profiles.
-
-### Agent Quick Start
-
-In non-interactive agent sessions (where `eval "$(fgm env)"` does not persist across separate tool calls), run workspace commands through `fgm --chdir <dir> exec --`:
-
-```bash
-# 1. Inspect resolved Go and golangci-lint versions and environment health
-fgm --chdir . current
-fgm --chdir . doctor
-
-# 2. Import existing system toolchains and install any missing workspace binaries
-fgm import auto
-fgm --chdir . install
-
-# 3. Execute Go, golangci-lint, or Make targets with the resolved toolchain on PATH
-fgm --chdir . exec -- go test ./...
-fgm --chdir . exec -- golangci-lint run ./...
-
-# 4. Audit existing lint config (inspect output lines; exits 0 even on ERROR findings)
-fgm --chdir . lint doctor
-```
-
-### Installing the `fgm` Skill for Your Agent
-
-Copy the `skills/fgm` directory from a tagged release or commit into your project's agent skill directory (having the `fgm` source repository elsewhere on disk does not automatically register the skill in another project):
-
-| Agent Client | Project Skill Directory |
+| I want to… | Read |
 |---|---|
-| [Claude Code](https://code.claude.com/docs/en/skills) | `.claude/skills/fgm/` |
-| [Codex](https://learn.chatgpt.com/docs/build-skills) | `.agents/skills/fgm/` |
-| [Pi](https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/docs/skills.md) | `.agents/skills/fgm/` (supported shared alias) |
-| [Cursor](https://cursor.com/docs/skills) | `.cursor/skills/fgm/` or `.agents/skills/fgm/` |
-| [Gemini CLI](https://geminicli.com/docs/cli/skills/) | `.gemini/skills/fgm/` or `.agents/skills/fgm/` |
+| Install, configure my shell, or uninstall FGM | [Installation](docs/installation.md) |
+| Set up an existing Go project and run checks | [Getting started](docs/getting-started.md) |
+| Set everything up through an AI agent | [AI coding agents and copyable prompt](docs/ai-agents.md) |
+| Look up commands, version rules, pins, or lint configuration | [CLI and configuration reference](docs/reference.md) |
+| Build or contribute to FGM | [Development](docs/development.md) |
 
-Example installation into a target repository's `.agents/skills/fgm/` directory:
+[Browse documentation](docs/README.md) · [Releases](https://github.com/kostikovk/fgm/releases) · [Report an issue](https://github.com/kostikovk/fgm/issues)
 
-```bash
-mkdir -p .agents/skills/fgm
-curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/skills/fgm/SKILL.md \
-  -o .agents/skills/fgm/SKILL.md
-```
+## License
 
-> [!NOTE]
-> The skill directory paths above reflect each client's documented skill discovery conventions (verified against client documentation on October 14, 2026). Runtime behavior and explicit invocation syntax depend on the installed client version.
-
-## Storage Layout
-
-FGM stores managed toolchains under `$XDG_DATA_HOME/fgm` (default: `~/.local/share/fgm`):
-
-```text
-fgm/
-  go/
-    1.22.0/bin/go
-    1.23.0/bin/go
-  golangci-lint/
-    v2.1.0/golangci-lint
-  shims/
-    go
-  state/
-    global-go-version
-```
-
-## Development
-
-```bash
-make build        # Build binary to tmp/fgm
-make test         # Run all tests
-make fmt          # Format Go files
-make pre-commit   # Run fix, test, tidy, build
-make cover-html   # Generate HTML coverage report
-```
-
-Run directly:
-
-```bash
-go run . --help
-go run . current --chdir .
-```
+[MIT](LICENSE).

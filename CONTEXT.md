@@ -18,7 +18,8 @@ Fast Go Manager (`fgm`) is a single-binary Go CLI that manages Go toolchains, `g
 | [`skills/fgm/SKILL.md`](skills/fgm/SKILL.md) | Distributable standalone `fgm` skill for AI coding agents (mirrored locally in `.agents/skills/fgm/SKILL.md`) |
 | `.agents/skills/*/SKILL.md` | Task-specific engineering workflows, boundaries, and reference routing |
 | `.agents/skills/*/references/*.md` | Focused technical procedures and language/framework guidance |
-| [README.md](README.md) | User-facing CLI documentation, installation, and quick-start examples |
+| [README.md](README.md) | User-facing overview, installation entrypoints, quick-start example, and documentation navigation |
+| [Documentation](docs/README.md) | Installation and project setup guides, AI agent setup prompt, CLI/configuration reference, and development instructions |
 | This file | Project purpose, domain terms, layered architecture, package ownership, and invariants |
 
 Treat the working tree, `go.mod`, and `Makefile` as the source of truth for current versions, commands, and file availability.
