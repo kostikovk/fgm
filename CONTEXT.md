@@ -20,6 +20,7 @@ Fast Go Manager (`fgm`) is a single-binary Go CLI that manages Go toolchains, `g
 | `.agents/skills/*/references/*.md` | Focused technical procedures and language/framework guidance |
 | [README.md](README.md) | User-facing overview, installation entrypoints, quick-start example, and documentation navigation |
 | [Documentation](docs/README.md) | Installation and project setup guides, AI agent setup prompt, CLI/configuration reference, and development instructions |
+| `site/` | Static landing page (`Next.js 16`, `TypeScript 7`, `output: "export"`, `basePath: "/fgm"`) and Playwright E2E test suite (`site/e2e/landing.spec.ts`) deployed via `.github/workflows/pages.yml` |
 | This file | Project purpose, domain terms, layered architecture, package ownership, and invariants |
 
 Treat the working tree, `go.mod`, and `Makefile` as the source of truth for current versions, commands, and file availability.

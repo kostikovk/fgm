@@ -18,3 +18,12 @@ coverage.out
 # Local environment files
 .env
 .env.*
+
+# Landing site (Next.js + Playwright) build & test artifacts
+site/node_modules/
+site/.next/
+site/out/
+site/playwright-report/
+site/test-results/
+site/next-env.d.ts
+site/tsconfig.tsbuildinfo
