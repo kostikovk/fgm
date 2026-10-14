@@ -77,6 +77,9 @@ func newVersionsGoCmd(application *app.App, v *viper.Viper) *cobra.Command {
 					return err
 				}
 			}
+			if remote {
+				refreshUpdateCache(cmd.Context(), application.FGMUpdateChecker)
+			}
 			return nil
 		},
 	}

@@ -68,6 +68,7 @@ func newInstallCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				}
 			}
 
+			refreshUpdateCache(cmd.Context(), application.FGMUpdateChecker)
 			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
@@ -105,6 +106,7 @@ func newInstallGoCmd(application *app.App) *cobra.Command {
 			if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
 				return err
 			}
+			refreshUpdateCache(cmd.Context(), application.FGMUpdateChecker)
 			return ensureShimsIfSupported(application.GoStore)
 		},
 	}
@@ -137,6 +139,7 @@ func newInstallLintCmd(application *app.App) *cobra.Command {
 			if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
 				return err
 			}
+			refreshUpdateCache(cmd.Context(), application.FGMUpdateChecker)
 			return ensureShimsIfSupported(application.GoStore)
 		},
 	}

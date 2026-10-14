@@ -51,7 +51,7 @@ FGM uses project metadata before the global default. This workflow requires no s
 
 | I want to… | Read |
 |---|---|
-| Install, configure my shell, or uninstall FGM | [Installation](docs/installation.md) |
+| Install, upgrade, configure my shell, or uninstall FGM | [Installation](docs/installation.md) |
 | Set up an existing Go project and run checks | [Getting started](docs/getting-started.md) |
 | Set everything up through an AI agent | [AI coding agents and copyable prompt](docs/ai-agents.md) |
 | Look up commands, version rules, pins, or lint configuration | [CLI and configuration reference](docs/reference.md) |

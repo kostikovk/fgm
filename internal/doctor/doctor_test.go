@@ -546,3 +546,101 @@ func TestDiagnose_IgnoresResolverErrorAndReturnsBaseDiagnostics(t *testing.T) {
 		t.Fatalf("joined = %q, want resolver errors to be ignored", joined)
 	}
 }
+
+type stubFGMUpdateChecker struct {
+	checkLatestFn  func(ctx context.Context) (app.FGMUpdateStatus, bool, error)
+	cachedNoticeFn func(ctx context.Context) (app.FGMUpdateStatus, bool)
+}
+
+func (s stubFGMUpdateChecker) CheckLatest(ctx context.Context) (app.FGMUpdateStatus, bool, error) {
+	if s.checkLatestFn == nil {
+		return app.FGMUpdateStatus{}, false, nil
+	}
+	return s.checkLatestFn(ctx)
+}
+
+func (s stubFGMUpdateChecker) CachedNotice(ctx context.Context) (app.FGMUpdateStatus, bool) {
+	if s.cachedNoticeFn == nil {
+		return app.FGMUpdateStatus{}, false
+	}
+	return s.cachedNoticeFn(ctx)
+}
+
+func TestDiagnose_ReportsFGMUpdateFinding(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should emit WARN finding with upgrade command when a newer FGM version is available", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		service := New(Config{
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+					return "1.27.2", true, nil
+				},
+				shimDirFn: func() string { return "/tmp/fgm/shims" },
+			},
+			FGMUpdateChecker: stubFGMUpdateChecker{
+				checkLatestFn: func(ctx context.Context) (app.FGMUpdateStatus, bool, error) {
+					return app.FGMUpdateStatus{
+						CurrentVersion:  "0.5.0",
+						LatestVersion:   "0.6.0",
+						UpdateAvailable: true,
+						UpgradeCommand:  "brew update && brew upgrade --cask fgm",
+					}, true, nil
+				},
+			},
+			PathEnv: "/tmp/fgm/shims",
+		})
+
+		// Act
+		findings, err := service.Diagnose(context.Background(), ".")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Diagnose: %v", err)
+		}
+		joined := findingsToString(findings)
+		want := `WARN fgm update available: 0.5.0 -> 0.6.0 (run "brew update && brew upgrade --cask fgm")`
+		if !strings.Contains(joined, want) {
+			t.Fatalf("joined = %q, want it to contain %q", joined, want)
+		}
+	})
+
+	t.Run("should emit OK finding when FGM is already up to date", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		service := New(Config{
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+					return "1.27.2", true, nil
+				},
+				shimDirFn: func() string { return "/tmp/fgm/shims" },
+			},
+			FGMUpdateChecker: stubFGMUpdateChecker{
+				checkLatestFn: func(ctx context.Context) (app.FGMUpdateStatus, bool, error) {
+					return app.FGMUpdateStatus{
+						CurrentVersion:  "0.5.0",
+						LatestVersion:   "0.5.0",
+						UpdateAvailable: false,
+					}, true, nil
+				},
+			},
+			PathEnv: "/tmp/fgm/shims",
+		})
+
+		// Act
+		findings, err := service.Diagnose(context.Background(), ".")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Diagnose: %v", err)
+		}
+		joined := findingsToString(findings)
+		want := "OK fgm is up to date: 0.5.0"
+		if !strings.Contains(joined, want) {
+			t.Fatalf("joined = %q, want it to contain %q", joined, want)
+		}
+	})
+}

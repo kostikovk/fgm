@@ -18,6 +18,7 @@ import (
 	"github.com/kostikovk/fgm/internal/doctor"
 	"github.com/kostikovk/fgm/internal/envsetup"
 	"github.com/kostikovk/fgm/internal/execenv"
+	"github.com/kostikovk/fgm/internal/fgmupdate"
 	"github.com/kostikovk/fgm/internal/goimport"
 	"github.com/kostikovk/fgm/internal/goinstall"
 	"github.com/kostikovk/fgm/internal/golangcilint"
@@ -127,11 +128,19 @@ func run(
 		LintCatalogProvider: lintReleaseProvider,
 		LintRemoteProvider:  lintReleaseProvider,
 	})
+	buildInfo := resolveBuildInfo(buildVersion, buildCommit, buildDate, readBuildInfo)
+	execPath, _ := os.Executable()
+	updateChecker := fgmupdate.New(fgmupdate.Config{
+		Root:           goRoot,
+		CurrentVersion: buildInfo.Version,
+		ExecutablePath: execPath,
+	})
 	doctorService := doctor.New(doctor.Config{
 		Resolver:           currentResolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		LintRemoteProvider: lintReleaseProvider,
+		FGMUpdateChecker:   updateChecker,
 		PathEnv:            getenv("PATH"),
 	})
 	executor := execenv.New(execenv.Config{
@@ -168,13 +177,14 @@ func run(
 			RemoteProvider: lintReleaseProvider,
 			Installer:      lintInstaller,
 		}),
-		BuildInfo:           resolveBuildInfo(buildVersion, buildCommit, buildDate, readBuildInfo),
+		BuildInfo:           buildInfo,
 		Doctor:              doctorService,
 		Executor:            executor,
 		EnvRenderer:         envRenderer,
 		ProfileInstaller:    envRenderer,
 		LintConfigGenerator: lintConfigService,
 		LintDoctor:          lintConfigService,
+		FGMUpdateChecker:    updateChecker,
 	}
 
 	return buildRoot(application).ExecuteContext(ctx)

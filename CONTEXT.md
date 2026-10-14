@@ -60,8 +60,9 @@ FGM follows a strict three-layer design:
 | `internal/envsetup` | Render shell setup scripts (`bash`, `zsh`, `fish`, `powershell`) and install shell integration into `zsh`, `bash`, and `fish` profiles (`ProfileInstaller`) |
 | `internal/shim` | Resolve the target Go and `golangci-lint` binary paths for shim execution |
 | `internal/execenv` | Execute external commands in the resolved working directory with `PATH` ordered as `selected Go` (required) → `installed selected golangci-lint` (prepended only when installed locally) → `inherited PATH`, without auto-installing missing toolchains |
-| `internal/doctor` | Run environment health checks and report actionable findings (including `shell_profile` fix hints handled by `fgm doctor --fix`) |
-| `internal/toolhint` | Format exact CLI recovery command hints (`fgm install go <version>`, `fgm install golangci-lint <version>`, `fgm exec -- <command>`) shared across stores, commands, and doctor diagnostics |
+| `internal/doctor` | Run environment health checks and report actionable findings (including `fgm` release update checks and `shell_profile` fix hints handled by `fgm doctor --fix`) |
+| `internal/fgmupdate` | Check and cache the latest `fgm` release on GitHub (`state/update-check.json`, 24h TTL) and provide non-blocking cached update notices for interactive TTY sessions (suppressed when `FGM_NO_UPDATE_NOTIFIER` is set) |
+| `internal/toolhint` | Format exact CLI recovery and self-upgrade command hints (`fgm install go <version>`, `fgm install golangci-lint <version>`, `fgm exec -- <command>`, `brew update && brew upgrade --cask fgm`) shared across stores, commands, and doctor diagnostics |
 | `internal/archive` | Archive extraction (`.tar.gz`, `.zip`), cross-filesystem atomic move fallback (`MoveAtomically` on `EXDEV`), and download progress reporting |
 | `internal/versionutil` | Semantic/Go version parsing, comparison, normalization, and binary discovery helpers |
 | `internal/testutil` | Shared command-execution test helpers for `cmd/` and integration tests |
@@ -87,6 +88,7 @@ fgm/
   shims/go
   shims/golangci-lint
   state/global-go-version
+  state/update-check.json
 ```
 
 ### Build metadata injection

@@ -177,4 +177,5 @@ fgm/
     golangci-lint
   state/
     global-go-version
+    update-check.json
 ```

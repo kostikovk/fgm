@@ -4,7 +4,7 @@
 
 ## Start here
 
-- [Installation](installation.md): install FGM, configure shell integration, or remove it.
+- [Installation](installation.md): install or upgrade FGM, configure shell integration, or remove it.
 - [Getting started](getting-started.md): install an existing project's tools and run tests, builds, and lint checks.
 - [AI coding agents](ai-agents.md): copy a setup prompt or install the standalone skill manually.
 

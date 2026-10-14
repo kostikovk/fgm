@@ -74,6 +74,20 @@ type BuildInfo struct {
 	Date    string
 }
 
+// FGMUpdateStatus describes whether a newer FGM CLI version is available.
+type FGMUpdateStatus struct {
+	CurrentVersion  string
+	LatestVersion   string
+	UpdateAvailable bool
+	UpgradeCommand  string
+}
+
+// FGMUpdateChecker checks or reads cached FGM release availability.
+type FGMUpdateChecker interface {
+	CheckLatest(ctx context.Context) (FGMUpdateStatus, bool, error)
+	CachedNotice(ctx context.Context) (FGMUpdateStatus, bool)
+}
+
 // GoImporter imports existing Go installations into FGM.
 type GoImporter interface {
 	ImportAuto(ctx context.Context) ([]ImportedGo, error)
@@ -205,4 +219,5 @@ type App struct {
 	LintConfigGenerator LintConfigGenerator
 	LintDoctor          LintDoctor
 	ProfileInstaller    ProfileInstaller
+	FGMUpdateChecker    FGMUpdateChecker
 }

@@ -1,4 +1,4 @@
-# Installation and removal
+# Installation, upgrade, and removal
 
 [Home](../README.md) · [Documentation](README.md)
 
@@ -67,6 +67,34 @@ fgm env --shell fish | source
 ```
 
 For persistent integration, `fgm doctor --fix` can add the snippet to your shell profile. [Shell profile behavior](reference.md#shell-profile-setup) lists the affected files and confirmation behavior.
+
+## Upgrade FGM
+
+**Homebrew (macOS and Linux):**
+
+```bash
+brew update
+brew upgrade --cask fgm
+```
+
+If you installed an older release (`<= 0.4.0`) as a Homebrew formula before FGM migrated to Casks, switch once with:
+
+```bash
+brew uninstall --formula fgm
+brew install --cask kostikovk/fgm/fgm
+```
+
+**Install script:**
+
+Re-run the install script to overwrite the binary in `~/.local/bin` (or your custom `INSTALL_DIR`) with the latest release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/install.sh | sh
+```
+
+**Update notifications:**
+
+When you run `fgm doctor`, `fgm install`, or `fgm upgrade`, FGM caches the latest available release version in `state/update-check.json` (24-hour TTL). If a newer release is recorded in the local cache, interactive TTY commands print an upgrade hint to `stderr`. Set `FGM_NO_UPDATE_NOTIFIER=1` to disable the notice.
 
 ## Uninstall
 

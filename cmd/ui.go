@@ -14,6 +14,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
+	"github.com/kostikovk/fgm/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -327,6 +328,20 @@ func (u *uiRenderer) FormatError(err error) string {
 		return badge + "\n  " + err.Error()
 	}
 	return singleLine
+}
+
+// FormatUpdateNotice renders an informational FGM update notice for TTY stderr.
+func (u *uiRenderer) FormatUpdateNotice(status app.FGMUpdateStatus) string {
+	if !u.Err.Styled {
+		return fmt.Sprintf("A new version of fgm is available: %s -> %s (run %q)", status.CurrentVersion, status.LatestVersion, status.UpgradeCommand)
+	}
+	badge := u.theme.info.Render("i INFO")
+	head := badge + "  " + u.theme.muted.Render("A new version of fgm is available: ") +
+		u.theme.version.Render(status.CurrentVersion) +
+		u.theme.muted.Render(" -> ") +
+		u.theme.accent.Render(status.LatestVersion)
+	cmdLine := "  " + u.theme.muted.Render("Run: ") + u.theme.accent.Render(status.UpgradeCommand)
+	return head + "\n" + cmdLine
 }
 
 func fgmFangColorScheme(c lipgloss.LightDarkFunc) fang.ColorScheme {

@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/spf13/cobra"
@@ -47,6 +49,9 @@ func NewRootCmdWithUI(application *app.App, opts UIOptions) *cobra.Command {
 		PersistentPreRun: func(cmd *cobra.Command, _ []string) {
 			cmd.SetContext(withUIOptions(cmd.Context(), opts))
 		},
+		PersistentPostRun: func(cmd *cobra.Command, _ []string) {
+			maybePrintCachedUpdateNotice(cmd, application)
+		},
 	}
 
 	rootCmd.PersistentFlags().String(flagChdir, ".", "working directory for repo resolution")
@@ -71,4 +76,34 @@ func NewRootCmdWithUI(application *app.App, opts UIOptions) *cobra.Command {
 	configureFangHelp(rootCmd, opts)
 
 	return rootCmd
+}
+
+func maybePrintCachedUpdateNotice(cmd *cobra.Command, application *app.App) {
+	if cmd == nil || application == nil || application.FGMUpdateChecker == nil {
+		return
+	}
+	switch cmd.Name() {
+	case "__shim", "env", "exec", "version", "doctor":
+		return
+	}
+	resolvedOpts := optsForCommand(cmd).withDefaults()
+	if strings.TrimSpace(resolvedOpts.Getenv("FGM_NO_UPDATE_NOTIFIER")) != "" {
+		return
+	}
+	ui := uiFromCmd(cmd)
+	if !ui.Err.Styled {
+		return
+	}
+	status, ok := application.FGMUpdateChecker.CachedNotice(cmd.Context())
+	if !ok || !status.UpdateAvailable {
+		return
+	}
+	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), ui.FormatUpdateNotice(status))
+}
+
+func refreshUpdateCache(ctx context.Context, checker app.FGMUpdateChecker) {
+	if checker == nil {
+		return
+	}
+	_, _, _ = checker.CheckLatest(ctx)
 }

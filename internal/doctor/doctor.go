@@ -40,6 +40,7 @@ type Config struct {
 	GoStore            GoStore
 	LintStore          LintStore
 	LintRemoteProvider LintRemoteProvider
+	FGMUpdateChecker   app.FGMUpdateChecker
 	PathEnv            string
 }
 
@@ -49,6 +50,7 @@ type Service struct {
 	goStore            GoStore
 	lintStore          LintStore
 	lintRemoteProvider LintRemoteProvider
+	fgmUpdateChecker   app.FGMUpdateChecker
 	pathEnv            string
 }
 
@@ -59,6 +61,7 @@ func New(config Config) *Service {
 		goStore:            config.GoStore,
 		lintStore:          config.LintStore,
 		lintRemoteProvider: config.LintRemoteProvider,
+		fgmUpdateChecker:   config.FGMUpdateChecker,
 		pathEnv:            config.PathEnv,
 	}
 }
@@ -95,6 +98,22 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 		findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "fgm is available on PATH"})
 	} else {
 		findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: "fgm is not available on PATH"})
+	}
+
+	if s.fgmUpdateChecker != nil {
+		if status, ok, err := s.fgmUpdateChecker.CheckLatest(ctx); err == nil && ok {
+			if status.UpdateAvailable {
+				findings = append(findings, app.DoctorFinding{
+					Severity: "WARN",
+					Message:  fmt.Sprintf("fgm update available: %s -> %s (run %q)", status.CurrentVersion, status.LatestVersion, status.UpgradeCommand),
+				})
+			} else {
+				findings = append(findings, app.DoctorFinding{
+					Severity: "OK",
+					Message:  "fgm is up to date: " + status.CurrentVersion,
+				})
+			}
+		}
 	}
 
 	if s.resolver != nil {

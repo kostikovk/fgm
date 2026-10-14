@@ -401,4 +401,14 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     answer:
       "Yes. fgm lint doctor audits your existing .golangci.yml / .golangci.yaml without modifying it.",
   },
+  {
+    id: "faq-upgrade-fgm",
+    question: "How do I upgrade FGM itself to the latest version?",
+    answer:
+      "Run brew update && brew upgrade --cask fgm (for Homebrew) or re-run the install.sh script. FGM also checks for newer CLI releases during fgm doctor / install / upgrade and notifies you in interactive terminals (set FGM_NO_UPDATE_NOTIFIER=1 to disable).",
+    docLink: {
+      href: "https://github.com/kostikovk/fgm/blob/main/docs/installation.md#upgrade-fgm",
+      label: "docs/installation.md#upgrade-fgm",
+    },
+  },
 ];

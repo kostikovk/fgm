@@ -779,3 +779,152 @@ func TestCommandSuccessMessagesAndRegressionsUI(t *testing.T) {
 		}
 	})
 }
+
+type stubUpdateChecker struct {
+	checkLatestFn  func(ctx context.Context) (app.FGMUpdateStatus, bool, error)
+	cachedNoticeFn func(ctx context.Context) (app.FGMUpdateStatus, bool)
+}
+
+func (s stubUpdateChecker) CheckLatest(ctx context.Context) (app.FGMUpdateStatus, bool, error) {
+	if s.checkLatestFn == nil {
+		return app.FGMUpdateStatus{}, false, nil
+	}
+	return s.checkLatestFn(ctx)
+}
+
+func (s stubUpdateChecker) CachedNotice(ctx context.Context) (app.FGMUpdateStatus, bool) {
+	if s.cachedNoticeFn == nil {
+		return app.FGMUpdateStatus{}, false
+	}
+	return s.cachedNoticeFn(ctx)
+}
+
+func TestUpdateNotifier_ShowsCachedNoticeOnTTYStderrAndSuppressesWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should print cached update notice to TTY stderr after current command and suppress when FGM_NO_UPDATE_NOTIFIER=1", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var outBuf, errBuf bytes.Buffer
+		application := &app.App{
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2", GoSource: "go.mod"}, nil
+				},
+			},
+			FGMUpdateChecker: stubUpdateChecker{
+				cachedNoticeFn: func(ctx context.Context) (app.FGMUpdateStatus, bool) {
+					return app.FGMUpdateStatus{
+						CurrentVersion:  "0.5.0",
+						LatestVersion:   "0.6.0",
+						UpdateAvailable: true,
+						UpgradeCommand:  "brew update && brew upgrade --cask fgm",
+					}, true
+				},
+			},
+		}
+
+		ttyOpts := UIOptions{
+			Getenv:     func(string) string { return "" },
+			IsTerminal: func(w io.Writer) bool { return w == &outBuf || w == &errBuf },
+			TermWidth:  func(io.Writer) int { return 100 },
+		}
+		root := NewRootCmdWithUI(application, ttyOpts)
+		root.SetOut(&outBuf)
+		root.SetErr(&errBuf)
+		root.SetArgs([]string{"current"})
+
+		// Act
+		err := Execute(context.Background(), root, ttyOpts)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("Execute(current): %v", err)
+		}
+		plainErr := ansi.Strip(errBuf.String())
+		for _, want := range []string{"0.5.0 -> 0.6.0", "brew update && brew upgrade --cask fgm"} {
+			if !strings.Contains(plainErr, want) {
+				t.Fatalf("plainErr = %q, want it to contain %q", plainErr, want)
+			}
+		}
+
+		// Arrange — disabled via FGM_NO_UPDATE_NOTIFIER=1
+		var suppressedOut, suppressedErr bytes.Buffer
+		disabledOpts := UIOptions{
+			Getenv: func(key string) string {
+				if key == "FGM_NO_UPDATE_NOTIFIER" {
+					return "1"
+				}
+				return ""
+			},
+			IsTerminal: func(w io.Writer) bool { return w == &suppressedOut || w == &suppressedErr },
+			TermWidth:  func(io.Writer) int { return 100 },
+		}
+		disabledRoot := NewRootCmdWithUI(application, disabledOpts)
+		disabledRoot.SetOut(&suppressedOut)
+		disabledRoot.SetErr(&suppressedErr)
+		disabledRoot.SetArgs([]string{"current"})
+
+		// Act
+		if err := Execute(context.Background(), disabledRoot, disabledOpts); err != nil {
+			t.Fatalf("Execute(current disabled): %v", err)
+		}
+
+		// Assert
+		if suppressedErr.String() != "" {
+			t.Fatalf("suppressedErr = %q, want empty stderr when FGM_NO_UPDATE_NOTIFIER=1", suppressedErr.String())
+		}
+	})
+}
+
+func TestInstallAndUpgradeSubcommands_RefreshUpdateCache(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should refresh update cache when install go and upgrade go complete", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var checkCount int
+		application := &app.App{
+			GoInstaller: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					return "/tmp/fgm/go/" + version, nil
+				},
+			},
+			GoUpgrader: stubGoUpgrader{
+				upgradeGlobalFn: func(ctx context.Context, options app.GoUpgradeOptions) (app.GoUpgradeResult, error) {
+					return app.GoUpgradeResult{Version: "1.27.2"}, nil
+				},
+			},
+			FGMUpdateChecker: stubUpdateChecker{
+				checkLatestFn: func(ctx context.Context) (app.FGMUpdateStatus, bool, error) {
+					checkCount++
+					return app.FGMUpdateStatus{}, false, nil
+				},
+			},
+		}
+
+		// Act
+		root1 := NewRootCmd(application)
+		root1.SetOut(new(bytes.Buffer))
+		root1.SetErr(new(bytes.Buffer))
+		root1.SetArgs([]string{"install", "go", "1.27.2"})
+		if err := root1.Execute(); err != nil {
+			t.Fatalf("install go: %v", err)
+		}
+
+		root2 := NewRootCmd(application)
+		root2.SetOut(new(bytes.Buffer))
+		root2.SetErr(new(bytes.Buffer))
+		root2.SetArgs([]string{"upgrade", "go", "--global"})
+		if err := root2.Execute(); err != nil {
+			t.Fatalf("upgrade go --global: %v", err)
+		}
+
+		// Assert
+		if checkCount != 2 {
+			t.Fatalf("checkCount = %d, want 2", checkCount)
+		}
+	})
+}
