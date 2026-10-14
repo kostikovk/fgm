@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"syscall"
 	"time"
 
@@ -39,6 +40,7 @@ var (
 	buildVersion            = "dev"
 	buildCommit             = "unknown"
 	buildDate               = "unknown"
+	readBuildInfo           = debug.ReadBuildInfo
 	defaultGoRoot           = golocal.DefaultRoot
 	getEnv                  = os.Getenv
 	stderrWriter  io.Writer = os.Stderr
@@ -166,11 +168,7 @@ func run(
 			RemoteProvider: lintReleaseProvider,
 			Installer:      lintInstaller,
 		}),
-		BuildInfo: app.BuildInfo{
-			Version: buildVersion,
-			Commit:  buildCommit,
-			Date:    buildDate,
-		},
+		BuildInfo:           resolveBuildInfo(buildVersion, buildCommit, buildDate, readBuildInfo),
 		Doctor:              doctorService,
 		Executor:            executor,
 		EnvRenderer:         envRenderer,
@@ -180,4 +178,40 @@ func run(
 	}
 
 	return buildRoot(application).ExecuteContext(ctx)
+}
+
+func resolveBuildInfo(
+	version string,
+	commit string,
+	date string,
+	readInfo func() (*debug.BuildInfo, bool),
+) app.BuildInfo {
+	if readInfo != nil && (version == "" || version == "dev") {
+		if info, ok := readInfo(); ok && info != nil {
+			if info.Main.Version != "" && info.Main.Version != "(devel)" {
+				version = info.Main.Version
+			}
+			for _, setting := range info.Settings {
+				switch setting.Key {
+				case "vcs.revision":
+					if (commit == "" || commit == "unknown") && setting.Value != "" {
+						commit = setting.Value
+						if len(commit) > 7 {
+							commit = commit[:7]
+						}
+					}
+				case "vcs.time":
+					if (date == "" || date == "unknown") && setting.Value != "" {
+						date = setting.Value
+					}
+				}
+			}
+		}
+	}
+
+	return app.BuildInfo{
+		Version: version,
+		Commit:  commit,
+		Date:    date,
+	}
 }

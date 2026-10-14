@@ -9,7 +9,7 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS := -s -w -X main.buildVersion=$(VERSION) -X main.buildCommit=$(COMMIT) -X main.buildDate=$(DATE)
 
-.PHONY: help build run cmd test cover cover-html fmt fix tidy pre-commit hook-install update-lint-compat clean
+.PHONY: help build run cmd test cover cover-html fmt fix tidy pre-commit hook-install update-lint-compat next-version clean
 
 help:
 	@echo "Available targets:"
@@ -25,6 +25,7 @@ help:
 	@echo "  make pre-commit - run the local pre-commit checks"
 	@echo "  make hook-install - sync Hooky hooks into .git/hooks"
 	@echo "  make update-lint-compat - regenerate golangci-lint compatibility.json"
+	@echo "  make next-version - print next semantic version tag from git history"
 	@echo "  make clean  - remove local build artifacts"
 
 build:
@@ -66,6 +67,9 @@ hook-install:
 
 update-lint-compat:
 	go run ./scripts/update-lint-compatibility
+
+next-version:
+	go run ./scripts/next-version
 
 clean:
 	rm -rf $(BIN_DIR)

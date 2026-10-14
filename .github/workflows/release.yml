@@ -2,8 +2,14 @@ name: release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
@@ -22,7 +28,25 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Resolve and push next tag on main
+        id: tag
+        if: github.ref == 'refs/heads/main'
+        run: |
+          NEXT_TAG="$(go run ./scripts/next-version)"
+          if [ -z "$NEXT_TAG" ]; then
+            echo "No releasable commits since latest tag; skipping release."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG"
+          git push origin "$NEXT_TAG"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$NEXT_TAG" >> "$GITHUB_OUTPUT"
+
       - name: Run GoReleaser
+        if: startsWith(github.ref, 'refs/tags/v') || steps.tag.outputs.should_release == 'true'
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
@@ -31,3 +55,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.tag.outputs.tag || github.ref_name }}
+
+      - name: Warm Go Module Proxy
+        if: startsWith(github.ref, 'refs/tags/v') || steps.tag.outputs.should_release == 'true'
+        run: |
+          TAG="${{ steps.tag.outputs.tag || github.ref_name }}"
+          curl -fsSL "https://proxy.golang.org/github.com/kostikovk/fgm/@v/${TAG}.info" || true

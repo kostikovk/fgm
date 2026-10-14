@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"runtime/debug"
 	"testing"
 
 	"github.com/kostikovk/fgm/cmd"
@@ -58,6 +59,90 @@ func TestRunBuildsApplicationAndExecutesRootCommand(t *testing.T) {
 	if capturedApp.BuildInfo.Version != "dev" || capturedApp.BuildInfo.Commit != "unknown" || capturedApp.BuildInfo.Date != "unknown" {
 		t.Fatalf("BuildInfo = %+v, want default build metadata", capturedApp.BuildInfo)
 	}
+}
+
+func TestResolveBuildInfo(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should preserve ldflags build metadata when version commit and date are explicitly set", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		readInfo := func() (*debug.BuildInfo, bool) {
+			return &debug.BuildInfo{
+				Main: debug.Module{Version: "v0.9.9"},
+				Settings: []debug.BuildSetting{
+					{Key: "vcs.revision", Value: "1234567890abcdef"},
+					{Key: "vcs.time", Value: "2026-10-14T12:00:00Z"},
+				},
+			}, true
+		}
+
+		// Act
+		got := resolveBuildInfo("v0.4.0", "f2006ec", "2026-10-14T10:00:00Z", readInfo)
+
+		// Assert
+		want := app.BuildInfo{
+			Version: "v0.4.0",
+			Commit:  "f2006ec",
+			Date:    "2026-10-14T10:00:00Z",
+		}
+		if got != want {
+			t.Errorf("resolveBuildInfo() = %+v; want %+v", got, want)
+		}
+	})
+
+	t.Run("should fallback to module version and vcs settings when built via go install without ldflags", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		readInfo := func() (*debug.BuildInfo, bool) {
+			return &debug.BuildInfo{
+				Main: debug.Module{Version: "v0.4.0"},
+				Settings: []debug.BuildSetting{
+					{Key: "vcs.revision", Value: "f2006ec5777ced667f5ef50659618c5c36ade484"},
+					{Key: "vcs.time", Value: "2026-10-14T10:00:00Z"},
+				},
+			}, true
+		}
+
+		// Act
+		got := resolveBuildInfo("dev", "unknown", "unknown", readInfo)
+
+		// Assert
+		want := app.BuildInfo{
+			Version: "v0.4.0",
+			Commit:  "f2006ec",
+			Date:    "2026-10-14T10:00:00Z",
+		}
+		if got != want {
+			t.Errorf("resolveBuildInfo() = %+v; want %+v", got, want)
+		}
+	})
+
+	t.Run("should keep dev version when module version is devel", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		readInfo := func() (*debug.BuildInfo, bool) {
+			return &debug.BuildInfo{
+				Main: debug.Module{Version: "(devel)"},
+			}, true
+		}
+
+		// Act
+		got := resolveBuildInfo("dev", "unknown", "unknown", readInfo)
+
+		// Assert
+		want := app.BuildInfo{
+			Version: "dev",
+			Commit:  "unknown",
+			Date:    "unknown",
+		}
+		if got != want {
+			t.Errorf("resolveBuildInfo() = %+v; want %+v", got, want)
+		}
+	})
 }
 
 func TestMainWritesDefaultRootErrorAndExits(t *testing.T) {
