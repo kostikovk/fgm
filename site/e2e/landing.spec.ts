@@ -257,6 +257,29 @@ test.describe("FGM Landing Page (/fgm/)", () => {
       expect(res.status(), `status for ${assetPath}`).toBe(200);
     }
 
+    // Assert — complete OpenGraph and Twitter preview metadata in <head>
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      "https://kostikovk.github.io/fgm/assets/social.png"
+    );
+    await expect(
+      page.locator('meta[property="og:image:width"]')
+    ).toHaveAttribute("content", "1200");
+    await expect(
+      page.locator('meta[property="og:image:height"]')
+    ).toHaveAttribute("content", "630");
+    await expect(
+      page.locator('meta[property="og:image:type"]')
+    ).toHaveAttribute("content", "image/png");
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+      "content",
+      "FGM — Fast Go Manager"
+    );
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      "content",
+      "summary_large_image"
+    );
+
     // Assert — no prohibited marketing claims
     const bodyText = (await page.locator("body").innerText()).toLowerCase();
     for (const forbidden of [

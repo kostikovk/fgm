@@ -22,24 +22,27 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
+    siteName: "FGM — Fast Go Manager",
+    locale: "en_US",
     title: "FGM — Your project's Go and golangci-lint, managed together.",
     description:
-      "FGM reads your Go project files, helps select a compatible golangci-lint version, and runs checks with the selected toolchains from one CLI.",
+      "Install, auto-switch on cd, and upgrade Go + your repository's compatible golangci-lint from one single-binary CLI.",
     url: "https://kostikovk.github.io/fgm/",
     images: [
       {
         url: "https://kostikovk.github.io/fgm/assets/social.png",
         width: 1200,
         height: 630,
+        type: "image/png",
         alt: "FGM — Project Go and golangci-lint managed from one CLI",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FGM — Fast Go Manager",
+    title: "FGM — Your project's Go and golangci-lint, managed together.",
     description:
-      "Manage project Go versions and compatible golangci-lint toolchains from one CLI.",
+      "Install, auto-switch on cd, and upgrade Go + your repository's compatible golangci-lint from one single-binary CLI.",
     images: ["https://kostikovk.github.io/fgm/assets/social.png"],
   },
 };
