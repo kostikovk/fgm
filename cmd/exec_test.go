@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -423,4 +424,227 @@ func (s execLocatorStub) GoBinaryPath(ctx context.Context, version string) (stri
 
 func (s execLocatorStub) LintBinaryPath(ctx context.Context, version string) (string, error) {
 	return s.lintBinaryPathFn(ctx, version)
+}
+
+func TestExecCommand_InstallFlagInstallsMissingGoAndLintToStderrBeforeExec(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should install missing Go and golangci-lint and print status to stderr while keeping stdout clean when --install is passed", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var installedGo string
+		var installedLint string
+		var execCalled bool
+
+		application := &app.App{
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.27.2",
+						GoSource:    "go.mod",
+						LintVersion: "v2.14.0",
+						LintSource:  "remote",
+					}, nil
+				},
+			},
+			GoStore: stubGoStore{
+				hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
+					return false, nil
+				},
+			},
+			LintStore: stubLintStore{
+				lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return "", os.ErrNotExist
+				},
+			},
+			GoInstaller: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					installedGo = version
+					return "/tmp/fgm/go/" + version, nil
+				},
+			},
+			LintInstaller: stubLintInstaller{
+				installLintVersionFn: func(ctx context.Context, version string) (string, error) {
+					installedLint = version
+					return "/tmp/fgm/golangci-lint/" + version, nil
+				},
+			},
+			Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					execCalled = true
+					_, err := io.WriteString(stdout, "child-stdout-only\n")
+					return err
+				},
+			},
+		}
+
+		// Act
+		stdout, stderr, err := testutil.ExecuteCommand(t, NewRootCmd(application), "exec", "--install", "--", "go", "version")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("exec --install: %v", err)
+		}
+		if installedGo != "1.27.2" {
+			t.Fatalf("installedGo = %q, want 1.27.2", installedGo)
+		}
+		if installedLint != "v2.14.0" {
+			t.Fatalf("installedLint = %q, want v2.14.0", installedLint)
+		}
+		if !execCalled {
+			t.Fatal("expected Executor.Exec to be called after installing missing toolchains")
+		}
+		if stdout != "child-stdout-only\n" {
+			t.Fatalf("stdout = %q, want exact child stdout without install logs", stdout)
+		}
+		for _, want := range []string{
+			"Installed Go 1.27.2 to /tmp/fgm/go/1.27.2",
+			"Installed golangci-lint v2.14.0 to /tmp/fgm/golangci-lint/v2.14.0",
+		} {
+			if !strings.Contains(stderr, want) {
+				t.Fatalf("stderr = %q, want it to contain %q", stderr, want)
+			}
+		}
+	})
+}
+
+func TestExecCommand_InstallFlagSkipsInstallWhenAlreadyInstalled(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should skip installers when selected Go and golangci-lint are already installed", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		application := &app.App{
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion:   "1.27.2",
+						LintVersion: "v2.14.0",
+					}, nil
+				},
+			},
+			GoStore: stubGoStore{
+				hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
+					return true, nil
+				},
+			},
+			LintStore: stubLintStore{
+				lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return "/tmp/fgm/golangci-lint/v2.14.0/golangci-lint", nil
+				},
+			},
+			GoInstaller: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					t.Fatal("InstallGoVersion should not be called when Go is already installed")
+					return "", nil
+				},
+			},
+			LintInstaller: stubLintInstaller{
+				installLintVersionFn: func(ctx context.Context, version string) (string, error) {
+					t.Fatal("InstallLintVersion should not be called when lint is already installed")
+					return "", nil
+				},
+			},
+			Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					_, err := io.WriteString(stdout, "ok\n")
+					return err
+				},
+			},
+		}
+
+		// Act
+		stdout, stderr, err := testutil.ExecuteCommand(t, NewRootCmd(application), "exec", "--install", "--", "go", "test")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("exec --install: %v", err)
+		}
+		if stdout != "ok\n" {
+			t.Fatalf("stdout = %q, want ok", stdout)
+		}
+		if stderr != "" {
+			t.Fatalf("stderr = %q, want empty stderr when nothing was installed", stderr)
+		}
+	})
+
+	t.Run("should pass --install after -- separator to child command without triggering fgm toolchain installer", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var gotArgs []string
+		application := &app.App{
+			GoInstaller: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					t.Fatal("InstallGoVersion should not be called when --install is after --")
+					return "", nil
+				},
+			},
+			Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					gotArgs = append([]string(nil), args...)
+					return nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "exec", "--", "go", "test", "--install")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("exec -- go test --install: %v", err)
+		}
+		if strings.Join(gotArgs, " ") != "go test --install" {
+			t.Fatalf("gotArgs = %v, want [go test --install]", gotArgs)
+		}
+	})
+
+	t.Run("should pass child flags like -v after command name even when -- separator is omitted", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		var gotArgs []string
+		var installedGo string
+		application := &app.App{
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.27.2"}, nil
+				},
+			},
+			GoStore: stubGoStore{
+				hasGoVersionFn: func(ctx context.Context, version string) (bool, error) {
+					return false, nil
+				},
+			},
+			GoInstaller: stubGoInstaller{
+				installGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					installedGo = version
+					return "/tmp/fgm/go/" + version, nil
+				},
+			},
+			Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					gotArgs = append([]string(nil), args...)
+					return nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "exec", "--install", "go", "test", "-v", "./...")
+
+		// Assert
+		if err != nil {
+			t.Fatalf("exec --install go test -v ./...: %v", err)
+		}
+		if installedGo != "1.27.2" {
+			t.Fatalf("installedGo = %q, want 1.27.2", installedGo)
+		}
+		if strings.Join(gotArgs, " ") != "go test -v ./..." {
+			t.Fatalf("gotArgs = %v, want [go test -v ./...]", gotArgs)
+		}
+	})
 }

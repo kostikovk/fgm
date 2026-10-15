@@ -65,6 +65,7 @@ func NewRootCmdWithUI(application *app.App, opts UIOptions) *cobra.Command {
 	rootCmd.AddCommand(newImportCmd(application))
 	rootCmd.AddCommand(newInstallCmd(application, v))
 	rootCmd.AddCommand(newPinCmd(v))
+	rootCmd.AddCommand(newPruneCmd(application, v))
 	rootCmd.AddCommand(newRemoveCmd(application))
 	rootCmd.AddCommand(newUpgradeCmd(application, v))
 	rootCmd.AddCommand(newUseCmd(application))

@@ -54,6 +54,8 @@ In the table below, `DIR` is the target module or workspace directory, and `X` (
 | Install a specific missing Go version | `fgm install go X` |
 | Install a specific missing linter version | `fgm install golangci-lint V` |
 | Run tests, build, lint, or Make targets | `fgm --chdir DIR exec -- go test ./...` or `fgm --chdir DIR exec -- make <target>` |
+| Run and auto-install missing toolchains first | `fgm --chdir DIR exec --install -- go test ./...` |
+| Remove unused Go and linter versions | `fgm --chdir DIR prune` (or `--dry-run` to preview) |
 | List remote compatible linters for a target Go version | `fgm versions golangci-lint --remote --go TARGET` |
 | Change an authorized repository linter pin | `fgm --chdir DIR pin golangci-lint V` (or `auto`), then `fgm --chdir DIR install` and `fgm --chdir DIR doctor` |
 | Generate a new v2 lint config | `fgm --chdir DIR lint init --preset standard`, then `fgm --chdir DIR lint doctor` and a real lint run |

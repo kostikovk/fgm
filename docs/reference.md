@@ -11,7 +11,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm current` | Show resolved Go and lint versions with source labels |
 | `fgm doctor [--fix]` | Check installation health and environment (`--fix` adds shell integration to `zsh`/`bash`/`fish` profile) |
 | `fgm env` | Print shell setup (`--shell zsh\|bash\|fish\|powershell`) |
-| `fgm exec -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` |
+| `fgm exec [--install] -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` (`--install` installs missing resolved toolchains first) |
 | `fgm import auto` | Auto-import existing Go and `golangci-lint` installations from system locations |
 | `fgm install` | Install resolved Go (and selected `golangci-lint`, if resolved) for the workspace |
 | `fgm install go <version>` | Install a specific Go version |
@@ -19,6 +19,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm use go <version> --global` | Set global Go version and generate Unix shims |
 | `fgm versions go [--local\|--remote]` | List Go versions (defaults to `--local`) |
 | `fgm versions golangci-lint [--local\|--remote] [--go <ver>]` | List lint versions (defaults to `--local`; `--go` filters only with `--remote`) |
+| `fgm prune [--dry-run]` | Remove unused Go and `golangci-lint` versions not referenced by global default or current workspace |
 | `fgm remove go <version>` | Remove an FGM-managed Go version |
 | `fgm remove golangci-lint <version>` | Remove an FGM-managed lint version |
 | `fgm pin golangci-lint <version\|auto>` | Pin lint version in `.fgm.toml` |

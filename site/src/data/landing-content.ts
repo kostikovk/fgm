@@ -377,7 +377,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     id: "faq-exec-install",
     question: "Does fgm exec install missing tools automatically?",
     answer:
-      "No. Run fgm install (or fgm import auto) first. If the selected linter isn't installed in FGM, fgm exec still runs other commands and may fall back to PATH.",
+      "By default, no — run fgm install (or fgm import auto) first, or pass --install (fgm exec --install -- <cmd>) to automatically install missing resolved Go and golangci-lint versions before running the command.",
   },
   {
     id: "faq-windows",
