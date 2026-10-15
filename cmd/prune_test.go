@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -251,6 +252,59 @@ func TestPruneCommand_PreservesLintCompatibleWithGlobalGo(t *testing.T) {
 		}
 		if !slices.Equal(deletedLint, []string{"v1.64.8"}) {
 			t.Fatalf("deletedLint = %v, want only [v1.64.8] (preserving v2.14.0 for repo and v2.11.2 for global Go 1.25.7)", deletedLint)
+		}
+	})
+}
+
+func TestPruneCommand_AbortsWhenResolverReturnsError(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should abort without deleting any toolchains when Resolver.Current returns a project configuration error", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		application := &app.App{
+			Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{}, fmt.Errorf("parse .fgm.toml: invalid syntax")
+				},
+			},
+			GoStore: stubGoStore{
+				shimDirFn: func() string { return "/tmp/fgm/shims" },
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) {
+					return "1.25.7", true, nil
+				},
+				listLocalGoVersionsFn: func(ctx context.Context) ([]string, error) {
+					return []string{"1.27.2", "1.25.7"}, nil
+				},
+				goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+					return "/tmp/fgm/go/" + version + "/bin/go", nil
+				},
+				deleteGoVersionFn: func(ctx context.Context, version string) (string, error) {
+					t.Fatalf("DeleteGoVersion should not be called when Resolver.Current fails (tried to delete %s)", version)
+					return "", nil
+				},
+			},
+			LintStore: stubLintStore{
+				listLocalLintVersionsFn: func(ctx context.Context) ([]string, error) {
+					return []string{"v2.14.0"}, nil
+				},
+				deleteLintVersionFn: func(ctx context.Context, version string) (string, error) {
+					t.Fatalf("DeleteLintVersion should not be called when Resolver.Current fails (tried to delete %s)", version)
+					return "", nil
+				},
+			},
+		}
+
+		// Act
+		_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "prune")
+
+		// Assert
+		if err == nil {
+			t.Fatal("expected error from Resolver.Current to abort prune, got nil")
+		}
+		if !strings.Contains(err.Error(), "parse .fgm.toml") {
+			t.Fatalf("err = %q, want it to contain parse .fgm.toml", err.Error())
 		}
 	})
 }
