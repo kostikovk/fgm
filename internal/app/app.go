@@ -55,10 +55,15 @@ type LintInstaller interface {
 	InstallLintVersion(ctx context.Context, version string) (string, error)
 }
 
-// ImportedGo describes a Go installation imported into FGM.
+// ImportedGo describes a Go installation imported into FGM, or one that was found and skipped.
 type ImportedGo struct {
 	Version string
 	Path    string
+	// Source names where the installation was found: "module cache", "golang.org/dl", or ""
+	// for a system installation.
+	Source string
+	// SkipReason is set when the installation was found but not imported.
+	SkipReason string
 }
 
 // ImportedLint describes a golangci-lint installation imported into FGM.

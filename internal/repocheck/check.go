@@ -75,6 +75,7 @@ func (s *Service) Check(ctx context.Context, dir string) (app.CheckReport, error
 		func() ([]app.CheckFinding, error) { return checkSetupGo(current, module) },
 		func() ([]app.CheckFinding, error) { return checkDockerfiles(module) },
 		func() ([]app.CheckFinding, error) { return checkGoWork(module) },
+		func() ([]app.CheckFinding, error) { return checkToolBypass(current, module) },
 	} {
 		found, err := check()
 		if err != nil {
@@ -328,6 +329,8 @@ type workflowStep struct {
 	goVersion     string
 	goVersionLine int
 	goVersionFile string
+	run           string
+	runFirstLine  int
 }
 
 // moduleWorkflowSteps returns workflow steps that apply to the module, using the same
@@ -364,6 +367,7 @@ func moduleWorkflowSteps(module moduleFacts) ([]workflowStep, error) {
 			steps = append(steps, workflowStep{
 				file: file, uses: step.Uses,
 				goVersion: step.GoVersion, goVersionLine: step.GoVersionLine, goVersionFile: step.GoVersionFile,
+				run: step.Run, runFirstLine: step.RunFirstLine,
 			})
 		}
 	}

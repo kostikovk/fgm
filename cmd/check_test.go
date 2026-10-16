@@ -131,3 +131,43 @@ func TestCheckCommandSkip(t *testing.T) {
 		})
 	})
 }
+
+func TestCheckCommandToolBypass(t *testing.T) {
+	t.Parallel()
+
+	files := map[string]string{"go.mod": "module m\n\ngo 1.26.0\n", "Makefile": "lint:\n\t$(shell go env GOPATH)/bin/golangci-lint run ./...\n"}
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should exit 0 when only a C7 warning exists and fail-on is error", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := writeFixture(t, files)
+
+			// Act
+			stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(newCheckingApp()), "check", "--chdir", root)
+
+			// Assert
+			if code := ExitCode(err); code != 0 || !strings.Contains(stdout, "C7 WARN Makefile:2") {
+				t.Errorf("exit code = %d, stdout = %q; want 0 and a C7 warning", code, stdout)
+			}
+		})
+
+		t.Run("should exit 1 when a C7 warning exists and fail-on is warn", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := writeFixture(t, files)
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(newCheckingApp()), "check", "--fail-on", "warn", "--chdir", root)
+
+			// Assert
+			if code := ExitCode(err); code != 1 {
+				t.Errorf("exit code = %d; want 1", code)
+			}
+		})
+	})
+}

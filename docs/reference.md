@@ -20,7 +20,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm use go <version> --global` | Set global Go version and generate Unix shims |
 | `fgm versions go [--local\|--remote]` | List Go versions (defaults to `--local`) |
 | `fgm versions golangci-lint [--local\|--remote] [--go <ver>]` | List lint versions (defaults to `--local`; `--go` filters only with `--remote`) |
-| `fgm prune [--dry-run]` | Remove unused Go and `golangci-lint` versions not referenced by global default or current workspace |
+| `fgm prune [--all] [--dry-run] [--force]` | Remove unused Go and `golangci-lint` versions not referenced by the global default or the current workspace (`--all`: by any module below the working directory) |
 | `fgm remove go <version>` | Remove an FGM-managed Go version |
 | `fgm remove golangci-lint <version>` | Remove an FGM-managed lint version |
 | `fgm pin go <version\|latest-patch>` | Pin the Go version policy in `.fgm.toml` |
@@ -79,10 +79,13 @@ Exit status: `0` when every module resolved, `1` when at least one failed (its e
 | C4b | …different minor from the resolved Go (`go-version-file` is always OK; `${{ … }}` expressions are reported as INFO "not checked") | WARN |
 | C5 | Dockerfile `FROM golang:<tag>` older than the `go` directive (a floating `1.26` tag is compared by minor; `ARG`-substituted tags are INFO "not checked") | ERROR |
 | C6 | `go.work` `go` version lower than a used module's `go` directive | ERROR |
+| C7 | A Makefile/`*.mk` recipe or workflow `run:` step invokes `golangci-lint` or `go` by a path that bypasses `PATH` (`$(GOPATH)/bin/…`, `$(shell go env GOPATH)/bin/…`, `$(GOBIN)/…`, `~/go/bin/…`, `$HOME/go/bin/…`, any absolute `…/bin/…`), so `fgm exec` cannot route it | WARN |
 
 Output is one line per finding — `ID SEVERITY file:line message (fix: hint)` — or `OK no consistency findings`. `--json` prints the [`current --json`](#machine-readable-output) envelope plus a `findings` array (`id`, `severity`, `file`, `line`, `message`, `hint`; `file` is relative to `dir`); with `--all` it is an array with one entry per module. Workflows map to modules with the same `working-directory` rule as lint pin detection.
 
 Exit status: `0` clean, `1` findings at or above `--fail-on` (default `error`), `2` could not run (invalid invocation or a module that cannot be resolved).
+
+C7 matches lines literally, without Make or shell evaluation. Project-local tool directories (`./bin/…`, `$(LOCALBIN)/…`, `$(CURDIR)/bin/…`) are not reported — when their install target pins another version, C3 reports the disagreement — and neither are lines that only install the tool (`install.sh`, `go install`, `curl`, `wget`).
 
 Skip checks for repositories whose files intentionally differ:
 
@@ -127,7 +130,7 @@ The resolved Go version must be installed locally. `fgm exec` searches `PATH` in
 It does not auto-install missing tools unless `--install` is given. When the selected linter is not installed:
 
 - `fgm exec -- golangci-lint ...` exits non-zero with the `fgm install golangci-lint <version>` hint instead of running another version from the inherited `PATH` (`--install` installs it first);
-- any other command (for example `make lint`) still runs, and fgm prints one stderr warning naming the `golangci-lint` binary that `PATH` resolves to. Absolute paths inside scripts cannot be intercepted.
+- any other command (for example `make lint`) still runs, and fgm prints one stderr warning naming the `golangci-lint` binary that `PATH` resolves to. Absolute paths inside scripts cannot be intercepted; `fgm check` reports them as `C7`.
 
 `--allow-unselected-lint` restores the previous behaviour: no error and no warning.
 
@@ -150,7 +153,17 @@ To keep Go's own switching, pass `fgm exec --gotoolchain inherit` or set `FGM_EX
 - Go: `go/<version>` points to the external `GOROOT` directory.
 - Linter: `golangci-lint/<version>/golangci-lint` points to the external binary.
 
-Imported versions depend on those source installations remaining on disk. `fgm remove` removes only the symlink inside the FGM store.
+Go is imported from these read-only, local sources (no network, no writes outside the FGM store; re-running is idempotent):
+
+| Source | Location |
+|---|---|
+| System installations | the `go` on `PATH`, `/usr/local/go`, Homebrew |
+| Module cache (Go's own toolchain switching) | `<GOMODCACHE>/golang.org/toolchain@v0.0.1-go<version>.<goos>-<goarch>`, current platform only; `GOMODCACHE` comes from `go env`, else `$GOMODCACHE`, `$GOPATH/pkg/mod`, `~/go/pkg/mod` |
+| `golang.org/dl` SDKs | `~/sdk/go<version>` |
+
+A module-cache or SDK directory is imported only when `bin/go` exists and its `VERSION` file matches the version in the directory name; otherwise it is listed as skipped with the reason. Output names the source, e.g. `Imported Go 1.26.8 from …/toolchain@v0.0.1-go1.26.8.darwin-arm64 (module cache)`.
+
+Imported versions depend on those source installations remaining on disk (`go clean -modcache` removes module-cache toolchains); `fgm doctor` warns about an imported version whose source is gone, with the `fgm install go <version>` hint. `fgm remove` removes only the symlink inside the FGM store.
 
 ## Shell profile setup
 
@@ -164,6 +177,17 @@ When the shim directory is missing from `PATH`, `fgm doctor --fix` appends a she
 | Fish | `~/.config/fish/config.fish` |
 
 It prompts for confirmation when `stdin` is an interactive terminal and applies the change automatically when `stdin` is non-terminal. `fgm env --shell powershell` renders a PowerShell `PATH` snippet, but `shims/go` and `shims/golangci-lint` generation is not implemented on Windows.
+
+## Pruning
+
+`fgm prune` removes store versions that nothing keeps: the global default Go (and an installed linter compatible with it) and the versions the current workspace selects are kept. `--dry-run` lists every kept version with the reason, e.g. `Keep Go 1.26.9 (selected by svc/api)`, and what would be removed.
+
+In a repository with several modules, use `fgm prune --all` from its root: it keeps every version selected by any module that `fgm current --all` enumerates (`go.work` `use` entries, else every `go.mod`, skipping `vendor/`, `testdata/`, `node_modules/`, and dot-directories), and stops without removing anything if one of them cannot be resolved.
+
+Without `--all`:
+
+- prune warns when other modules exist that it does not consider — modules below a directory without Go metadata, or the other modules of the current repository;
+- from a directory without its own `go.work`/`go.mod` (ancestors included) it refuses to remove anything unless `--all` or `--force` is given; `--dry-run` still lists what would go.
 
 ## Upgrade behavior
 

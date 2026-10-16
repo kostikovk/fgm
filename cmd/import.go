@@ -22,7 +22,7 @@ func newImportAutoCmd(application *app.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "auto",
 		Short: "Automatically import existing Go and golangci-lint installations from common locations",
-		Long:  "Discover existing Go and golangci-lint installations in standard system paths and register them as symlinks in the FGM store without modifying the global default Go selection.",
+		Long:  "Discover existing Go and golangci-lint installations in standard system paths, Go toolchains cached in the module cache by Go's own toolchain switching, and golang.org/dl SDKs (~/sdk), and register them as symlinks in the FGM store without modifying the global default Go selection. Toolchain directories whose bin/go is missing or whose VERSION file disagrees with the directory name are listed as skipped.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if application.GoImporter == nil && application.LintImporter == nil {
@@ -48,18 +48,38 @@ func newImportAutoCmd(application *app.App) *cobra.Command {
 			}
 
 			ui := uiFromCmd(cmd)
-			if len(importedGo) == 0 && len(importedLint) == 0 {
+			importedAny := len(importedLint) > 0
+			for _, item := range importedGo {
+				importedAny = importedAny || item.SkipReason == ""
+			}
+			for _, item := range importedGo {
+				if item.SkipReason == "" {
+					continue
+				}
+				notice := fmt.Sprintf("Skipped Go %s at %s (%s): %s", item.Version, item.Path, item.Source, item.SkipReason)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatEmptyNotice(notice)); err != nil {
+					return err
+				}
+			}
+			if !importedAny {
 				_, err := fmt.Fprintln(cmd.OutOrStdout(), ui.FormatEmptyNotice("No Go or golangci-lint installations were imported."))
 				return err
 			}
 
 			for _, item := range importedGo {
+				if item.SkipReason != "" {
+					continue
+				}
+				from := "from " + item.Path
+				if item.Source != "" {
+					from += " (" + item.Source + ")"
+				}
 				msg := ui.FormatOutcome(
-					fmt.Sprintf("Imported Go %s from %s", item.Version, item.Path),
+					fmt.Sprintf("Imported Go %s %s", item.Version, from),
 					"Imported",
 					"Go",
 					item.Version,
-					"from "+item.Path,
+					from,
 				)
 				if _, err := fmt.Fprintln(cmd.OutOrStdout(), msg); err != nil {
 					return err

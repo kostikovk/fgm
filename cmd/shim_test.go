@@ -395,3 +395,64 @@ func TestShimCommandGoToolchainEnvironment(t *testing.T) {
 		})
 	})
 }
+
+func TestShimCommandForwardsArgumentsVerbatim(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	argvScript := "#!/bin/sh\nfor arg in \"$@\"; do printf '[%s]\\n' \"$arg\"; done\n"
+	newApp := func(t *testing.T) *app.App {
+		t.Helper()
+		dir := t.TempDir()
+		goBinary := filepath.Join(dir, "go")
+		lintBinary := filepath.Join(dir, "golangci-lint")
+		for _, path := range []string{goBinary, lintBinary} {
+			if err := os.WriteFile(path, []byte(argvScript), 0o755); err != nil {
+				t.Fatalf("write fake tool: %v", err)
+			}
+		}
+		return &app.App{
+			GoStore: stubGoStore{goBinaryPathFn: func(ctx context.Context, version string) (string, error) { return goBinary, nil }},
+			Resolver: stubSelectionResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.26.0", LintVersion: "v2.9.0"}, nil
+			}},
+			LintStore: stubLintStore{lintBinaryPathFn: func(ctx context.Context, version string) (string, error) { return lintBinary, nil }},
+		}
+	}
+
+	cases := []struct {
+		name string
+		args []string
+	}{
+		{name: "should forward a short flag with its value when go test filters tests", args: []string{"go", "test", "-run", "TestX", "./..."}},
+		{name: "should forward a long flag with its value when golangci-lint limits new issues", args: []string{"golangci-lint", "run", "--new-from-rev", "HEAD~1", "./..."}},
+		{name: "should forward --version to the tool when golangci-lint prints its version", args: []string{"golangci-lint", "--version"}},
+		{name: "should forward -h to the tool when go prints help", args: []string{"go", "-h"}},
+		{name: "should forward --help to the tool when golangci-lint prints help", args: []string{"golangci-lint", "--help"}},
+		{name: "should forward a bare double dash and the arguments after it", args: []string{"go", "run", ".", "--", "-flag"}},
+		{name: "should forward an empty argument and one containing spaces", args: []string{"go", "test", "", "two words"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			root := NewRootCmd(newApp(t))
+			want := ""
+			for _, arg := range tc.args[1:] {
+				want += "[" + arg + "]\n"
+			}
+
+			// Act
+			stdout, _, err := testutil.ExecuteCommand(t, root, append([]string{"__shim"}, tc.args...)...)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("__shim: %v", err)
+			}
+			if stdout != want {
+				t.Errorf("tool argv = %q; want %q", stdout, want)
+			}
+		})
+	}
+}

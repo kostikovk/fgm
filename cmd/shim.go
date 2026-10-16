@@ -18,7 +18,9 @@ func newShimCmd(application *app.App) *cobra.Command {
 		Use:    "__shim [tool] [args...]",
 		Short:  "Internal shim entrypoint",
 		Hidden: true,
-		Args:   cobra.MinimumNArgs(1),
+		// Everything after the tool name belongs to the tool, including -h/--help and "--".
+		DisableFlagParsing: true,
+		Args:               cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch args[0] {
 			case "go":
