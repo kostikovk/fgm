@@ -91,10 +91,15 @@ func run(
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
 	})
+	githubToken := getenv("GITHUB_TOKEN")
+	if githubToken == "" {
+		githubToken = getenv("GH_TOKEN")
+	}
 	lintReleaseProvider := golangcilint.New(golangcilint.Config{
 		Client: httpClient,
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
+		Token:  githubToken,
 	})
 	goInstaller := goinstall.New(goinstall.Config{
 		Root:           goRoot,

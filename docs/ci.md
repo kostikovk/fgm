@@ -26,6 +26,7 @@ The composite action in [`setup-fgm/`](../setup-fgm/action.yml) installs a pinne
 | `working-directory` | `.` | Directory whose toolchain is resolved |
 | `install` | `true` | Install missing resolved toolchains |
 | `cache` | `true` | Cache the resolved toolchains; key: OS, arch, Go and linter versions |
+| `token` | `github.token` | GitHub token for `golangci-lint` release lookups (unauthenticated GitHub API calls are limited to 60/hour per runner IP) |
 | `fgm-binary` | — | Use a prebuilt fgm instead of downloading (used to test fgm itself) |
 
 Outputs: `go-version`, `go-source`, `golangci-lint-version`, `golangci-lint-source`, `cache-hit`.

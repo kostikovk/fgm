@@ -49,6 +49,9 @@ type Config struct {
 	GOOS              string
 	GOARCH            string
 	CompatibilityData []byte
+	// Token authenticates GitHub API requests; unauthenticated requests share a 60/hour
+	// per-IP limit that CI runners exhaust quickly.
+	Token string
 }
 
 // Provider lists remote golangci-lint releases for a single platform.
@@ -58,6 +61,7 @@ type Provider struct {
 	goos              string
 	goarch            string
 	compatibilityData []byte
+	token             string
 
 	releasesOnce      sync.Once
 	cachedReleases    []release
@@ -88,6 +92,7 @@ func New(config Config) *Provider {
 		goos:              config.GOOS,
 		goarch:            config.GOARCH,
 		compatibilityData: pickCompatibilityData(config.CompatibilityData),
+		token:             config.Token,
 	}
 }
 
@@ -204,6 +209,10 @@ func (p *Provider) fetchAllReleasePages(ctx context.Context) ([]release, error) 
 		if err != nil {
 			return nil, fmt.Errorf("build golangci-lint releases request: %w", err)
 		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		if p.token != "" {
+			req.Header.Set("Authorization", "Bearer "+p.token)
+		}
 
 		resp, err := p.client.Do(req)
 		if err != nil {
@@ -212,6 +221,9 @@ func (p *Provider) fetchAllReleasePages(ctx context.Context) ([]release, error) 
 
 		if resp.StatusCode != http.StatusOK {
 			_ = resp.Body.Close()
+			if (resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusTooManyRequests) && p.token == "" {
+				return nil, fmt.Errorf("fetch golangci-lint releases: unexpected status %s (GitHub API rate limit; set GITHUB_TOKEN or GH_TOKEN)", resp.Status)
+			}
 			return nil, fmt.Errorf("fetch golangci-lint releases: unexpected status %s", resp.Status)
 		}
 

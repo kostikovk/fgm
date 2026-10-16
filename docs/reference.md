@@ -239,6 +239,8 @@ Detection is read-only and offline. It searches from the module root up to the r
 - Detected versions go through the same compatibility check as explicit pins: `fgm doctor` warns when the catalog says the linter cannot run on the resolved Go.
 - Opt out with `golangci_lint_detect = false` under `[toolchain]`.
 
+Remote `golangci-lint` lookups (`fgm install`, `exec --install`, `versions --remote`, upgrades) call the GitHub API. Set `GITHUB_TOKEN` or `GH_TOKEN` to authenticate them; unauthenticated calls share a 60/hour per-IP limit that CI runners hit quickly.
+
 > [!IMPORTANT]
 > Remote `golangci-lint` compatibility resolution combines FGM's generated catalog in [`internal/golangcilint/compatibility.json`](../internal/golangcilint/compatibility.json) with live GitHub release lookups, rather than a complete offline historical matrix.
 

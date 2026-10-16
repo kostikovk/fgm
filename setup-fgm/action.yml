@@ -18,6 +18,10 @@ inputs:
     description: Cache the resolved toolchains in the fgm store between runs.
     required: false
     default: "true"
+  token:
+    description: GitHub token for golangci-lint release lookups; unauthenticated API calls are rate-limited per runner IP.
+    required: false
+    default: ${{ github.token }}
   fgm-binary:
     description: Path to a prebuilt fgm binary to use instead of downloading the release (for testing fgm itself).
     required: false
@@ -101,6 +105,7 @@ runs:
       shell: bash
       env:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        GITHUB_TOKEN: ${{ inputs.token }}
       run: fgm --chdir "$WORKING_DIRECTORY" exec --install -- true
 
     - name: Add toolchains to PATH
