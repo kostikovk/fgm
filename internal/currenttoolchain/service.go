@@ -2,9 +2,13 @@ package currenttoolchain
 
 import (
 	"context"
+	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/kostikovk/fgm/internal/fgmconfig"
+	"github.com/kostikovk/fgm/internal/lintdetect"
 )
 
 // GoResolver resolves the current Go toolchain selection.
@@ -44,6 +48,9 @@ func New(config Config) *Service {
 }
 
 // Current resolves the current Go version and the best known golangci-lint version.
+//
+// Lint precedence: .fgm.toml explicit version → a pin detected in other repository files
+// (when all detected pins agree) → the newest catalog version compatible with the resolved Go.
 func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, error) {
 	selection, err := s.goResolver.Current(ctx, workDir)
 	if err != nil {
@@ -55,7 +62,31 @@ func (s *Service) Current(ctx context.Context, workDir string) (app.Selection, e
 	} else if ok {
 		selection.LintVersion = lintVersion
 		selection.LintSource = "config"
+		if path, found, err := fgmconfig.PinnedLintPath(workDir); err == nil && found {
+			selection.LintSourceFile = path
+		}
 		return selection, nil
+	}
+
+	detectEnabled, err := fgmconfig.LintDetectionEnabled(workDir)
+	if err != nil {
+		return app.Selection{}, err
+	}
+	if detectEnabled {
+		detected, err := lintdetect.Detect(workDir)
+		if err != nil {
+			return app.Selection{}, err
+		}
+		if pin, ok := detected.Agreed(); ok {
+			selection.LintVersion = pin.Version
+			selection.LintSource = "detected"
+			selection.LintSourceFile = pin.File
+			selection.LintSourceLine = pin.Line
+			return selection, nil
+		}
+		if detected.Conflict() {
+			selection.Warnings = append(selection.Warnings, ConflictWarning(workDir, detected.Pins))
+		}
 	}
 
 	var compatibleVersions []app.LintVersion
@@ -108,4 +139,22 @@ func pickInstalledLintVersion(localVersions []string, remoteVersions []app.LintV
 	}
 
 	return "", false
+}
+
+// ConflictWarning describes disagreeing lint pins with paths relative to workDir.
+func ConflictWarning(workDir string, pins []lintdetect.Pin) string {
+	candidates := make([]string, 0, len(pins))
+	for _, pin := range pins {
+		candidates = append(candidates, fmt.Sprintf("%s (%s:%d)", pin.Version, DisplayPath(workDir, pin.File), pin.Line))
+	}
+	return "conflicting golangci-lint pins ignored: " + strings.Join(candidates, ", ")
+}
+
+// DisplayPath renders path relative to workDir when that is shorter to read.
+func DisplayPath(workDir string, path string) string {
+	rel, err := filepath.Rel(workDir, path)
+	if err != nil {
+		return path
+	}
+	return filepath.ToSlash(rel)
 }

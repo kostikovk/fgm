@@ -764,3 +764,82 @@ func TestDiagnoseSelectionWarnings(t *testing.T) {
 		})
 	})
 }
+
+type stubLintCatalog struct {
+	compatible bool
+	known      bool
+}
+
+func (s stubLintCatalog) LintCompatibility(goVersion string, lintVersion string) (bool, bool, error) {
+	return s.compatible, s.known, nil
+}
+
+func TestDiagnoseDetectedLint(t *testing.T) {
+	t.Parallel()
+
+	newService := func(catalog stubLintCatalog) *Service {
+		return New(Config{
+			Resolver: stubResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{
+					GoVersion: "1.27.0", LintVersion: "v2.5.0", LintSource: "detected",
+					LintSourceFile: filepath.Join(workDir, "Makefile"), LintSourceLine: 3,
+				}, nil
+			}},
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.27.0", true, nil },
+				shimDirFn:         func() string { return "/tmp/fgm/shims" },
+			},
+			LintCatalog: catalog,
+			PathEnv:     "/tmp/fgm/shims",
+			Getenv:      func(string) string { return "" },
+		})
+	}
+	hasFinding := func(findings []app.DoctorFinding, severity string, needle string) bool {
+		for _, finding := range findings {
+			if finding.Severity == severity && strings.Contains(finding.Message, needle) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should warn with the pin location when the detected linter cannot run on the resolved Go", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(stubLintCatalog{compatible: false, known: true})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !hasFinding(findings, "WARN", "detected golangci-lint v2.5.0 (Makefile:3) cannot run on Go 1.27.0") {
+				t.Errorf("findings = %+v; want an incompatibility warning", findings)
+			}
+		})
+
+		t.Run("should report the detected pin as OK when the catalog marks it compatible", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(stubLintCatalog{compatible: true, known: true})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !hasFinding(findings, "OK", "repo pins golangci-lint v2.5.0 (detected: Makefile:3)") {
+				t.Errorf("findings = %+v; want the detected pin reported", findings)
+			}
+		})
+	})
+}

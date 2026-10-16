@@ -172,7 +172,11 @@ type Selection struct {
 	// GoBase is the go directive a "latest-patch" selection was raised from.
 	GoBase      string
 	LintVersion string
-	LintSource  string
+	// LintSource is "config", "detected", "local", or "remote".
+	LintSource string
+	// LintSourceFile and LintSourceLine locate a "config" or "detected" lint pin.
+	LintSourceFile string
+	LintSourceLine int
 	// Warnings describe selections that may be stale or ambiguous.
 	Warnings []string
 }

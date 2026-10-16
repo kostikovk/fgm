@@ -151,6 +151,7 @@ func run(
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		LintRemoteProvider: lintReleaseProvider,
+		LintCatalog:        lintReleaseProvider,
 		FGMUpdateChecker:   updateChecker,
 		PathEnv:            getenv("PATH"),
 		Getenv:             getenv,

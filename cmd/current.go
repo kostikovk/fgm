@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/currenttoolchain"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,7 +37,7 @@ func newCurrentCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				return err
 			}
 			if selection.LintVersion != "" {
-				lintLine := ui.FormatCurrentLine("golangci-lint", selection.LintVersion, sourceLabel(selection.LintSource), colWidth)
+				lintLine := ui.FormatCurrentLine("golangci-lint", selection.LintVersion, lintSourceLabel(workDir, selection), colWidth)
 				if _, err := fmt.Fprintln(cmd.OutOrStdout(), lintLine); err != nil {
 					return err
 				}
@@ -67,11 +68,18 @@ func goSourceLabel(selection app.Selection) string {
 	return sourceLabel(selection.GoSource)
 }
 
+func lintSourceLabel(workDir string, selection app.Selection) string {
+	if selection.LintSource == "detected" {
+		return fmt.Sprintf("detected: %s:%d", currenttoolchain.DisplayPath(workDir, selection.LintSourceFile), selection.LintSourceLine)
+	}
+	return sourceLabel(selection.LintSource)
+}
+
 func sourceLabel(source string) string {
 	switch source {
 	case "":
 		return ""
-	case "global", "config", "local", "remote":
+	case "global", "config", "detected", "local", "remote", "latest-patch":
 		return source
 	default:
 		return filepath.Base(source)

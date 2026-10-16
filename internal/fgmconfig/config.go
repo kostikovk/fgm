@@ -75,10 +75,35 @@ func ResolvePinnedLint(workDir string) (string, bool, error) {
 	return version, true, nil
 }
 
+// PinnedLintPath returns the path of the .fgm.toml that pins golangci-lint, if any.
+func PinnedLintPath(workDir string) (string, bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return "", false, err
+	}
+	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
+	if version == "" || version == "auto" {
+		return "", false, nil
+	}
+	return config.Path, true, nil
+}
+
+// LintDetectionEnabled reports whether lint pins may be detected from other repository files.
+func LintDetectionEnabled(workDir string) (bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return err == nil, err
+	}
+	detect := config.File.Toolchain.GolangCILintDetect
+	return detect == nil || *detect, nil
+}
+
 // ToolchainConfig describes FGM-specific toolchain overrides.
 type ToolchainConfig struct {
 	Go           string `toml:"go,omitempty"`
 	GolangCILint string `toml:"golangci_lint,omitempty"`
+	// GolangCILintDetect disables reading lint pins from other repository files when false.
+	GolangCILintDetect *bool `toml:"golangci_lint_detect,omitempty"`
 }
 
 // File describes the supported FGM repo config.

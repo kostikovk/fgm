@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/currenttoolchain"
 	"github.com/kostikovk/fgm/internal/fgmconfig"
 	"github.com/kostikovk/fgm/internal/goenv"
 	"github.com/kostikovk/fgm/internal/toolhint"
@@ -31,6 +32,11 @@ type LintRemoteProvider interface {
 	ListRemoteLintVersions(ctx context.Context, goVersion string) ([]app.LintVersion, error)
 }
 
+// LintCatalog reports offline golangci-lint/Go compatibility from the embedded catalog.
+type LintCatalog interface {
+	LintCompatibility(goVersion string, lintVersion string) (compatible bool, known bool, err error)
+}
+
 // Resolver provides the current toolchain selection for a workspace.
 type Resolver interface {
 	Current(ctx context.Context, workDir string) (app.Selection, error)
@@ -42,6 +48,7 @@ type Config struct {
 	GoStore            GoStore
 	LintStore          LintStore
 	LintRemoteProvider LintRemoteProvider
+	LintCatalog        LintCatalog
 	FGMUpdateChecker   app.FGMUpdateChecker
 	PathEnv            string
 	// Getenv reads the caller's environment; os.Getenv is used when nil.
@@ -54,6 +61,7 @@ type Service struct {
 	goStore            GoStore
 	lintStore          LintStore
 	lintRemoteProvider LintRemoteProvider
+	lintCatalog        LintCatalog
 	fgmUpdateChecker   app.FGMUpdateChecker
 	pathEnv            string
 	getenv             func(string) string
@@ -70,6 +78,7 @@ func New(config Config) *Service {
 		goStore:            config.GoStore,
 		lintStore:          config.LintStore,
 		lintRemoteProvider: config.LintRemoteProvider,
+		lintCatalog:        config.LintCatalog,
 		fgmUpdateChecker:   config.FGMUpdateChecker,
 		pathEnv:            config.PathEnv,
 		getenv:             getenv,
@@ -161,6 +170,9 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 			if pinned {
 				findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "repo pins golangci-lint: " + pinnedLintVersion})
 			}
+			if selection.LintSource == "detected" {
+				findings = append(findings, s.detectedLintFindings(workDir, selection)...)
+			}
 
 			if selection.LintVersion != "" && s.lintStore != nil {
 				if _, err := s.lintStore.LintBinaryPath(ctx, selection.LintVersion); err == nil {
@@ -198,6 +210,28 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 	}
 
 	return findings, nil
+}
+
+func (s *Service) detectedLintFindings(workDir string, selection app.Selection) []app.DoctorFinding {
+	location := fmt.Sprintf("%s:%d", currenttoolchain.DisplayPath(workDir, selection.LintSourceFile), selection.LintSourceLine)
+	findings := []app.DoctorFinding{{
+		Severity: "OK",
+		Message:  fmt.Sprintf("repo pins golangci-lint %s (detected: %s)", selection.LintVersion, location),
+	}}
+	if s.lintCatalog == nil {
+		return findings
+	}
+	compatible, known, err := s.lintCatalog.LintCompatibility(selection.GoVersion, selection.LintVersion)
+	if err != nil || !known || compatible {
+		return findings
+	}
+	return append(findings, app.DoctorFinding{
+		Severity: "WARN",
+		Message: fmt.Sprintf(
+			"detected golangci-lint %s (%s) cannot run on Go %s according to the compatibility catalog",
+			selection.LintVersion, location, selection.GoVersion,
+		),
+	})
 }
 
 func pathContainsDir(pathEnv string, dir string) bool {

@@ -157,8 +157,29 @@ Example `.fgm.toml`:
 ```toml
 [toolchain]
 go = "latest-patch"        # or "1.26.8"; omit to follow go.work/go.mod
-golangci_lint = "v2.11.2"  # or "auto"
+golangci_lint = "v2.11.2"  # or "auto"; omit to use a detected pin
+golangci_lint_detect = true  # false ignores pins in Makefile, workflows, .tool-versions, …
 ```
+
+### Detected `golangci-lint` pins
+
+Without an explicit `golangci_lint` in `.fgm.toml`, FGM looks for the version the repository already pins for CI before falling back to `auto`, and reports where it came from, e.g. `golangci-lint v2.5.0 (detected: Makefile:31)`. Precedence: `.fgm.toml` explicit version → detected pin → `auto`.
+
+Detection is read-only and offline. It searches from the module root up to the repository root (the nearest `.git`, else the `go.work` root):
+
+| Source | Recognised shape |
+|---|---|
+| `.tool-versions` (asdf, nearest) | `golangci-lint 2.5.0` |
+| `mise.toml` / `.mise.toml` (nearest) | `[tools] golangci-lint = "2.5.0"` |
+| module `go.mod` (Go 1.24+ tool directive) | `tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint` plus its `require` version |
+| `.github/workflows/*.yml` | `uses: golangci/golangci-lint-action@…` with `with.version: v2.5.0` |
+| nearest `GNUmakefile`/`makefile`/`Makefile` and `*.mk` | `GOLANGCI_LINT_VERSION ?= v2.5.0` (also `:=`, `::=`, `=`); `golangci-lint@v2.5.0`; `install.sh … v2.5.0` on a line mentioning `golangci-lint` |
+
+- Only exact `X.Y.Z` versions count; `latest` or `v2.5` are not pins. Make variables are matched literally, without evaluation.
+- When detected pins disagree, nothing is selected from detection: `fgm current` falls back to `auto` and prints the candidates on stderr, and `fgm doctor` reports a `WARN` with each `file:line`.
+- A workflow pin applies to a module when the step's `with.working-directory` (or the job's `defaults.run.working-directory`) equals the module path relative to the repository root, or when the repository has a single module. Reusable workflows called from another repository are not followed.
+- Detected versions go through the same compatibility check as explicit pins: `fgm doctor` warns when the catalog says the linter cannot run on the resolved Go.
+- Opt out with `golangci_lint_detect = false` under `[toolchain]`.
 
 > [!IMPORTANT]
 > Remote `golangci-lint` compatibility resolution combines FGM's generated catalog in [`internal/golangcilint/compatibility.json`](../internal/golangcilint/compatibility.json) with live GitHub release lookups, rather than a complete offline historical matrix.
