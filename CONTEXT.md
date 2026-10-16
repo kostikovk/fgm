@@ -19,7 +19,8 @@ Fast Go Manager (`fgm`) is a single-binary Go CLI that manages Go toolchains, `g
 | `.agents/skills/*/SKILL.md` | Task-specific engineering workflows, boundaries, and reference routing |
 | `.agents/skills/*/references/*.md` | Focused technical procedures and language/framework guidance |
 | [README.md](README.md) | User-facing overview, installation entrypoints, quick-start example, and documentation navigation |
-| [Documentation](docs/README.md) | Installation and project setup guides, AI agent setup prompt, CLI/configuration reference, and development instructions |
+| [`setup-fgm/action.yml`](setup-fgm/action.yml) | Composite GitHub Action that installs a pinned fgm, resolves and caches the toolchain, and exports `PATH`/`GOTOOLCHAIN=local`; exercised by `.github/workflows/ci.yml` on Linux and macOS |
+| [Documentation](docs/README.md) | Installation and project setup guides, CI usage, AI agent setup prompt, CLI/configuration reference, and development instructions |
 | `site/` | Static landing page (`Next.js 16`, `TypeScript 7`, `output: "export"`, `basePath: "/fgm"`) and Playwright E2E test suite (`site/e2e/landing.spec.ts`) deployed via `.github/workflows/pages.yml` |
 | This file | Project purpose, domain terms, layered architecture, package ownership, and invariants |
 
@@ -101,7 +102,7 @@ fgm/
 
 ### Build metadata injection
 
-`main.go` declares `buildVersion`, `buildCommit`, and `buildDate`, injected at build time via `-ldflags -X` in `Makefile` and `.goreleaser.yaml`. `release_files_test.go` guards the integrity of `.goreleaser.yaml`, `.github/workflows/release.yml`, `install.sh`, and `Makefile`.
+`main.go` declares `buildVersion`, `buildCommit`, and `buildDate`, injected at build time via `-ldflags -X` in `Makefile` and `.goreleaser.yaml`. `release_files_test.go` guards the integrity of `.goreleaser.yaml`, `.github/workflows/release.yml`, `install.sh`, `setup-fgm/action.yml`, and `Makefile`; `install_script_test.go` runs `install.sh` against a local release mirror (`FGM_VERSION`, `FGM_RELEASE_BASE_URL`) to prove it fails closed on a checksum mismatch.
 
 ## Architectural invariants
 

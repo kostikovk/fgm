@@ -22,12 +22,20 @@ case "$arch" in
   *) echo "unsupported architecture: $arch" >&2; exit 1 ;;
 esac
 
-api_url="https://api.github.com/repos/$REPO/releases/latest"
-version="$(curl -fsSL "$api_url" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1)"
-
-if [ -z "$version" ]; then
-  echo "failed to resolve latest release from $api_url" >&2
-  exit 1
+# FGM_VERSION pins an exact release tag (for example v0.4.0); unset installs the latest release.
+version="${FGM_VERSION:-}"
+if [ -n "$version" ]; then
+  case "$version" in
+    v*) ;;
+    *) version="v$version" ;;
+  esac
+else
+  api_url="https://api.github.com/repos/$REPO/releases/latest"
+  version="$(curl -fsSL "$api_url" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1)"
+  if [ -z "$version" ]; then
+    echo "failed to resolve latest release from $api_url" >&2
+    exit 1
+  fi
 fi
 
 archive="fgm_${version#v}_${os}_${arch}.tar.gz"
@@ -35,7 +43,8 @@ if [ "$os" = "windows" ]; then
   archive="fgm_${version#v}_${os}_${arch}.zip"
 fi
 
-base_url="https://github.com/$REPO/releases/download/$version"
+# FGM_RELEASE_BASE_URL points at a mirror laid out like GitHub release downloads (<base>/<tag>/<file>).
+base_url="${FGM_RELEASE_BASE_URL:-https://github.com/$REPO/releases/download}/$version"
 archive_path="$TMP_DIR/$archive"
 checksums_path="$TMP_DIR/checksums.txt"
 
@@ -57,8 +66,9 @@ else
   exit 1
 fi
 
+# Fail closed: nothing is extracted or installed unless the archive matches checksums.txt.
 if [ "$actual" != "$expected" ]; then
-  echo "checksum mismatch for $archive" >&2
+  echo "checksum mismatch for $archive (expected $expected, got $actual)" >&2
   exit 1
 fi
 
