@@ -20,7 +20,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm use go <version> --global` | Set global Go version and generate Unix shims |
 | `fgm versions go [--local\|--remote]` | List Go versions (defaults to `--local`) |
 | `fgm versions golangci-lint [--local\|--remote] [--go <ver>]` | List lint versions (defaults to `--local`; `--go` filters only with `--remote`) |
-| `fgm prune [--dry-run]` | Remove unused Go and `golangci-lint` versions not referenced by global default or current workspace |
+| `fgm prune [--all] [--dry-run] [--force]` | Remove unused Go and `golangci-lint` versions not referenced by the global default or the current workspace (`--all`: by any module below the working directory) |
 | `fgm remove go <version>` | Remove an FGM-managed Go version |
 | `fgm remove golangci-lint <version>` | Remove an FGM-managed lint version |
 | `fgm pin go <version\|latest-patch>` | Pin the Go version policy in `.fgm.toml` |
@@ -177,6 +177,17 @@ When the shim directory is missing from `PATH`, `fgm doctor --fix` appends a she
 | Fish | `~/.config/fish/config.fish` |
 
 It prompts for confirmation when `stdin` is an interactive terminal and applies the change automatically when `stdin` is non-terminal. `fgm env --shell powershell` renders a PowerShell `PATH` snippet, but `shims/go` and `shims/golangci-lint` generation is not implemented on Windows.
+
+## Pruning
+
+`fgm prune` removes store versions that nothing keeps: the global default Go (and an installed linter compatible with it) and the versions the current workspace selects are kept. `--dry-run` lists every kept version with the reason, e.g. `Keep Go 1.26.9 (selected by svc/api)`, and what would be removed.
+
+In a repository with several modules, use `fgm prune --all` from its root: it keeps every version selected by any module that `fgm current --all` enumerates (`go.work` `use` entries, else every `go.mod`, skipping `vendor/`, `testdata/`, `node_modules/`, and dot-directories), and stops without removing anything if one of them cannot be resolved.
+
+Without `--all`:
+
+- prune warns when other modules exist that it does not consider — modules below a directory without Go metadata, or the other modules of the current repository;
+- from a directory without its own `go.work`/`go.mod` (ancestors included) it refuses to remove anything unless `--all` or `--force` is given; `--dry-run` still lists what would go.
 
 ## Upgrade behavior
 
