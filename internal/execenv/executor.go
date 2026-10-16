@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/goenv"
 )
 
 // SelectionResolver resolves the selected Go version for a working directory.
@@ -34,6 +35,7 @@ type Executor struct {
 	goLocator   GoBinaryLocator
 	lintLocator LintBinaryLocator
 	pathEnv     string
+	environ     func() []string
 }
 
 // Config configures an Executor.
@@ -42,6 +44,8 @@ type Config struct {
 	GoLocator   GoBinaryLocator
 	LintLocator LintBinaryLocator
 	PathEnv     string
+	// Environ returns the inherited environment; os.Environ is used when nil.
+	Environ func() []string
 }
 
 // New constructs an Executor.
@@ -51,13 +55,18 @@ func New(config Config) *Executor {
 		goLocator:   config.GoLocator,
 		lintLocator: config.LintLocator,
 		pathEnv:     config.PathEnv,
+		environ:     config.Environ,
 	}
 }
 
 // Exec runs a command with the selected Go binary directory prepended to PATH.
-func (e *Executor) Exec(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+func (e *Executor) Exec(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no command provided")
+	}
+	toolchainMode, err := goenv.ParseMode(options.GoToolchain)
+	if err != nil {
+		return err
 	}
 
 	selection, err := e.resolver.Current(ctx, workDir)
@@ -81,7 +90,16 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, stdi
 		}
 	}
 
-	env := withPrependedPath(os.Environ(), pathDirs, e.pathEnv)
+	inherited := os.Environ()
+	if e.environ != nil {
+		inherited = e.environ()
+	}
+	env, warning := goenv.Apply(withPrependedPath(inherited, pathDirs, e.pathEnv), toolchainMode)
+	if warning != "" && stderr != nil {
+		if _, err := fmt.Fprintln(stderr, warning); err != nil {
+			return err
+		}
+	}
 	commandPath, err := resolveCommandPath(args[0], env)
 	if err != nil {
 		return err

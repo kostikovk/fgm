@@ -144,9 +144,15 @@ type Doctor interface {
 	Diagnose(ctx context.Context, workDir string) ([]DoctorFinding, error)
 }
 
+// ExecOptions configures how an Executor builds the child process environment.
+type ExecOptions struct {
+	// GoToolchain is "local" (used when empty) or "inherit"; see internal/goenv.
+	GoToolchain string
+}
+
 // Executor runs commands with a selected Go toolchain on PATH.
 type Executor interface {
-	Exec(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+	Exec(ctx context.Context, workDir string, args []string, options ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 }
 
 // EnvRenderer prints shell-specific environment setup for FGM.

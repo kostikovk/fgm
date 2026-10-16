@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/goenv"
 	"github.com/kostikovk/fgm/internal/shim"
 	"github.com/spf13/cobra"
 )
@@ -73,6 +74,17 @@ func newShimCmd(application *app.App) *cobra.Command {
 }
 
 func runShimBinary(cmd *cobra.Command, binaryPath string, args []string, env []string) error {
+	mode, err := goenv.ParseMode(optsForCommand(cmd).withDefaults().Getenv(goenv.ModeEnvVar))
+	if err != nil {
+		return err
+	}
+	env, warning := goenv.Apply(env, mode)
+	if warning != "" {
+		if _, err := fmt.Fprintln(cmd.ErrOrStderr(), warning); err != nil {
+			return err
+		}
+	}
+
 	execCmd := exec.CommandContext(cmd.Context(), binaryPath, args...)
 	execCmd.Stdin = cmd.InOrStdin()
 	execCmd.Stdout = cmd.OutOrStdout()

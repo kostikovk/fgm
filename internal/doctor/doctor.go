@@ -3,12 +3,14 @@ package doctor
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/kostikovk/fgm/internal/fgmconfig"
+	"github.com/kostikovk/fgm/internal/goenv"
 	"github.com/kostikovk/fgm/internal/toolhint"
 )
 
@@ -42,6 +44,8 @@ type Config struct {
 	LintRemoteProvider LintRemoteProvider
 	FGMUpdateChecker   app.FGMUpdateChecker
 	PathEnv            string
+	// Getenv reads the caller's environment; os.Getenv is used when nil.
+	Getenv func(string) string
 }
 
 // Service reports diagnostics for FGM environment setup.
@@ -52,10 +56,15 @@ type Service struct {
 	lintRemoteProvider LintRemoteProvider
 	fgmUpdateChecker   app.FGMUpdateChecker
 	pathEnv            string
+	getenv             func(string) string
 }
 
 // New constructs a doctor Service.
 func New(config Config) *Service {
+	getenv := config.Getenv
+	if getenv == nil {
+		getenv = os.Getenv
+	}
 	return &Service{
 		resolver:           config.Resolver,
 		goStore:            config.GoStore,
@@ -63,6 +72,7 @@ func New(config Config) *Service {
 		lintRemoteProvider: config.LintRemoteProvider,
 		fgmUpdateChecker:   config.FGMUpdateChecker,
 		pathEnv:            config.PathEnv,
+		getenv:             getenv,
 	}
 }
 
@@ -91,6 +101,19 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 			Severity: "WARN",
 			Message:  fmt.Sprintf("shim dir is not on PATH: %s (for non-interactive runs, use %q)", shimDir, toolhint.ExecCommand()),
 			FixKind:  "shell_profile",
+		})
+	}
+
+	if value := s.getenv("GOTOOLCHAIN"); goenv.OverridesSelection(value) {
+		findings = append(findings, app.DoctorFinding{
+			Severity: "WARN",
+			Message:  fmt.Sprintf("shell sets GOTOOLCHAIN=%s; shims and plain go calls may run a toolchain other than the selected one (fgm exec forces GOTOOLCHAIN=local)", value),
+		})
+	}
+	if value := s.getenv("GOROOT"); value != "" {
+		findings = append(findings, app.DoctorFinding{
+			Severity: "WARN",
+			Message:  fmt.Sprintf("shell sets GOROOT=%s; the selected go binary may use another installation's standard library (unset it; fgm exec drops it)", value),
 		})
 	}
 

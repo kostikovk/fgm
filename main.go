@@ -142,6 +142,7 @@ func run(
 		LintRemoteProvider: lintReleaseProvider,
 		FGMUpdateChecker:   updateChecker,
 		PathEnv:            getenv("PATH"),
+		Getenv:             getenv,
 	})
 	executor := execenv.New(execenv.Config{
 		Resolver:    currentResolver,

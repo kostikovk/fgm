@@ -644,3 +644,84 @@ func TestDiagnose_ReportsFGMUpdateFinding(t *testing.T) {
 		}
 	})
 }
+
+func TestDiagnoseGoToolchainEnvironment(t *testing.T) {
+	t.Parallel()
+
+	newService := func(env map[string]string) *Service {
+		return New(Config{
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.26.0", true, nil },
+				shimDirFn:         func() string { return "/tmp/fgm/shims" },
+			},
+			PathEnv: "/tmp/fgm/shims",
+			Getenv:  func(key string) string { return env[key] },
+		})
+	}
+	findWarning := func(findings []app.DoctorFinding, needle string) bool {
+		for _, finding := range findings {
+			if finding.Severity == "WARN" && strings.Contains(finding.Message, needle) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should warn when the shell sets GOTOOLCHAIN to a toolchain version", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(map[string]string{"GOTOOLCHAIN": "go1.26.8"})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !findWarning(findings, "GOTOOLCHAIN=go1.26.8") {
+				t.Errorf("findings = %+v; want a GOTOOLCHAIN warning", findings)
+			}
+		})
+
+		t.Run("should warn when the shell sets GOROOT", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(map[string]string{"GOROOT": "/opt/go"})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !findWarning(findings, "GOROOT=/opt/go") {
+				t.Errorf("findings = %+v; want a GOROOT warning", findings)
+			}
+		})
+
+		t.Run("should not warn about GOTOOLCHAIN when the shell sets it to auto", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(map[string]string{"GOTOOLCHAIN": "auto"})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if findWarning(findings, "GOTOOLCHAIN") {
+				t.Errorf("findings = %+v; want no GOTOOLCHAIN warning", findings)
+			}
+		})
+	})
+}

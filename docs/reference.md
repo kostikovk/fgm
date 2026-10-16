@@ -11,7 +11,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm current` | Show resolved Go and lint versions with source labels |
 | `fgm doctor [--fix]` | Check installation health and environment (`--fix` adds shell integration to `zsh`/`bash`/`fish` profile) |
 | `fgm env` | Print shell setup (`--shell zsh\|bash\|fish\|powershell`) |
-| `fgm exec [--install] -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` (`--install` installs missing resolved toolchains first) |
+| `fgm exec [--install] [--gotoolchain local\|inherit] -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` and `GOTOOLCHAIN=local` (`--install` installs missing resolved toolchains first) |
 | `fgm import auto` | Auto-import existing Go and `golangci-lint` installations from system locations |
 | `fgm install` | Install resolved Go (and selected `golangci-lint`, if resolved) for the workspace |
 | `fgm install go <version>` | Install a specific Go version |
@@ -66,6 +66,18 @@ The resolved Go version must be installed locally. `fgm exec` searches `PATH` in
 3. Inherited `PATH`.
 
 It does not auto-install missing tools. If the selected linter is missing, unrelated commands still run, but `golangci-lint` may fall back to a different version on the inherited `PATH` or fail to start. Run `fgm install` before relying on the selected linter.
+
+### Go toolchain environment
+
+`fgm exec` and the `go`/`golangci-lint` shims run the child with `GOTOOLCHAIN=local` and without `GOROOT`. The `go` binary on `PATH` already is the selected toolchain, so this keeps "what `fgm current` reports" equal to "what runs" (the official `golang` container images set `GOTOOLCHAIN=local` for the same reason):
+
+- an inherited `GOTOOLCHAIN=go1.X.Y` would make the selected `go` re-exec a different toolchain;
+- an inherited `GOROOT` would make it use another installation's standard library and compiler;
+- with `GOTOOLCHAIN=auto`, a module or dependency that declares a newer `go`/`toolchain` would silently switch toolchains.
+
+A module that needs a newer Go now fails loudly (`requires go >= 1.26.8 (running go 1.26.0; GOTOOLCHAIN=local)`). Update `go.mod` or the pin instead of the environment.
+
+To keep Go's own switching, pass `fgm exec --gotoolchain inherit` or set `FGM_EXEC_GOTOOLCHAIN=inherit` (the flag wins; shims read only the variable). With `inherit`, fgm prints one warning to stderr when the inherited `GOTOOLCHAIN` is not `local`, `auto`, or empty. `fgm doctor` warns when the shell sets `GOTOOLCHAIN` to a specific toolchain or sets `GOROOT`.
 
 ### Imported installations
 
