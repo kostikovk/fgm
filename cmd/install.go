@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/versionutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -89,7 +91,14 @@ func newInstallGoCmd(application *app.App) *cobra.Command {
 				return fmt.Errorf("go installer is not configured")
 			}
 
-			version := args[0]
+			requested := strings.TrimPrefix(strings.TrimSpace(args[0]), "go")
+			version := versionutil.ToolchainVersion(requested)
+			if version != requested {
+				notice := fmt.Sprintf("%s is a language version; installing its first release, %s", requested, version)
+				if _, err := fmt.Fprintln(cmd.OutOrStdout(), uiFromCmd(cmd).FormatEmptyNotice(notice)); err != nil {
+					return err
+				}
+			}
 			installPath, err := application.GoInstaller.InstallGoVersion(cmd.Context(), version)
 			if err != nil {
 				return err

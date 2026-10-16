@@ -71,3 +71,55 @@ func TestGeneratedGoShim(t *testing.T) {
 		})
 	})
 }
+
+func TestGeneratedGoShimLanguageVersion(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shims are generated on macOS and Linux only")
+	}
+	if testing.Short() {
+		t.Skip("builds the fgm binary")
+	}
+
+	t.Run("go shim", func(t *testing.T) {
+		t.Run("should run Go 1.26.0 when go.mod declares the language version go 1.26", func(t *testing.T) {
+			// Arrange
+			binDir := t.TempDir()
+			build := exec.Command("go", "build", "-o", filepath.Join(binDir, "fgm"), ".")
+			if output, err := build.CombinedOutput(); err != nil {
+				t.Fatalf("build fgm: %v\n%s", err, output)
+			}
+			dataHome := t.TempDir()
+			storeRoot := filepath.Join(dataHome, "fgm")
+			fakeGo := filepath.Join(storeRoot, "go", "1.26.0", "bin", "go")
+			if err := os.MkdirAll(filepath.Dir(fakeGo), 0o755); err != nil {
+				t.Fatalf("mkdir: %v", err)
+			}
+			if err := testutil.WriteExecutable(fakeGo, []byte("#!/bin/sh\necho go1.26.0\n"), 0o755); err != nil {
+				t.Fatalf("write fake go: %v", err)
+			}
+			store := golocal.New(storeRoot, "")
+			if err := store.EnsureShims(); err != nil {
+				t.Fatalf("EnsureShims: %v", err)
+			}
+			module := t.TempDir()
+			if err := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module m\n\ngo 1.26\n"), 0o644); err != nil {
+				t.Fatalf("write go.mod: %v", err)
+			}
+			cmd := exec.Command(filepath.Join(store.ShimDir(), "go"), "version")
+			cmd.Dir = module
+			cmd.Env = append(os.Environ(),
+				"PATH="+binDir+string(os.PathListSeparator)+"/usr/bin"+string(os.PathListSeparator)+"/bin",
+				"XDG_DATA_HOME="+dataHome,
+				"FGM_NO_UPDATE_NOTIFIER=1",
+			)
+
+			// Act
+			output, err := cmd.CombinedOutput()
+
+			// Assert
+			if err != nil || string(output) != "go1.26.0\n" {
+				t.Errorf("shim output %q, err %v; want the 1.26.0 binary to run", output, err)
+			}
+		})
+	})
+}

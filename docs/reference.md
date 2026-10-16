@@ -215,6 +215,8 @@ Inside a repository, FGM resolves Go in this order:
 3. The `go` directive — or, with `go = "latest-patch"`, the newest released patch of that minor (never lower than a `toolchain` directive), shown as `go 1.26.9 (latest-patch of go.mod 1.26.0)`.
 4. Global default when no project metadata is found.
 
+Since Go 1.21 a `go` directive may name a language version without a patch, such as `go 1.26`. No release is named `go1.26`; Go orders `1.26 < 1.26rc1 < 1.26.0`, so FGM selects the lowest stable release that satisfies it, `1.26.0`, and shows the mapping: `go 1.26.0 (go.mod 1.26)` (`"base": "1.26"` in JSON). The same applies to `go.work`, to `.fgm.toml` `go = "1.26"`, to `fgm pin go 1.26` (which writes `1.26.0`), and to `fgm install go 1.26` (which installs `1.26.0` and says so). Pre-1.21 directives such as `go 1.20` name real releases and are unchanged; a `toolchain` directive still wins.
+
 The `go` directive is a *minimum*: `go 1.26.0` written by `go mod init` selects the first 1.26 release with its known standard-library vulnerabilities, while CI usually runs the newest patch. `latest-patch` matches CI without editing `go.mod` for every consumer. Patch data comes from the embedded catalog (refreshed with every fgm release), then the newest installed patch of that minor, in which case `fgm current` and `fgm doctor` warn that the selection may be stale; with neither, the `go` directive is used with a warning. Selection never uses the network, so `fgm current`, `fgm exec`, and the shims always pick the same Go. `fgm check` uses the catalog only, so its findings do not depend on what is installed.
 
 ### Working directory

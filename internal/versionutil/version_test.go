@@ -297,3 +297,40 @@ func TestFindNearestFile(t *testing.T) {
 		}
 	})
 }
+
+func TestToolchainVersion(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ToolchainVersion", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name    string
+			version string
+			want    string
+		}{
+			{name: "should add .0 when a Go 1.21+ language version has no patch", version: "1.26", want: "1.26.0"},
+			{name: "should add .0 when the language version is exactly 1.21", version: "1.21", want: "1.21.0"},
+			{name: "should keep a pre-1.21 version without a patch because it names a release", version: "1.20", want: "1.20"},
+			{name: "should keep a version that already has a patch", version: "1.26.3", want: "1.26.3"},
+			{name: "should keep a release candidate", version: "1.27rc1", want: "1.27rc1"},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// Arrange
+				version := tc.version
+
+				// Act
+				got := ToolchainVersion(version)
+
+				// Assert
+				if got != tc.want {
+					t.Errorf("ToolchainVersion(%q) = %q; want %q", version, got, tc.want)
+				}
+			})
+		}
+	})
+}

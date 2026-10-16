@@ -82,7 +82,7 @@ func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, 
 				policy.Path, policy.Version, metadata.goDirective, metadata.path,
 			)
 		}
-		return app.Selection{GoVersion: policy.Version, GoSource: "config", GoSourceFile: policy.Path}, nil
+		return app.Selection{GoVersion: versionutil.ToolchainVersion(policy.Version), GoSource: "config", GoSourceFile: policy.Path}, nil
 	}
 
 	if found {
@@ -123,11 +123,18 @@ func ValidateGoPin(workDir string, version string) error {
 }
 
 func directiveSelection(metadata versionMetadata) app.Selection {
-	version := metadata.goDirective
 	if metadata.toolchain != "" {
-		version = metadata.toolchain
+		return app.Selection{GoVersion: metadata.toolchain, GoSource: metadata.path, GoSourceFile: metadata.path}
 	}
-	return app.Selection{GoVersion: version, GoSource: metadata.path, GoSourceFile: metadata.path}
+	selection := app.Selection{
+		GoVersion:    versionutil.ToolchainVersion(metadata.goDirective),
+		GoSource:     metadata.path,
+		GoSourceFile: metadata.path,
+	}
+	if selection.GoVersion != metadata.goDirective {
+		selection.GoBase = metadata.goDirective
+	}
+	return selection
 }
 
 func (r *Resolver) latestPatchSelection(ctx context.Context, metadata versionMetadata) (app.Selection, error) {
