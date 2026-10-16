@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 type stubRegistry struct {
@@ -68,7 +70,7 @@ func createExistingGoInstallation(t *testing.T, version string) string {
 		t.Fatalf("mkdir go bin dir: %v", err)
 	}
 	script := "#!/bin/sh\nprintf 'go version go" + version + " darwin/arm64\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -112,7 +114,7 @@ func TestDefaultCandidates_IncludesGoOnPath(t *testing.T) {
 	}
 	goBinary := filepath.Join(binDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.99.0 linux/amd64\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -142,7 +144,7 @@ func TestDefaultCandidates_SkipsFgmShimOnPath(t *testing.T) {
 			t.Fatalf("mkdir shimDir: %v", err)
 		}
 		shimBinary := filepath.Join(shimDir, "go")
-		if err := os.WriteFile(shimBinary, []byte("#!/bin/sh\nexec fgm __shim go \"$@\"\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(shimBinary, []byte("#!/bin/sh\nexec fgm __shim go \"$@\"\n"), 0o755); err != nil {
 			t.Fatalf("write shim binary: %v", err)
 		}
 
@@ -152,7 +154,7 @@ func TestDefaultCandidates_SkipsFgmShimOnPath(t *testing.T) {
 			t.Fatalf("mkdir binDir: %v", err)
 		}
 		goBinary := filepath.Join(binDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.27.2 darwin/arm64\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.27.2 darwin/arm64\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write go binary: %v", err)
 		}
 
@@ -190,7 +192,7 @@ func TestGorootFromPathGo_FindsGoBinary(t *testing.T) {
 		t.Fatalf("mkdir bin dir: %v", err)
 	}
 	goBinary := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -213,7 +215,7 @@ func TestGorootFromPathGo_SkipsEmptyDirSegments(t *testing.T) {
 		t.Fatalf("mkdir bin dir: %v", err)
 	}
 	goBinary := filepath.Join(binDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -258,7 +260,7 @@ func TestDetectVersion_ErrorOnBadOutput(t *testing.T) {
 	}
 	// Output has fewer than 3 fields, so parsing should fail.
 	script := "#!/bin/sh\nprintf 'garbage\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -282,7 +284,7 @@ func TestDetectVersion_ErrorOnEmptyVersion(t *testing.T) {
 	}
 	// Third field is "go" with no version suffix, so TrimPrefix yields "".
 	script := "#!/bin/sh\nprintf 'go version go linux/amd64\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -396,7 +398,7 @@ func TestImportAuto_DetectVersionErrorIsPropagated(t *testing.T) {
 		t.Fatalf("mkdir go bin dir: %v", err)
 	}
 	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -462,7 +464,7 @@ func TestDetectVersionProbeEnvironment(t *testing.T) {
 			t.Setenv("GOROOT", "/nonexistent")
 			goBinary := filepath.Join(t.TempDir(), "go")
 			script := "#!/bin/sh\nif [ \"$GOTOOLCHAIN\" != local ] || [ -n \"${GOROOT+set}\" ]; then printf 'go version go1.26.8 darwin/arm64\\n'; exit 0; fi\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
-			if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+			if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 				t.Fatalf("write fake go: %v", err)
 			}
 

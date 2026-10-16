@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestCommandHints(t *testing.T) {
@@ -114,7 +116,7 @@ func TestCommandHints(t *testing.T) {
 			t.Fatalf("mkdir caskBinDir: %v", err)
 		}
 		realBin := filepath.Join(caskBinDir, "fgm")
-		if err := os.WriteFile(realBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(realBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write realBin: %v", err)
 		}
 

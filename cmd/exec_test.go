@@ -31,7 +31,7 @@ func TestExecCommand_RunsCommandWithSelectedGoOnPATH(t *testing.T) {
 
 	goBinary := filepath.Join(goBinDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.7 darwin/arm64\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -84,11 +84,11 @@ func TestExecCommand_RunsCommandWithSelectedLintOnPATH(t *testing.T) {
 	}
 
 	goBinary := filepath.Join(goBinDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.25.7 darwin/arm64\\n'\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.25.7 darwin/arm64\\n'\n"), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 	lintBinary := filepath.Join(lintBinDir, "golangci-lint")
-	if err := os.WriteFile(lintBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version v2.11.2\\n'\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(lintBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version v2.11.2\\n'\n"), 0o755); err != nil {
 		t.Fatalf("write fake lint binary: %v", err)
 	}
 
@@ -182,11 +182,11 @@ func TestExecCommand_PrefersPinnedLintVersionFromRepoConfig(t *testing.T) {
 	}
 
 	goBinary := filepath.Join(goBinDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.25.0 darwin/arm64\\n'\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.25.0 darwin/arm64\\n'\n"), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 	lintBinary := filepath.Join(lintBinDir, "golangci-lint")
-	if err := os.WriteFile(lintBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version v2.10.1\\n'\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(lintBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version v2.10.1\\n'\n"), 0o755); err != nil {
 		t.Fatalf("write fake lint binary: %v", err)
 	}
 

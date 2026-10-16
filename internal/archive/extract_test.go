@@ -10,6 +10,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestFilenameSuffix(t *testing.T) {
@@ -1538,7 +1540,7 @@ func TestMoveAtomically_CrossDeviceFallback(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(srcDir, "bin"), 0o755); err != nil {
 			t.Fatalf("MkdirAll: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(srcDir, "bin", "go"), []byte("#!/bin/sh\necho go\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(filepath.Join(srcDir, "bin", "go"), []byte("#!/bin/sh\necho go\n"), 0o755); err != nil {
 			t.Fatalf("WriteFile: %v", err)
 		}
 		dstParent := t.TempDir()
@@ -1574,7 +1576,7 @@ func TestMoveAtomically_CrossDeviceFallback(t *testing.T) {
 	t.Run("should stage file in destination parent and rename atomically when Rename returns EXDEV", func(t *testing.T) {
 		// Arrange
 		srcFile := filepath.Join(t.TempDir(), "golangci-lint")
-		if err := os.WriteFile(srcFile, []byte("#!/bin/sh\necho lint\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(srcFile, []byte("#!/bin/sh\necho lint\n"), 0o755); err != nil {
 			t.Fatalf("WriteFile: %v", err)
 		}
 		dstParent := t.TempDir()

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestStoreListLocalLintVersions_ReturnsInstalledVersions(t *testing.T) {
@@ -19,7 +21,7 @@ func TestStoreListLocalLintVersions_ReturnsInstalledVersions(t *testing.T) {
 	if err := os.MkdirAll(versionDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(versionDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(filepath.Join(versionDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -27,7 +29,7 @@ func TestStoreListLocalLintVersions_ReturnsInstalledVersions(t *testing.T) {
 	if err := os.MkdirAll(olderDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll older: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(olderDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(filepath.Join(olderDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
 		t.Fatalf("WriteFile older: %v", err)
 	}
 
@@ -56,7 +58,7 @@ func TestStoreDeleteLintVersion_RemovesManagedVersion(t *testing.T) {
 	if err := os.MkdirAll(versionDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(versionDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(filepath.Join(versionDir, "golangci-lint"), []byte("binary"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -80,7 +82,7 @@ func TestStoreRegisterExistingLintInstallation_CreatesSymlinkedManagedVersion(t 
 	root := t.TempDir()
 	externalDir := t.TempDir()
 	externalBinary := filepath.Join(externalDir, "golangci-lint")
-	if err := os.WriteFile(externalBinary, []byte("binary"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(externalBinary, []byte("binary"), 0o755); err != nil {
 		t.Fatalf("WriteFile external: %v", err)
 	}
 
@@ -113,7 +115,7 @@ func TestStoreLintBinaryPath_ReturnsBinaryPath(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	binaryPath := filepath.Join(versionDir, "golangci-lint")
-	if err := os.WriteFile(binaryPath, []byte("binary"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte("binary"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -284,7 +286,7 @@ func TestStoreRegisterExistingLintInstallation_IdempotentIfExists(t *testing.T) 
 	root := t.TempDir()
 	externalDir := t.TempDir()
 	externalBinary := filepath.Join(externalDir, "golangci-lint")
-	if err := os.WriteFile(externalBinary, []byte("binary"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(externalBinary, []byte("binary"), 0o755); err != nil {
 		t.Fatalf("WriteFile external: %v", err)
 	}
 
@@ -362,7 +364,7 @@ func TestStoreDeleteLintVersion_RemoveAllError(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	// Put a file inside the version directory.
-	if err := os.WriteFile(filepath.Join(versionDir, "golangci-lint"), []byte("bin"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(filepath.Join(versionDir, "golangci-lint"), []byte("bin"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	// Make the parent directory read-only to prevent removal of children.
@@ -445,7 +447,7 @@ func TestStoreListLocalLintVersions_SkipsHiddenStagingDirs(t *testing.T) {
 			if err := os.MkdirAll(filepath.Dir(binPath), 0o755); err != nil {
 				t.Fatalf("MkdirAll: %v", err)
 			}
-			if err := os.WriteFile(binPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			if err := testutil.WriteExecutable(binPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
 				t.Fatalf("WriteFile: %v", err)
 			}
 		}

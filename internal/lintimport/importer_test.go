@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 type stubRegistry struct {
@@ -65,7 +67,7 @@ func createExistingLintBinary(t *testing.T, version string) string {
 	binDir := t.TempDir()
 	binaryPath := filepath.Join(binDir, "golangci-lint")
 	script := "#!/bin/sh\nprintf 'golangci-lint has version " + version + " built with go1.25.0\\n'\n"
-	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake lint binary: %v", err)
 	}
 
@@ -81,7 +83,7 @@ func TestDefaultCandidates_IncludesBinaryOnPath(t *testing.T) {
 
 	binDir := t.TempDir()
 	binaryPath := filepath.Join(binDir, "golangci-lint")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -109,13 +111,13 @@ func TestDefaultCandidates_SkipsFgmShimOnPath(t *testing.T) {
 			t.Fatalf("mkdir shimDir: %v", err)
 		}
 		shimBinary := filepath.Join(shimDir, "golangci-lint")
-		if err := os.WriteFile(shimBinary, []byte("#!/bin/sh\nexec fgm __shim golangci-lint \"$@\"\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(shimBinary, []byte("#!/bin/sh\nexec fgm __shim golangci-lint \"$@\"\n"), 0o755); err != nil {
 			t.Fatalf("write shim binary: %v", err)
 		}
 
 		realDir := t.TempDir()
 		realBinary := filepath.Join(realDir, "golangci-lint")
-		if err := os.WriteFile(realBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version 2.11.2\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(realBinary, []byte("#!/bin/sh\nprintf 'golangci-lint has version 2.11.2\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write real binary: %v", err)
 		}
 
@@ -165,7 +167,7 @@ func TestBinaryFromPath_FindsBinary(t *testing.T) {
 
 	binDir := t.TempDir()
 	binaryPath := filepath.Join(binDir, "golangci-lint")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -213,7 +215,7 @@ func TestDetectVersion_ParsesOutput(t *testing.T) {
 	binDir := t.TempDir()
 	binaryPath := filepath.Join(binDir, "golangci-lint")
 	script := "#!/bin/sh\nprintf 'golangci-lint has version 1.57.2 built with go1.21.0 from abc123 on linux/amd64\\n'\n"
-	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -315,7 +317,7 @@ func TestDetectVersion_ErrorOnOutputWithoutVersionKeyword(t *testing.T) {
 	binaryPath := filepath.Join(binDir, "golangci-lint")
 	// Output has no "version" keyword at all.
 	script := "#!/bin/sh\nprintf 'golangci-lint 1.57.2 built with go1.21.0\\n'\n"
-	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -336,7 +338,7 @@ func TestDetectVersion_ErrorOnEmptyVersionAfterKeyword(t *testing.T) {
 	binaryPath := filepath.Join(binDir, "golangci-lint")
 	// "version" is the last field, so idx+1 is out of bounds for fields.
 	script := "#!/bin/sh\nprintf 'golangci-lint has version\\n'\n"
-	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -357,7 +359,7 @@ func TestDetectVersion_ErrorOnVersionKeywordFollowedByV(t *testing.T) {
 	binaryPath := filepath.Join(binDir, "golangci-lint")
 	// "version" keyword followed by just "v" which after TrimPrefix("v") yields "".
 	script := "#!/bin/sh\nprintf 'golangci-lint has version v\\n'\n"
-	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -401,7 +403,7 @@ func TestImportAuto_DetectVersionErrorIsPropagated(t *testing.T) {
 	binDir := t.TempDir()
 	binaryPath := filepath.Join(binDir, "golangci-lint")
 	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(binaryPath, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake binary: %v", err)
 	}
 
@@ -444,7 +446,7 @@ func TestBinaryFromPath_SkipsEmptySegments(t *testing.T) {
 
 	binDir := t.TempDir()
 	binaryPath := filepath.Join(binDir, "golangci-lint")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 

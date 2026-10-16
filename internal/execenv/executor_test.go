@@ -14,6 +14,7 @@ import (
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/kostikovk/fgm/internal/lintlocal"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 type stubResolver struct {
@@ -55,7 +56,7 @@ func TestExecutorExec_PrependsSelectedGoBinaryDirToPATH(t *testing.T) {
 
 	goBinary := filepath.Join(goBinDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.7 darwin/arm64\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -106,7 +107,7 @@ func TestExecutorExec_PrependsSelectedLintBinaryDirToPATH(t *testing.T) {
 
 	lintBinary := filepath.Join(lintBinDir, "golangci-lint")
 	script := "#!/bin/sh\nprintf 'golangci-lint has version v2.11.2\\n'\n"
-	if err := os.WriteFile(lintBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(lintBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake lint binary: %v", err)
 	}
 
@@ -314,7 +315,7 @@ func TestResolveCommandPath_FindsExecutableOnPATH(t *testing.T) {
 
 	dir := t.TempDir()
 	execFile := filepath.Join(dir, "mytool")
-	if err := os.WriteFile(execFile, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(execFile, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write executable file: %v", err)
 	}
 
@@ -407,7 +408,7 @@ func TestExecutorExec_ReturnsErrorWhenCommandNotFoundOnPATH(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	goBinary := filepath.Join(goBinDir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
@@ -451,7 +452,7 @@ func TestResolveCommandPath_SkipsEmptyDirsInPATH(t *testing.T) {
 
 	dir := t.TempDir()
 	execFile := filepath.Join(dir, "mytool")
-	if err := os.WriteFile(execFile, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(execFile, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write executable file: %v", err)
 	}
 
@@ -499,7 +500,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		}
 		goBinary := filepath.Join(goBinDir, "go")
 		script := "#!/bin/sh\nprintf 'args=%s cwd=%s\\n' \"$*\" \"$(pwd)\"\n"
-		if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 		lintStore := lintlocal.New(t.TempDir())
@@ -558,7 +559,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 			t.Fatalf("mkdir go bin dir: %v", err)
 		}
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go env ok\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go env ok\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 		lintStore := lintlocal.New(t.TempDir())
@@ -615,15 +616,15 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		}
 
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go: %v", err)
 		}
 		managedLint := filepath.Join(managedLintDir, "golangci-lint")
-		if err := os.WriteFile(managedLint, []byte("#!/bin/sh\nprintf 'managed v2.11.2 path=%s\\n' \"$PATH\"\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(managedLint, []byte("#!/bin/sh\nprintf 'managed v2.11.2 path=%s\\n' \"$PATH\"\n"), 0o755); err != nil {
 			t.Fatalf("write managed lint: %v", err)
 		}
 		inheritedLint := filepath.Join(inheritedLintDir, "golangci-lint")
-		if err := os.WriteFile(inheritedLint, []byte("#!/bin/sh\nprintf 'inherited v1.64.0\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(inheritedLint, []byte("#!/bin/sh\nprintf 'inherited v1.64.0\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write inherited lint: %v", err)
 		}
 		t.Setenv("PATH", inheritedLintDir)
@@ -689,11 +690,11 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		}
 
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go: %v", err)
 		}
 		inheritedLint := filepath.Join(inheritedLintDir, "golangci-lint")
-		if err := os.WriteFile(inheritedLint, []byte("#!/bin/sh\nprintf 'inherited v1.64.0\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(inheritedLint, []byte("#!/bin/sh\nprintf 'inherited v1.64.0\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write inherited lint: %v", err)
 		}
 		t.Setenv("PATH", inheritedLintDir)
@@ -747,7 +748,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 			t.Fatalf("mkdir go bin dir: %v", err)
 		}
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go: %v", err)
 		}
 		t.Setenv("PATH", "")
@@ -801,7 +802,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 			t.Fatalf("mkdir go bin dir: %v", err)
 		}
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go: %v", err)
 		}
 
@@ -906,7 +907,7 @@ func TestExecutorGoToolchainEnvironment(t *testing.T) {
 		t.Helper()
 		goBinDir := t.TempDir()
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 		return New(Config{
@@ -1018,12 +1019,12 @@ func TestExecutorUnselectedLint(t *testing.T) {
 	newFixture := func(t *testing.T) fixture {
 		t.Helper()
 		goBinary := filepath.Join(t.TempDir(), "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 		foreignDir := t.TempDir()
 		foreignLint := filepath.Join(foreignDir, "golangci-lint")
-		if err := os.WriteFile(foreignLint, []byte("#!/bin/sh\nprintf 'foreign lint\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(foreignLint, []byte("#!/bin/sh\nprintf 'foreign lint\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write foreign lint: %v", err)
 		}
 		executor := New(Config{
