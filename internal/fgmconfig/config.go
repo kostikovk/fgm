@@ -146,23 +146,76 @@ func SaveNearest(workDir string, file File) (string, error) {
 	return path, nil
 }
 
-// UpdateNearest applies update to the .fgm.toml that SaveNearest would write and saves it,
-// preserving keys that update does not change.
+// knownKeys lists the .fgm.toml keys owned by File; UpdateNearest keeps every other key.
+var knownKeys = map[string][]string{
+	"toolchain": {"go", "golangci_lint", "golangci_lint_detect"},
+	"check":     {"skip"},
+}
+
+// UpdateNearest applies update to the .fgm.toml that SaveNearest would write and saves it.
+// Keys and tables fgm does not know are kept; comments and formatting are not.
 func UpdateNearest(workDir string, update func(*File)) (string, error) {
 	path, err := resolveWritePath(workDir)
 	if err != nil {
 		return "", err
 	}
 	var file File
+	raw := map[string]any{}
 	if content, err := os.ReadFile(path); err == nil {
 		if err := toml.Unmarshal(content, &file); err != nil {
+			return "", fmt.Errorf("parse %s: %w", path, err)
+		}
+		if err := toml.Unmarshal(content, &raw); err != nil {
 			return "", fmt.Errorf("parse %s: %w", path, err)
 		}
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}
 	update(&file)
-	return SaveNearest(workDir, file)
+
+	encoded, err := toml.Marshal(file)
+	if err != nil {
+		return "", fmt.Errorf("marshal %s: %w", path, err)
+	}
+	typed := map[string]any{}
+	if err := toml.Unmarshal(encoded, &typed); err != nil {
+		return "", fmt.Errorf("marshal %s: %w", path, err)
+	}
+	for section, keys := range knownKeys {
+		merged, _ := raw[section].(map[string]any)
+		if merged == nil {
+			merged = map[string]any{}
+		}
+		values, _ := typed[section].(map[string]any)
+		for _, key := range keys {
+			if value, ok := values[key]; ok {
+				merged[key] = value
+			} else {
+				delete(merged, key)
+			}
+		}
+		if len(merged) == 0 {
+			delete(raw, section)
+		} else {
+			raw[section] = merged
+		}
+	}
+
+	content, err := toml.Marshal(raw)
+	if err != nil {
+		return "", fmt.Errorf("marshal %s: %w", path, err)
+	}
+	return path, writeConfig(path, content)
+}
+
+func writeConfig(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
 }
 
 // LoadNearest loads the nearest .fgm.toml by walking upward from workDir.

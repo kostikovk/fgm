@@ -3,6 +3,7 @@ package goenv
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 )
 
@@ -38,8 +39,7 @@ func ParseMode(value string) (Mode, error) {
 func Apply(env []string, mode Mode) ([]string, string) {
 	if mode == ModeInherit {
 		value, _ := lookup(env, "GOTOOLCHAIN")
-		switch value {
-		case "", "local", "auto":
+		if !OverridesSelection(value) {
 			return env, ""
 		}
 		return env, fmt.Sprintf("fgm: warning: inherited GOTOOLCHAIN=%s may run a Go toolchain other than the selected one", value)
@@ -47,7 +47,7 @@ func Apply(env []string, mode Mode) ([]string, string) {
 
 	result := make([]string, 0, len(env)+1)
 	for _, entry := range env {
-		if strings.HasPrefix(entry, "GOTOOLCHAIN=") || strings.HasPrefix(entry, "GOROOT=") {
+		if hasKey(entry, "GOTOOLCHAIN") || hasKey(entry, "GOROOT") {
 			continue
 		}
 		result = append(result, entry)
@@ -66,11 +66,21 @@ func OverridesSelection(value string) bool {
 }
 
 func lookup(env []string, key string) (string, bool) {
-	prefix := key + "="
 	for _, entry := range env {
-		if value, ok := strings.CutPrefix(entry, prefix); ok {
-			return value, true
+		if hasKey(entry, key) {
+			return entry[len(key)+1:], true
 		}
 	}
 	return "", false
+}
+
+// hasKey reports whether entry assigns key; Windows environment names are case-insensitive.
+func hasKey(entry string, key string) bool {
+	if len(entry) <= len(key) || entry[len(key)] != '=' {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(entry[:len(key)], key)
+	}
+	return entry[:len(key)] == key
 }

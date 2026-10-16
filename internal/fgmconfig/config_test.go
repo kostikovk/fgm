@@ -575,3 +575,38 @@ func TestGoPolicy(t *testing.T) {
 		})
 	})
 }
+
+func TestUpdateNearestKeepsUnknownKeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("UpdateNearest", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should keep tables fgm does not know when a toolchain key is written", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, fileName), []byte("[custom]\nowner = \"team\"\n\n[toolchain]\ngolangci_lint = \"v2.9.0\"\n"), 0o644); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+
+			// Act
+			path, err := UpdateNearest(dir, func(file *File) { file.Toolchain.Go = "latest-patch" })
+
+			// Assert
+			if err != nil {
+				t.Fatalf("UpdateNearest: %v", err)
+			}
+			content, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			for _, want := range []string{"[custom]", "owner = 'team'", "golangci_lint = 'v2.9.0'", "go = 'latest-patch'"} {
+				if !strings.Contains(string(content), want) {
+					t.Errorf("content = %q; want it to contain %q", content, want)
+				}
+			}
+		})
+	})
+}

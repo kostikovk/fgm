@@ -2,7 +2,6 @@ package resolve
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,10 +18,6 @@ func (s stubPatchCatalog) LatestGoPatch(goVersion string) (string, bool, error) 
 type stubVersionList struct {
 	versions []string
 	err      error
-}
-
-func (s stubVersionList) ListRemoteGoVersions(ctx context.Context) ([]string, error) {
-	return s.versions, s.err
 }
 
 func (s stubVersionList) ListLocalGoVersions(ctx context.Context) ([]string, error) {
@@ -123,18 +118,18 @@ func TestResolverGoPolicy(t *testing.T) {
 			wantBase:   "1.26.0",
 		},
 		{
-			name:       "should use the remote releases when the catalog lacks the minor",
+			name:       "should use the go directive with a warning when no patch data exists",
 			files:      map[string]string{"go.mod": "module m\n\ngo 1.28.0\n", ".fgm.toml": "[toolchain]\ngo = \"latest-patch\"\n"},
-			config:     Config{PatchCatalog: catalog, RemoteVersions: stubVersionList{versions: []string{"1.28.2", "1.28.1", "1.27.9"}}},
-			wantGo:     "1.28.2",
-			wantSource: "latest-patch",
+			config:     Config{PatchCatalog: catalog},
+			wantGo:     "1.28.0",
+			wantSource: "go.mod",
 			wantFile:   "go.mod",
-			wantBase:   "1.28.0",
+			wantWarn:   true,
 		},
 		{
-			name:       "should fall back to the newest installed patch with a warning when offline",
+			name:       "should fall back to the newest installed patch with a warning when the catalog lacks the minor",
 			files:      map[string]string{"go.mod": "module m\n\ngo 1.28.0\n", ".fgm.toml": "[toolchain]\ngo = \"latest-patch\"\n"},
-			config:     Config{PatchCatalog: catalog, RemoteVersions: stubVersionList{err: errors.New("offline")}, LocalVersions: stubVersionList{versions: []string{"1.28.1", "1.27.9"}}},
+			config:     Config{PatchCatalog: catalog, LocalVersions: stubVersionList{versions: []string{"1.28.1", "1.27.9"}}},
 			wantGo:     "1.28.1",
 			wantSource: "latest-patch",
 			wantFile:   "go.mod",

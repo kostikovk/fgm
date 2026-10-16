@@ -60,7 +60,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `golangci_lint` | `null` when no linter is selected. `source` is `config`, `detected` (with `source_line`), `local`, or `remote`. |
 | `golangci_lint.compatible` | Catalog verdict for the selected Go; `null` when the catalog does not know the version. |
 | `warnings` | Stale `latest-patch` data, conflicting detected lint pins, and similar notes. |
-| `error` | Present only in `--all` entries whose module failed to resolve; `go` and `golangci_lint` are then `null`. |
+| `error` | Present only when the module failed to resolve (the exit status is then `1`); `go` and `golangci_lint` are then `null`. |
 
 `fgm current --all [--json]` reports every module under the working directory: the `use` entries of the nearest `go.work` that lie under it, otherwise every `go.mod` below it, skipping `vendor/`, `testdata/`, `node_modules/` and dot-directories and never following symlinks out of the root. Modules are listed in lexical order; JSON output is an array, text output is one line per module.
 
@@ -191,7 +191,7 @@ Inside a repository, FGM resolves Go in this order:
 3. The `go` directive — or, with `go = "latest-patch"`, the newest released patch of that minor (never lower than a `toolchain` directive), shown as `go 1.26.9 (latest-patch of go.mod 1.26.0)`.
 4. Global default when no project metadata is found.
 
-The `go` directive is a *minimum*: `go 1.26.0` written by `go mod init` selects the first 1.26 release with its known standard-library vulnerabilities, while CI usually runs the newest patch. `latest-patch` matches CI without editing `go.mod` for every consumer. Patch data comes from the embedded catalog, then `go.dev` releases (not used by the shims, which stay offline), then the newest installed patch of that minor, in which case `fgm current` and `fgm doctor` warn that the selection may be stale.
+The `go` directive is a *minimum*: `go 1.26.0` written by `go mod init` selects the first 1.26 release with its known standard-library vulnerabilities, while CI usually runs the newest patch. `latest-patch` matches CI without editing `go.mod` for every consumer. Patch data comes from the embedded catalog (refreshed with every fgm release), then the newest installed patch of that minor, in which case `fgm current` and `fgm doctor` warn that the selection may be stale; with neither, the `go` directive is used with a warning. Selection never uses the network, so `fgm current`, `fgm exec`, and the shims always pick the same Go. `fgm check` uses the catalog only, so its findings do not depend on what is installed.
 
 ### Working directory
 

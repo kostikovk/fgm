@@ -6,6 +6,7 @@ package repocheck
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,7 +47,7 @@ func New(config Config) *Service {
 var (
 	minorPattern      = regexp.MustCompile(`([0-9]+)\.([0-9]+)`)
 	dockerFromPattern = regexp.MustCompile(`(?i)^\s*FROM\s+(?:--\S+\s+)*(?:\S+/)?golang:(\S+)`)
-	tagVersionPattern = regexp.MustCompile(`^([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:$|-)`)
+	tagVersionPattern = regexp.MustCompile(`^([0-9]+\.[0-9]+(?:\.[0-9]+)?)(?:$|-|@)`)
 )
 
 // Check reports the findings for the module containing dir.
@@ -341,6 +342,9 @@ func moduleWorkflowSteps(module moduleFacts) ([]workflowStep, error) {
 	var steps []workflowStep
 	for _, file := range files {
 		parsed, err := lintdetect.ParseWorkflowSteps(file)
+		if errors.Is(err, lintdetect.ErrInvalidWorkflow) {
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}

@@ -164,3 +164,32 @@ func dirsOf(reports []app.CurrentReport) []string {
 	}
 	return dirs
 }
+
+func TestModuleDirsAbsoluteUse(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ModuleDirs", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should include an absolute go.work use path when it lies under the directory", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := writeTree(t, map[string]string{"b/go.mod": "module b\n"})
+			if err := os.WriteFile(filepath.Join(root, "go.work"), []byte("go 1.26.0\n\nuse "+filepath.Join(root, "b")+"\n"), 0o644); err != nil {
+				t.Fatalf("write go.work: %v", err)
+			}
+
+			// Act
+			dirs, err := ModuleDirs(root)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("ModuleDirs: %v", err)
+			}
+			if len(dirs) != 1 || dirs[0] != filepath.Join(root, "b") {
+				t.Errorf("dirs = %v; want [%s]", dirs, filepath.Join(root, "b"))
+			}
+		})
+	})
+}

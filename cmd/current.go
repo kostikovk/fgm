@@ -38,9 +38,15 @@ func newCurrentCmd(application *app.App, v *viper.Viper) *cobra.Command {
 			if !all {
 				report, err := application.CurrentReporter.Report(cmd.Context(), workDir)
 				if err != nil {
-					return err
+					report.Error = err.Error()
 				}
-				return writeJSON(cmd.OutOrStdout(), report)
+				if writeErr := writeJSON(cmd.OutOrStdout(), report); writeErr != nil {
+					return writeErr
+				}
+				if err != nil {
+					return &ExitError{Code: 1, Err: err, Silent: true}
+				}
+				return nil
 			}
 
 			reports, err := application.CurrentReporter.ReportAll(cmd.Context(), workDir)

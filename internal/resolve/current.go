@@ -24,22 +24,19 @@ type PatchCatalog interface {
 	LatestGoPatch(goVersion string) (string, bool, error)
 }
 
-// RemoteVersionLister lists released Go versions from the network.
-type RemoteVersionLister interface {
-	ListRemoteGoVersions(ctx context.Context) ([]string, error)
-}
-
 // LocalVersionLister lists installed Go versions.
 type LocalVersionLister interface {
 	ListLocalGoVersions(ctx context.Context) ([]string, error)
 }
 
 // Config configures a Resolver. Only Global is needed without a latest-patch policy.
+//
+// Selection never uses the network: shims run it on every go call, and fgm current must
+// report exactly what the shims and fgm exec run.
 type Config struct {
-	Global         GlobalVersionSource
-	PatchCatalog   PatchCatalog
-	RemoteVersions RemoteVersionLister
-	LocalVersions  LocalVersionLister
+	Global        GlobalVersionSource
+	PatchCatalog  PatchCatalog
+	LocalVersions LocalVersionLister
 }
 
 // Resolver locates Go toolchain metadata from workspace files.
@@ -112,6 +109,19 @@ func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, 
 	)
 }
 
+// ValidateGoPin reports an error when version is lower than the go directive of the nearest
+// go.work or go.mod, which Go itself would refuse to build with.
+func ValidateGoPin(workDir string, version string) error {
+	metadata, found, err := findVersionMetadata(workDir)
+	if err != nil || !found {
+		return err
+	}
+	if versionutil.CompareVersions(version, metadata.goDirective) < 0 {
+		return fmt.Errorf("go %s is lower than the go %s directive in %s", version, metadata.goDirective, metadata.path)
+	}
+	return nil
+}
+
 func directiveSelection(metadata versionMetadata) app.Selection {
 	version := metadata.goDirective
 	if metadata.toolchain != "" {
@@ -149,9 +159,8 @@ func (r *Resolver) latestPatchSelection(ctx context.Context, metadata versionMet
 	return selection, nil
 }
 
-// latestPatch looks up the newest patch of goDirective's minor: embedded catalog, then remote
-// releases, then installed versions (flagged as possibly stale). The result is never lower than
-// goDirective itself.
+// latestPatch looks up the newest patch of goDirective's minor: embedded catalog, then installed
+// versions (flagged as possibly stale). The result is never lower than goDirective itself.
 func (r *Resolver) latestPatch(ctx context.Context, goDirective string) (string, string, bool, error) {
 	if r.config.PatchCatalog != nil {
 		version, ok, err := r.config.PatchCatalog.LatestGoPatch(goDirective)
@@ -160,13 +169,6 @@ func (r *Resolver) latestPatch(ctx context.Context, goDirective string) (string,
 		}
 		if ok {
 			return maxVersion(version, goDirective), "", true, nil
-		}
-	}
-	if r.config.RemoteVersions != nil {
-		if versions, err := r.config.RemoteVersions.ListRemoteGoVersions(ctx); err == nil {
-			if version, ok := newestPatch(versions, goDirective); ok {
-				return maxVersion(version, goDirective), "", true, nil
-			}
 		}
 	}
 	if r.config.LocalVersions != nil {

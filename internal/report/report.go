@@ -140,7 +140,11 @@ func ModuleDirs(dir string) ([]string, error) {
 	}
 	var modules []string
 	for _, use := range uses {
-		module := filepath.Clean(filepath.Join(workRoot, use))
+		module := use
+		if !filepath.IsAbs(module) {
+			module = filepath.Join(workRoot, module)
+		}
+		module = filepath.Clean(module)
 		if !workspace.Contains(dir, module) {
 			continue
 		}

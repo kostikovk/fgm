@@ -154,3 +154,20 @@ func TestOverridesSelection(t *testing.T) {
 		}
 	})
 }
+
+func TestApplyInheritWarningMatchesDoctor(t *testing.T) {
+	t.Run("Apply", func(t *testing.T) {
+		t.Run("should not warn when the inherited GOTOOLCHAIN is path in inherit mode", func(t *testing.T) {
+			// Arrange
+			env := []string{"GOTOOLCHAIN=path"}
+
+			// Act
+			_, warning := Apply(env, ModeInherit)
+
+			// Assert
+			if warning != "" {
+				t.Errorf("warning = %q; want none", warning)
+			}
+		})
+	})
+}

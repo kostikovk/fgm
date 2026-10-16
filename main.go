@@ -123,17 +123,10 @@ func run(
 		LintInstaller:      lintInstaller,
 		GlobalStore:        goStore,
 	})
-	// Shims run on every go invocation, so their resolver never touches the network.
-	offlineGoResolver := resolve.NewWithConfig(resolve.Config{
+	goResolver := resolve.NewWithConfig(resolve.Config{
 		Global:        goStore,
 		PatchCatalog:  lintReleaseProvider,
 		LocalVersions: goStore,
-	})
-	goResolver := resolve.NewWithConfig(resolve.Config{
-		Global:         goStore,
-		PatchCatalog:   lintReleaseProvider,
-		RemoteVersions: goReleaseProvider,
-		LocalVersions:  goStore,
 	})
 	currentResolver := currenttoolchain.New(currenttoolchain.Config{
 		GoResolver:          goResolver,
@@ -170,10 +163,13 @@ func run(
 		ShellPath: getenv("SHELL"),
 		GOOS:      runtime.GOOS,
 	})
-	// fgm check must give identical results offline: no go.dev releases, no GitHub lint
-	// releases, and no dependence on locally installed linters.
+	// fgm check findings must not depend on the network or on what is installed locally:
+	// catalog-only Go patch data and lint selection.
 	offlineResolver := currenttoolchain.New(currenttoolchain.Config{
-		GoResolver:          offlineGoResolver,
+		GoResolver: resolve.NewWithConfig(resolve.Config{
+			Global:       goStore,
+			PatchCatalog: lintReleaseProvider,
+		}),
 		LintCatalogProvider: lintReleaseProvider,
 	})
 	repoChecker := repocheck.New(repocheck.Config{
@@ -193,7 +189,7 @@ func run(
 	}
 	application := &app.App{
 		Resolver:           currentResolver,
-		GoResolver:         offlineGoResolver,
+		GoResolver:         goResolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		GoRemoteProvider:   goReleaseProvider,

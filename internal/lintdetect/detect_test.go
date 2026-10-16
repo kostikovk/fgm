@@ -188,3 +188,55 @@ func TestResult(t *testing.T) {
 		})
 	})
 }
+
+func TestDetectSkipsBrokenWorkflow(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Detect", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should keep detecting other pins when a workflow file is not valid YAML", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := writeTree(t, map[string]string{
+				"go.mod":                        "module m\n\ngo 1.26.0\n",
+				".github/workflows/broken.yaml": "foo: [unclosed\n",
+				"Makefile":                      "GOLANGCI_LINT_VERSION ?= v2.5.0\n",
+			})
+
+			// Act
+			result, err := Detect(root)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Detect: %v", err)
+			}
+			if got := pinSummary(root, result.Pins); got != "v2.5.0@Makefile:001" {
+				t.Errorf("pins = %q; want the Makefile pin", got)
+			}
+		})
+
+		t.Run("should ignore commented-out pins when Makefile and mise comments mention versions", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := writeTree(t, map[string]string{
+				"go.mod":    "module m\n\ngo 1.26.0\n",
+				"Makefile":  "# go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.0\nlint:\n\tgolangci-lint run\n",
+				"mise.toml": "[tools]\ngolangci-lint = \"latest\" # was 1.64.8\n",
+			})
+
+			// Act
+			result, err := Detect(root)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Detect: %v", err)
+			}
+			if len(result.Pins) != 0 {
+				t.Errorf("pins = %q; want none", pinSummary(root, result.Pins))
+			}
+		})
+	})
+}

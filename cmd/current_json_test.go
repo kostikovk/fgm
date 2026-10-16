@@ -85,6 +85,13 @@ func TestCurrentCommandMachineReadable(t *testing.T) {
 			args: []string{"current", "--json"},
 		},
 		{
+			name:     "should print the envelope with an error and exit 1 when a single module cannot resolve",
+			golden:   "single-error.json",
+			files:    map[string]string{"go.mod": "module m\n"},
+			args:     []string{"current", "--json"},
+			wantCode: 1,
+		},
+		{
 			name:   "should print one entry per go.work use entry when a workspace is listed",
 			golden: "workspace.json",
 			files: map[string]string{

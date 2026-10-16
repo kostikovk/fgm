@@ -114,5 +114,7 @@ runs:
         lint_path="$(jq -r '.golangci_lint.path // ""' "$RUNNER_TEMP/fgm-current.json")"
         if [ -n "$go_path" ]; then dirname "$go_path" >> "$GITHUB_PATH"; fi
         if [ -n "$lint_path" ]; then dirname "$lint_path" >> "$GITHUB_PATH"; fi
-        # The go binary on PATH is the selection; keep Go from switching toolchains behind it.
+        # The go binary on PATH is the selection; keep Go from switching toolchains behind it,
+        # and let it derive GOROOT from its own location (an empty GOROOT counts as unset).
         echo "GOTOOLCHAIN=local" >> "$GITHUB_ENV"
+        echo "GOROOT=" >> "$GITHUB_ENV"

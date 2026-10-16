@@ -222,3 +222,32 @@ func TestPinLintCommandKeepsGoPolicy(t *testing.T) {
 		})
 	})
 }
+
+func TestPinGoCommandRejectsLowerVersion(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should refuse to write a version lower than the go directive", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module m\n\ngo 1.25.0\n"), 0o644); err != nil {
+				t.Fatalf("write go.mod: %v", err)
+			}
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), "pin", "go", "1.24.0", "--chdir", dir)
+
+			// Assert
+			if err == nil || !strings.Contains(err.Error(), "lower than") {
+				t.Fatalf("pin go err = %v; want a lower-than-directive error", err)
+			}
+			if _, statErr := os.Stat(filepath.Join(dir, ".fgm.toml")); !os.IsNotExist(statErr) {
+				t.Errorf(".fgm.toml written despite the error (stat err %v)", statErr)
+			}
+		})
+	})
+}

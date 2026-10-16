@@ -140,7 +140,11 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, opti
 }
 
 func commandName(command string) string {
-	return strings.TrimSuffix(filepath.Base(command), ".exe")
+	name := filepath.Base(command)
+	if ext := filepath.Ext(name); strings.EqualFold(ext, ".exe") {
+		name = strings.TrimSuffix(name, ext)
+	}
+	return name
 }
 
 func withPrependedPath(env []string, toolDirs []string, fallbackPath string) []string {

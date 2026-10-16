@@ -161,3 +161,29 @@ func TestServiceCheck(t *testing.T) {
 		})
 	}
 }
+
+func TestServiceCheckDigestPinnedImage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Check", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should report C5 when an older golang image is pinned by digest", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := writeRepo(t, map[string]string{"go.mod": goMod126, "Dockerfile": "FROM golang:1.24@sha256:0123456789abcdef AS build\n"})
+
+			// Act
+			result, err := newService().Check(context.Background(), root)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Check: %v", err)
+			}
+			if len(result.Findings) != 1 || result.Findings[0].ID != "C5" {
+				t.Errorf("findings = %+v; want one C5", result.Findings)
+			}
+		})
+	})
+}

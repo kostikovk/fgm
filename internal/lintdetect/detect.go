@@ -5,6 +5,7 @@ package lintdetect
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -49,7 +50,7 @@ func (r Result) Conflict() bool {
 }
 
 var (
-	semverPattern       = regexp.MustCompile(`v?([0-9]+\.[0-9]+\.[0-9]+)`)
+	miseValuePattern    = regexp.MustCompile(`^\s*(?:\{\s*version\s*=\s*)?["']([^"']+)["']`)
 	makeVariablePattern = regexp.MustCompile(`^\s*(?:export\s+)?GOLANGCI_LINT_VERSION\s*(?:\?=|::=|:=|=)\s*v?([0-9]+\.[0-9]+\.[0-9]+)\s*(?:#.*)?$`)
 	makeAtPattern       = regexp.MustCompile(`golangci-lint@v?([0-9]+\.[0-9]+\.[0-9]+)`)
 	installShPattern    = regexp.MustCompile(`\sv([0-9]+\.[0-9]+\.[0-9]+)\b`)
@@ -192,8 +193,10 @@ func scanMise(path string, lines []string) []Pin {
 		if !ok || strings.Trim(strings.TrimSpace(key), `"'`) != "golangci-lint" {
 			continue
 		}
-		if match := semverPattern.FindStringSubmatch(value); match != nil {
-			pins = append(pins, Pin{Version: "v" + match[1], File: path, Line: index + 1, Kind: "mise"})
+		if match := miseValuePattern.FindStringSubmatch(value); match != nil {
+			if version, ok := exactVersion(match[1]); ok {
+				pins = append(pins, Pin{Version: version, File: path, Line: index + 1, Kind: "mise"})
+			}
 		}
 	}
 	return pins
@@ -243,6 +246,7 @@ func scanGoModTool(path string, lines []string) []Pin {
 func scanMakefile(path string, lines []string) []Pin {
 	var pins []Pin
 	for index, line := range lines {
+		line = strings.SplitN(line, "#", 2)[0]
 		var match []string
 		switch {
 		case makeVariablePattern.MatchString(line):
@@ -273,6 +277,10 @@ func detectWorkflows(repoRoot string, moduleRoot string) ([]Pin, error) {
 	var pins []Pin
 	for _, file := range files {
 		steps, err := ParseWorkflowSteps(file)
+		if errors.Is(err, ErrInvalidWorkflow) {
+			// A workflow GitHub itself would reject must not block selecting a linter.
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -301,6 +309,9 @@ func detectWorkflows(repoRoot string, moduleRoot string) ([]Pin, error) {
 	}
 	return pins, nil
 }
+
+// ErrInvalidWorkflow marks a workflow file that is not valid YAML.
+var ErrInvalidWorkflow = errors.New("invalid workflow file")
 
 // WorkflowStep is the subset of a GitHub Actions step that fgm inspects.
 type WorkflowStep struct {
@@ -336,7 +347,7 @@ func ParseWorkflowSteps(file string) ([]WorkflowStep, error) {
 	}
 	var document yaml.Node
 	if err := yaml.Unmarshal(content, &document); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", file, err)
+		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidWorkflow, file, err)
 	}
 	if len(document.Content) == 0 {
 		return nil, nil
