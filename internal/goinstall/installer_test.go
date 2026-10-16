@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/kostikovk/fgm/internal/goreleases"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 type stubArchiveProvider struct {
@@ -103,7 +104,7 @@ func TestInstallGoVersion_ReturnsExistingWhenAlreadyInstalled(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(goBinaryPath), 0o755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
-	if err := os.WriteFile(goBinaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinaryPath, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 

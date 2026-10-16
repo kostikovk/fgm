@@ -438,7 +438,7 @@ func TestWorkDirResolution_RelativeAndEnvScenarios(t *testing.T) {
 			t.Fatalf("mkdir goBinDir: %v", err)
 		}
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'cwd=%s\\n' \"$(pwd)\"\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'cwd=%s\\n' \"$(pwd)\"\n"), 0o755); err != nil {
 			t.Fatalf("write fake go: %v", err)
 		}
 		goStore := stubGoStore{

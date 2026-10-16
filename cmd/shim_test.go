@@ -81,7 +81,7 @@ func TestShimCommand_GoShimExecutesBinaryAndCapturesOutput(t *testing.T) {
 	}
 	goBinary := filepath.Join(goBinDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.7 darwin/arm64\\n'\n"
-	if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake go binary: %v", err)
 	}
 
@@ -198,7 +198,7 @@ func TestShimCommand_PrefersGoResolverOverCompositeResolver(t *testing.T) {
 			t.Fatalf("mkdir go bin dir: %v", err)
 		}
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go1.27.2\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go1.27.2\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 
@@ -250,7 +250,7 @@ func TestShimCommand_LintShimExecutesWithSelectedGoOnPath(t *testing.T) {
 			t.Fatalf("mkdir go bin dir: %v", err)
 		}
 		goBinary := filepath.Join(goBinDir, "go")
-		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.27.2 darwin/arm64\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\nprintf 'go version go1.27.2 darwin/arm64\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 
@@ -260,7 +260,7 @@ func TestShimCommand_LintShimExecutesWithSelectedGoOnPath(t *testing.T) {
 		}
 		lintBinary := filepath.Join(lintDir, "golangci-lint")
 		lintScript := "#!/bin/sh\nprintf 'lint v2.14.0 using ' && go version\n"
-		if err := os.WriteFile(lintBinary, []byte(lintScript), 0o755); err != nil {
+		if err := testutil.WriteExecutable(lintBinary, []byte(lintScript), 0o755); err != nil {
 			t.Fatalf("write fake lint binary: %v", err)
 		}
 
@@ -339,7 +339,7 @@ func TestShimCommandGoToolchainEnvironment(t *testing.T) {
 		t.Helper()
 		goBinary := filepath.Join(t.TempDir(), "go")
 		script := "#!/bin/sh\nprintf 'GOTOOLCHAIN=%s GOROOT=%s\\n' \"${GOTOOLCHAIN-unset}\" \"${GOROOT-unset}\"\n"
-		if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+		if err := testutil.WriteExecutable(goBinary, []byte(script), 0o755); err != nil {
 			t.Fatalf("write fake go binary: %v", err)
 		}
 		return &app.App{
@@ -408,7 +408,7 @@ func TestShimCommandForwardsArgumentsVerbatim(t *testing.T) {
 		goBinary := filepath.Join(dir, "go")
 		lintBinary := filepath.Join(dir, "golangci-lint")
 		for _, path := range []string{goBinary, lintBinary} {
-			if err := os.WriteFile(path, []byte(argvScript), 0o755); err != nil {
+			if err := testutil.WriteExecutable(path, []byte(argvScript), 0o755); err != nil {
 				t.Fatalf("write fake tool: %v", err)
 			}
 		}

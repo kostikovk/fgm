@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/kostikovk/fgm/internal/golocal"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestGeneratedGoShim(t *testing.T) {
@@ -35,7 +36,7 @@ func TestGeneratedGoShim(t *testing.T) {
 				t.Fatalf("mkdir: %v", err)
 			}
 			script := "#!/bin/sh\nfor arg in \"$@\"; do printf '[%s]\\n' \"$arg\"; done\nexit 3\n"
-			if err := os.WriteFile(fakeGo, []byte(script), 0o755); err != nil {
+			if err := testutil.WriteExecutable(fakeGo, []byte(script), 0o755); err != nil {
 				t.Fatalf("write fake go: %v", err)
 			}
 			store := golocal.New(storeRoot, "")

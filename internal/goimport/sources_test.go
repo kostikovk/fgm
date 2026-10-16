@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func writeSDK(t *testing.T, dir string, versionFile string, withBinary bool) {
@@ -16,7 +17,7 @@ func writeSDK(t *testing.T, dir string, versionFile string, withBinary bool) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if withBinary {
-		if err := os.WriteFile(filepath.Join(dir, "bin", goBinaryName()), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(filepath.Join(dir, "bin", goBinaryName()), []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write go: %v", err)
 		}
 	}

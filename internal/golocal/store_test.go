@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 func TestStoreListLocalGoVersions_ReturnsManagedVersionsAndSystemGo(t *testing.T) {
@@ -21,7 +23,7 @@ func TestStoreListLocalGoVersions_ReturnsManagedVersionsAndSystemGo(t *testing.T
 	pathDir := t.TempDir()
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -136,7 +138,7 @@ func TestStoreSystemGo_SkipsShimDirOnPath(t *testing.T) {
 			t.Fatalf("mkdir sysBinDir: %v", err)
 		}
 		sysGo := filepath.Join(sysBinDir, "go")
-		if err := os.WriteFile(sysGo, []byte("#!/bin/sh\nprintf 'go version go1.26.4 darwin/arm64\\n'\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(sysGo, []byte("#!/bin/sh\nprintf 'go version go1.26.4 darwin/arm64\\n'\n"), 0o755); err != nil {
 			t.Fatalf("write sysGo: %v", err)
 		}
 
@@ -406,7 +408,7 @@ func TestGoBinaryPath_ReturnsSystemBinary(t *testing.T) {
 	pathDir := t.TempDir()
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -431,7 +433,7 @@ func TestGoBinaryPath_ErrorWhenSystemVersionMismatches(t *testing.T) {
 	pathDir := t.TempDir()
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -578,7 +580,7 @@ func TestFindGoBinary_SkipsEmptyPathEntries(t *testing.T) {
 
 	dir := t.TempDir()
 	goBinary := filepath.Join(dir, "go")
-	if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("write binary: %v", err)
 	}
 
@@ -690,7 +692,7 @@ func TestListLocalGoVersions_SystemGoError(t *testing.T) {
 	// Create a go binary that exits with an error.
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -717,7 +719,7 @@ func TestHasGoVersion_SystemGoError(t *testing.T) {
 	// Create a go binary that exits with an error.
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -917,7 +919,7 @@ func TestGoBinaryPath_SystemGoError(t *testing.T) {
 	// Create a go binary that exits with an error.
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -1018,7 +1020,7 @@ func TestSystemGo_ExecError(t *testing.T) {
 	pathDir := t.TempDir()
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nexit 1\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -1043,7 +1045,7 @@ func TestSystemGo_VersionParseMismatch(t *testing.T) {
 	systemGoBinary := filepath.Join(pathDir, "go")
 	// Output that doesn't match "go version goX.Y.Z ..." format.
 	script := "#!/bin/sh\nprintf 'something unexpected\\n'\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -1103,7 +1105,7 @@ func TestHasGoVersion_TrueForSystemGo(t *testing.T) {
 	pathDir := t.TempDir()
 	systemGoBinary := filepath.Join(pathDir, "go")
 	script := "#!/bin/sh\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
-	if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+	if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake system go binary: %v", err)
 	}
 
@@ -1270,7 +1272,7 @@ func TestStoreListLocalGoVersions_ImportedSymlinkScenarios(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(externalBin), 0o755); err != nil {
 			t.Fatalf("mkdir external bin: %v", err)
 		}
-		if err := os.WriteFile(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write external go binary: %v", err)
 		}
 
@@ -1303,7 +1305,7 @@ func TestStoreListLocalGoVersions_ImportedSymlinkScenarios(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(externalBin), 0o755); err != nil {
 			t.Fatalf("mkdir external bin: %v", err)
 		}
-		if err := os.WriteFile(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write external go binary: %v", err)
 		}
 
@@ -1343,7 +1345,7 @@ func TestStoreListLocalGoVersions_ImportedSymlinkScenarios(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(externalBin), 0o755); err != nil {
 			t.Fatalf("mkdir external bin: %v", err)
 		}
-		if err := os.WriteFile(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(externalBin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 			t.Fatalf("write external go binary: %v", err)
 		}
 
@@ -1378,7 +1380,7 @@ func TestStoreSystemGoProbeEnvironment(t *testing.T) {
 			pathDir := t.TempDir()
 			systemGoBinary := filepath.Join(pathDir, "go")
 			script := "#!/bin/sh\nif [ \"$GOTOOLCHAIN\" != local ] || [ -n \"${GOROOT+set}\" ]; then printf 'go version go1.26.8 darwin/arm64\\n'; exit 0; fi\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
-			if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+			if err := testutil.WriteExecutable(systemGoBinary, []byte(script), 0o755); err != nil {
 				t.Fatalf("write fake system go binary: %v", err)
 			}
 			store := New(t.TempDir(), pathDir)

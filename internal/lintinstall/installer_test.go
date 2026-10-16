@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/kostikovk/fgm/internal/golangcilint"
+	"github.com/kostikovk/fgm/internal/testutil"
 )
 
 type stubArchiveProvider struct {
@@ -101,7 +102,7 @@ func TestInstallLintVersion_ReturnsExistingWhenAlreadyInstalled(t *testing.T) {
 		t.Fatalf("MkdirAll: %v", err)
 	}
 	binaryPath := filepath.Join(installDir, "golangci-lint")
-	if err := os.WriteFile(binaryPath, []byte("#!/bin/sh\necho lint\n"), 0o755); err != nil {
+	if err := testutil.WriteExecutable(binaryPath, []byte("#!/bin/sh\necho lint\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
@@ -717,7 +718,7 @@ func TestFindLintBinary_SupportsWindowsExe(t *testing.T) {
 			t.Fatalf("MkdirAll: %v", err)
 		}
 		exePath := filepath.Join(nestedDir, "golangci-lint.exe")
-		if err := os.WriteFile(exePath, []byte("MZ"), 0o755); err != nil {
+		if err := testutil.WriteExecutable(exePath, []byte("MZ"), 0o755); err != nil {
 			t.Fatalf("WriteFile: %v", err)
 		}
 
