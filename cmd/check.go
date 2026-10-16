@@ -29,6 +29,7 @@ func newCheckCmd(application *app.App, v *viper.Viper) *cobra.Command {
   C4b  WARN   actions/setup-go go-version minor differs from the resolved Go
   C5   ERROR  Dockerfile FROM golang:<tag> older than the go directive
   C6   ERROR  go.work go version lower than a used module's go directive
+  C7   WARN   a build script runs golangci-lint/go by a path that bypasses fgm exec
 
 Skip checks with [check] skip = ["C5"] in .fgm.toml. Exit status: 0 clean, 1 findings at or above --fail-on, 2 could not run.`,
 		Args: usageArgs(cobra.NoArgs),

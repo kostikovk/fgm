@@ -321,8 +321,10 @@ type WorkflowStep struct {
 	GoVersion        string // with.go-version (setup-go)
 	GoVersionLine    int
 	GoVersionFile    string // with.go-version-file (setup-go)
-	WorkingDirectory string // with.working-directory, else the job's defaults.run.working-directory, cleaned; "." when unset
+	WorkingDirectory string // with.working-directory, else the step's or job's run working-directory, cleaned; "." when unset
 	Line             int
+	Run              string // run: script
+	RunFirstLine     int    // file line of the script's first line
 }
 
 // WorkflowFiles lists .github/workflows/*.yml and *.yaml under repoRoot in lexical order.
@@ -379,7 +381,17 @@ func ParseWorkflowSteps(file string) ([]WorkflowStep, error) {
 			if goVersion := mappingValue(with, "go-version"); goVersion != nil {
 				step.GoVersionLine = goVersion.Line
 			}
+			if run := mappingValue(node, "run"); run != nil && run.Kind == yaml.ScalarNode {
+				step.Run = run.Value
+				step.RunFirstLine = run.Line
+				if run.Style&(yaml.LiteralStyle|yaml.FoldedStyle) != 0 {
+					step.RunFirstLine = run.Line + 1
+				}
+			}
 			dir := scalar(mappingValue(with, "working-directory"))
+			if dir == "" {
+				dir = scalar(mappingValue(node, "working-directory"))
+			}
 			if dir == "" {
 				dir = jobDir
 			}
