@@ -261,7 +261,7 @@ Detection is read-only and offline. It searches from the module root up to the r
 
 - Only exact `X.Y.Z` versions count; `latest` or `v2.5` are not pins. Make variables are matched literally, without evaluation.
 - When detected pins disagree, nothing is selected from detection: `fgm current` falls back to `auto` and prints the candidates on stderr, and `fgm doctor` reports a `WARN` with each `file:line`.
-- A workflow pin applies to a module when the step's `with.working-directory` (or the job's `defaults.run.working-directory`) equals the module path relative to the repository root, or when the repository has a single module. Reusable workflows called from another repository are not followed.
+- A workflow pin applies to a module when the step's `with.working-directory` (or the job's `defaults.run.working-directory`) equals the module path relative to the repository root. A step without a working directory runs in the repository root, and `./...` does not cross module boundaries, so it applies to the root module only; when the root has no `go.mod`, it applies only if the repository has a single module (found with one walk that stops at the second `go.mod` and is cached for the rest of the command). A step with any other working directory belongs to another module. Reusable workflows called from another repository are not followed.
 - Detected versions go through the same compatibility check as explicit pins: `fgm doctor` warns when the catalog says the linter cannot run on the resolved Go.
 - Opt out with `golangci_lint_detect = false` under `[toolchain]`.
 

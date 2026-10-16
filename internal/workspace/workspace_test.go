@@ -118,3 +118,57 @@ func TestGoDirective(t *testing.T) {
 		})
 	})
 }
+
+func TestHasMultipleModules(t *testing.T) {
+	t.Parallel()
+
+	t.Run("HasMultipleModules", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should report true without listing every module when two modules exist", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := t.TempDir()
+			for _, name := range []string{"a/go.mod", "b/go.mod", "c/go.mod"} {
+				if err := os.MkdirAll(filepath.Join(root, filepath.Dir(name)), 0o755); err != nil {
+					t.Fatalf("mkdir: %v", err)
+				}
+				if err := os.WriteFile(filepath.Join(root, name), []byte("module m\n"), 0o644); err != nil {
+					t.Fatalf("write: %v", err)
+				}
+			}
+
+			// Act
+			first, err := HasMultipleModules(root)
+			walksAfterFirst := WalkCount()
+			second, secondErr := HasMultipleModules(root)
+
+			// Assert
+			if err != nil || secondErr != nil || !first || !second {
+				t.Fatalf("HasMultipleModules = %v, %v (errors %v, %v); want true twice", first, second, err, secondErr)
+			}
+			if WalkCount() != walksAfterFirst {
+				t.Errorf("second call walked the tree again")
+			}
+		})
+
+		t.Run("should report false when the tree holds a single module", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := t.TempDir()
+			if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module m\n"), 0o644); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+
+			// Act
+			got, err := HasMultipleModules(root)
+
+			// Assert
+			if err != nil || got {
+				t.Errorf("HasMultipleModules = %v, %v; want false", got, err)
+			}
+		})
+	})
+}

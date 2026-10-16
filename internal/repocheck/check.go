@@ -340,8 +340,6 @@ func moduleWorkflowSteps(module moduleFacts) ([]workflowStep, error) {
 	if err != nil {
 		return nil, err
 	}
-	modulePath := lintdetect.RelativeSlash(module.repoRoot, module.root)
-	singleModule := -1
 	var steps []workflowStep
 	for _, file := range files {
 		parsed, err := lintdetect.ParseWorkflowSteps(file)
@@ -352,17 +350,12 @@ func moduleWorkflowSteps(module moduleFacts) ([]workflowStep, error) {
 			return nil, err
 		}
 		for _, step := range parsed {
-			if step.WorkingDirectory != modulePath {
-				if singleModule == -1 {
-					modules, err := workspace.ListModuleDirs(module.repoRoot)
-					if err != nil {
-						return nil, err
-					}
-					singleModule = len(modules)
-				}
-				if singleModule != 1 {
-					continue
-				}
+			applies, err := lintdetect.StepAppliesToModule(step, module.repoRoot, module.root)
+			if err != nil {
+				return nil, err
+			}
+			if !applies {
+				continue
 			}
 			steps = append(steps, workflowStep{
 				file: file, uses: step.Uses,

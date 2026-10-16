@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/kostikovk/fgm/internal/workspace"
 	"gopkg.in/yaml.v3"
@@ -271,9 +272,6 @@ func detectWorkflows(repoRoot string, moduleRoot string) ([]Pin, error) {
 	if err != nil {
 		return nil, err
 	}
-	modulePath := RelativeSlash(repoRoot, moduleRoot)
-
-	singleModule := -1
 	var pins []Pin
 	for _, file := range files {
 		steps, err := ParseWorkflowSteps(file)
@@ -292,17 +290,12 @@ func detectWorkflows(repoRoot string, moduleRoot string) ([]Pin, error) {
 			if !ok {
 				continue
 			}
-			if step.WorkingDirectory != modulePath {
-				if singleModule == -1 {
-					modules, err := workspace.ListModuleDirs(repoRoot)
-					if err != nil {
-						return nil, err
-					}
-					singleModule = len(modules)
-				}
-				if singleModule != 1 {
-					continue
-				}
+			applies, err := StepAppliesToModule(step, repoRoot, moduleRoot)
+			if err != nil {
+				return nil, err
+			}
+			if !applies {
+				continue
 			}
 			pins = append(pins, Pin{Version: version, File: file, Line: step.VersionLine, Kind: "workflow"})
 		}
@@ -312,6 +305,27 @@ func detectWorkflows(repoRoot string, moduleRoot string) ([]Pin, error) {
 
 // ErrInvalidWorkflow marks a workflow file that is not valid YAML.
 var ErrInvalidWorkflow = errors.New("invalid workflow file")
+
+// StepAppliesToModule reports whether a workflow step runs in the module at moduleRoot.
+//
+// A step whose working directory equals the module path applies. A step without one runs in the
+// repository root, and since ./... does not cross module boundaries it applies to the root
+// module only; when the root has no go.mod it applies only if the repository has a single
+// module. Any other working directory names another module.
+func StepAppliesToModule(step WorkflowStep, repoRoot string, moduleRoot string) (bool, error) {
+	modulePath := RelativeSlash(repoRoot, moduleRoot)
+	if step.WorkingDirectory == modulePath {
+		return true, nil
+	}
+	if step.WorkingDirectory != "." {
+		return false, nil
+	}
+	if info, err := os.Stat(filepath.Join(repoRoot, "go.mod")); err == nil && !info.IsDir() {
+		return false, nil
+	}
+	multiple, err := workspace.HasMultipleModules(repoRoot)
+	return !multiple, err
+}
 
 // WorkflowStep is the subset of a GitHub Actions step that fgm inspects.
 type WorkflowStep struct {
@@ -341,8 +355,40 @@ func WorkflowFiles(repoRoot string) ([]string, error) {
 	return files, nil
 }
 
-// ParseWorkflowSteps returns every step of every job in a workflow file.
+type parsedWorkflow struct {
+	size    int64
+	modTime int64
+	steps   []WorkflowStep
+	err     error
+}
+
+var (
+	workflowCacheMu sync.Mutex
+	workflowCache   = map[string]parsedWorkflow{}
+)
+
+// ParseWorkflowSteps returns every step of every job in a workflow file. Results are cached per
+// file (keyed by size and modification time), since --all commands inspect the same workflows
+// once per module.
 func ParseWorkflowSteps(file string) ([]WorkflowStep, error) {
+	info, err := os.Stat(file)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", file, err)
+	}
+	workflowCacheMu.Lock()
+	cached, ok := workflowCache[file]
+	workflowCacheMu.Unlock()
+	if ok && cached.size == info.Size() && cached.modTime == info.ModTime().UnixNano() {
+		return cached.steps, cached.err
+	}
+	steps, err := parseWorkflowSteps(file)
+	workflowCacheMu.Lock()
+	workflowCache[file] = parsedWorkflow{size: info.Size(), modTime: info.ModTime().UnixNano(), steps: steps, err: err}
+	workflowCacheMu.Unlock()
+	return steps, err
+}
+
+func parseWorkflowSteps(file string) ([]WorkflowStep, error) {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", file, err)
