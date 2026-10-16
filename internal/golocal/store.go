@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kostikovk/fgm/internal/app"
 	"github.com/kostikovk/fgm/internal/goenv"
 	"github.com/kostikovk/fgm/internal/toolhint"
 	"github.com/kostikovk/fgm/internal/versionutil"
@@ -328,4 +329,34 @@ func sortVersions(set map[string]struct{}) []string {
 		return -versionutil.CompareVersions(a, b)
 	})
 	return versions
+}
+
+// BrokenGoImports lists imported Go versions whose symlinked source directory no longer exists,
+// for example a module-cache toolchain removed by `go clean -modcache`.
+func (s *Store) BrokenGoImports(ctx context.Context) ([]app.ImportedGo, error) {
+	_ = ctx
+
+	entries, err := os.ReadDir(filepath.Join(s.root, "go"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read managed Go root: %w", err)
+	}
+	var broken []app.ImportedGo
+	for _, entry := range entries {
+		if entry.Type()&os.ModeSymlink == 0 {
+			continue
+		}
+		link := filepath.Join(s.root, "go", entry.Name())
+		if _, err := os.Stat(link); err == nil || !errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		target, err := os.Readlink(link)
+		if err != nil {
+			return nil, fmt.Errorf("read imported Go link %s: %w", link, err)
+		}
+		broken = append(broken, app.ImportedGo{Version: entry.Name(), Path: target})
+	}
+	return broken, nil
 }

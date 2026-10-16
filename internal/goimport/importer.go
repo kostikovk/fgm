@@ -20,30 +20,42 @@ type Registry interface {
 
 // Importer discovers existing Go installations and registers them into FGM.
 type Importer struct {
-	candidates []string
-	registry   Registry
+	config Config
 }
 
 // Config configures an Importer.
 type Config struct {
+	// Candidates are system GOROOT directories whose version comes from `go version`.
 	Candidates []string
 	Registry   Registry
+	// ModCache returns GOMODCACHE, where Go's own toolchain switching caches toolchains;
+	// nil or "" skips that source.
+	ModCache func(ctx context.Context) string
+	// SDKDir is where golang.org/dl installs SDKs (usually ~/sdk); "" skips that source.
+	SDKDir string
+	// GOOS and GOARCH select module-cache toolchains; runtime values are used when empty.
+	GOOS   string
+	GOARCH string
 }
 
 // New constructs an Importer.
 func New(config Config) *Importer {
-	return &Importer{
-		candidates: config.Candidates,
-		registry:   config.Registry,
+	if config.GOOS == "" {
+		config.GOOS = runtime.GOOS
 	}
+	if config.GOARCH == "" {
+		config.GOARCH = runtime.GOARCH
+	}
+	return &Importer{config: config}
 }
 
-// ImportAuto discovers Go installations from known candidate paths and registers them.
+// ImportAuto discovers Go installations from system paths, the module cache, and
+// golang.org/dl SDKs, and registers them. Entries with SkipReason were found but not imported.
 func (i *Importer) ImportAuto(ctx context.Context) ([]app.ImportedGo, error) {
-	seenVersions := make(map[string]struct{})
-	var imported []app.ImportedGo
+	seenVersions := make(map[string]string)
+	var results []app.ImportedGo
 
-	for _, candidate := range i.candidates {
+	for _, candidate := range i.config.Candidates {
 		goBinary := filepath.Join(candidate, "bin", goBinaryName())
 		if _, err := os.Stat(goBinary); err != nil {
 			continue
@@ -57,18 +69,123 @@ func (i *Importer) ImportAuto(ctx context.Context) ([]app.ImportedGo, error) {
 			continue
 		}
 
-		if _, err := i.registry.RegisterExistingGoInstallation(version, candidate); err != nil {
+		if _, err := i.config.Registry.RegisterExistingGoInstallation(version, candidate); err != nil {
 			return nil, err
 		}
 
-		seenVersions[version] = struct{}{}
-		imported = append(imported, app.ImportedGo{
+		seenVersions[version] = candidate
+		results = append(results, app.ImportedGo{
 			Version: version,
 			Path:    candidate,
 		})
 	}
 
-	return imported, nil
+	for _, sdk := range i.toolchainCandidates(ctx) {
+		if reason := sdk.problem(); reason != "" {
+			sdk.SkipReason = reason
+		} else if previous, seen := seenVersions[sdk.Version]; seen {
+			sdk.SkipReason = "already imported from " + previous
+		} else {
+			if _, err := i.config.Registry.RegisterExistingGoInstallation(sdk.Version, sdk.Path); err != nil {
+				return nil, err
+			}
+			seenVersions[sdk.Version] = sdk.Path
+		}
+		results = append(results, sdk.ImportedGo)
+	}
+
+	return results, nil
+}
+
+type sdkCandidate struct {
+	app.ImportedGo
+}
+
+// problem explains why a toolchain directory cannot be imported, or returns "".
+// The VERSION file is trusted instead of running `go version`, so importing stays read-only.
+func (c sdkCandidate) problem() string {
+	if info, err := os.Stat(filepath.Join(c.Path, "bin", goBinaryName())); err != nil || info.IsDir() {
+		return "bin/" + goBinaryName() + " is missing"
+	}
+	content, err := os.ReadFile(filepath.Join(c.Path, "VERSION"))
+	if err != nil {
+		return "VERSION file is missing"
+	}
+	declared := strings.TrimSpace(strings.SplitN(string(content), "\n", 2)[0])
+	if declared != "go"+c.Version {
+		return fmt.Sprintf("VERSION says %s, directory says go%s", declared, c.Version)
+	}
+	return ""
+}
+
+const moduleCacheToolchainPrefix = "toolchain@v0.0.1-go"
+
+// toolchainCandidates lists module-cache toolchains for this platform, then golang.org/dl SDKs,
+// each in lexical order.
+func (i *Importer) toolchainCandidates(ctx context.Context) []sdkCandidate {
+	var candidates []sdkCandidate
+	if i.config.ModCache != nil {
+		if modCache := i.config.ModCache(ctx); modCache != "" {
+			platform := "." + i.config.GOOS + "-" + i.config.GOARCH
+			entries, _ := os.ReadDir(filepath.Join(modCache, "golang.org"))
+			for _, entry := range entries {
+				version, ok := strings.CutPrefix(entry.Name(), moduleCacheToolchainPrefix)
+				if !ok || !entry.IsDir() {
+					continue
+				}
+				version, ok = strings.CutSuffix(version, platform)
+				if !ok {
+					continue
+				}
+				candidates = append(candidates, sdkCandidate{app.ImportedGo{
+					Version: version,
+					Path:    filepath.Join(modCache, "golang.org", entry.Name()),
+					Source:  "module cache",
+				}})
+			}
+		}
+	}
+	if i.config.SDKDir != "" {
+		entries, _ := os.ReadDir(i.config.SDKDir)
+		for _, entry := range entries {
+			version, ok := strings.CutPrefix(entry.Name(), "go")
+			if !ok || !entry.IsDir() || version == "" || version[0] < '0' || version[0] > '9' {
+				continue
+			}
+			candidates = append(candidates, sdkCandidate{app.ImportedGo{
+				Version: version,
+				Path:    filepath.Join(i.config.SDKDir, entry.Name()),
+				Source:  "golang.org/dl",
+			}})
+		}
+	}
+	return candidates
+}
+
+// ModCacheLocator returns a lazy GOMODCACHE lookup: `go env GOMODCACHE` of the go on PATH,
+// else $GOMODCACHE, else the first $GOPATH entry plus /pkg/mod, else ~/go/pkg/mod.
+func ModCacheLocator(getenv func(string) string, pathEnv string, home string) func(ctx context.Context) string {
+	return func(ctx context.Context) string {
+		if goroot := gorootFromPathGo(pathEnv); goroot != "" {
+			cmd := exec.CommandContext(ctx, filepath.Join(goroot, "bin", goBinaryName()), "env", "GOMODCACHE")
+			cmd.Env, _ = goenv.Apply(cmd.Environ(), goenv.ModeLocal)
+			if output, err := cmd.Output(); err == nil {
+				if value := strings.TrimSpace(string(output)); value != "" {
+					return value
+				}
+			}
+		}
+		if value := getenv("GOMODCACHE"); value != "" {
+			return value
+		}
+		if gopath := filepath.SplitList(getenv("GOPATH")); len(gopath) > 0 && gopath[0] != "" {
+			return filepath.Join(gopath[0], "pkg", "mod")
+		}
+		if home == "" {
+			return ""
+		}
+		return filepath.Join(home, "go", "pkg", "mod")
+	}
 }
 
 // DefaultCandidates returns common locations that may already contain Go installations.

@@ -1396,3 +1396,40 @@ func TestStoreSystemGoProbeEnvironment(t *testing.T) {
 		})
 	})
 }
+
+func TestStoreBrokenGoImports(t *testing.T) {
+	t.Parallel()
+
+	t.Run("BrokenGoImports", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should report an imported version when its source directory was removed", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			root := t.TempDir()
+			source := filepath.Join(t.TempDir(), "toolchain@v0.0.1-go1.26.8.darwin-arm64")
+			if err := os.MkdirAll(source, 0o755); err != nil {
+				t.Fatalf("mkdir source: %v", err)
+			}
+			store := New(root, "")
+			if _, err := store.RegisterExistingGoInstallation("1.26.8", source); err != nil {
+				t.Fatalf("register: %v", err)
+			}
+			if err := os.RemoveAll(source); err != nil {
+				t.Fatalf("remove source: %v", err)
+			}
+
+			// Act
+			broken, err := store.BrokenGoImports(context.Background())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("BrokenGoImports: %v", err)
+			}
+			if len(broken) != 1 || broken[0].Version != "1.26.8" || broken[0].Path != source {
+				t.Errorf("broken = %+v; want 1.26.8 -> %s", broken, source)
+			}
+		})
+	})
+}

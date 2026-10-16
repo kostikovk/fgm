@@ -257,3 +257,39 @@ func TestImportAuto_EnsuresShimsWhenToolchainsImported(t *testing.T) {
 		}
 	})
 }
+
+func TestImportAutoCommandSources(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should name the source of each import and list skipped toolchains with their reason", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			application := &app.App{GoImporter: stubGoImporter{importAutoFn: func(ctx context.Context) ([]app.ImportedGo, error) {
+				return []app.ImportedGo{
+					{Version: "1.26.8", Path: "/cache/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64", Source: "module cache"},
+					{Version: "1.25.3", Path: "/home/u/sdk/go1.25.3", Source: "golang.org/dl", SkipReason: "VERSION file is missing"},
+				}, nil
+			}}}
+
+			// Act
+			stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "import", "auto")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("import auto: %v", err)
+			}
+			for _, want := range []string{
+				"Imported Go 1.26.8 from /cache/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64 (module cache)",
+				"Skipped Go 1.25.3 at /home/u/sdk/go1.25.3 (golang.org/dl): VERSION file is missing",
+			} {
+				if !strings.Contains(stdout, want) {
+					t.Errorf("stdout = %q; want it to contain %q", stdout, want)
+				}
+			}
+		})
+	})
+}

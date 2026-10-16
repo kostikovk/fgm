@@ -843,3 +843,46 @@ func TestDiagnoseDetectedLint(t *testing.T) {
 		})
 	})
 }
+
+type stubImports struct{ broken []app.ImportedGo }
+
+func (s stubImports) BrokenGoImports(ctx context.Context) ([]app.ImportedGo, error) {
+	return s.broken, nil
+}
+
+func TestDiagnoseBrokenImports(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should warn with an install hint when an imported Go points at a removed directory", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := New(Config{
+				GoStore: stubGoStore{
+					globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.26.8", true, nil },
+					shimDirFn:         func() string { return "/tmp/fgm/shims" },
+				},
+				Imports: stubImports{broken: []app.ImportedGo{{Version: "1.26.8", Path: "/cache/golang.org/toolchain@v0.0.1-go1.26.8.darwin-arm64"}}},
+				PathEnv: "/tmp/fgm/shims",
+				Getenv:  func(string) string { return "" },
+			})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			for _, finding := range findings {
+				if finding.Severity == "WARN" && strings.Contains(finding.Message, "imported Go 1.26.8") && strings.Contains(finding.Message, "fgm install go 1.26.8") {
+					return
+				}
+			}
+			t.Errorf("findings = %+v; want a dangling import warning", findings)
+		})
+	})
+}
