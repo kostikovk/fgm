@@ -85,7 +85,7 @@ Output is one line per finding — `ID SEVERITY file:line message (fix: hint)` �
 
 Exit status: `0` clean, `1` findings at or above `--fail-on` (default `error`), `2` could not run (invalid invocation or a module that cannot be resolved).
 
-C7 matches lines literally, without Make or shell evaluation. Project-local tool directories (`./bin/…`, `$(LOCALBIN)/…`, `$(CURDIR)/bin/…`) are not reported — when their install target pins another version, C3 reports the disagreement — and neither are lines that only install the tool (`install.sh`, `go install`, `curl`, `wget`).
+C7 expands simple Makefile variables before matching, so `path := $(shell go env GOPATH)` followed by `$(path)/bin/golangci-lint run` is reported as `$(path)/bin/golangci-lint (expands to $(shell go env GOPATH)/bin/golangci-lint)`. It uses `=`, `:=`, `::=` and `?=` assignments from the makefiles in the same directory and from files they `include` by a literal path; `$(VAR)` and `${VAR}` references expand recursively up to four levels, and cycles stop expansion. Of Make functions, only `$(shell go env GOPATH)` and `$(shell go env GOBIN)` are recognised. A variable with no visible assignment (environment or command line), any other function, and `+=` stay unexpanded and are never reported. Recipe prefixes `@`, `-` and `+` are ignored. Workflow `run:` steps are matched literally. Project-local tool directories (`./bin/…`, `$(LOCALBIN)/…`, `$(CURDIR)/bin/…`) are not reported — when their install target pins another version, C3 reports the disagreement — and neither are lines that only install the tool (`install.sh`, `go install`, `curl`, `wget`).
 
 Skip checks for repositories whose files intentionally differ:
 
