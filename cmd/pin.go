@@ -6,6 +6,7 @@ import (
 
 	"github.com/kostikovk/fgm/internal/fgmconfig"
 	"github.com/kostikovk/fgm/internal/resolve"
+	"github.com/kostikovk/fgm/internal/versionutil"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -70,6 +71,9 @@ func newPinGoCmd(v *viper.Viper) *cobra.Command {
 			policy, err := fgmconfig.ParseGoPolicyValue(args[0])
 			if err != nil {
 				return err
+			}
+			if policy != fgmconfig.LatestPatchPolicy {
+				policy = versionutil.ToolchainVersion(policy)
 			}
 
 			workDir, err := resolveWorkDir(v)

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 )
 
 // RepoRoot returns the nearest ancestor of dir (inclusive) that contains a .git entry.
@@ -135,4 +137,59 @@ func GoDirective(path string) (version string, line int, found bool, err error) 
 		}
 	}
 	return "", 0, false, nil
+}
+
+var (
+	multiModuleMu    sync.Mutex
+	multiModuleCache = map[string]bool{}
+	walks            atomic.Int64
+)
+
+// errSecondModule stops a walk as soon as a second go.mod is found.
+var errSecondModule = errors.New("second module found")
+
+// HasMultipleModules reports whether root (inclusive) holds more than one go.mod, using the same
+// skip rules as ListModuleDirs. The walk stops at the second go.mod, and the answer is cached for
+// the rest of the process, so repeated lint resolution never re-walks a repository.
+func HasMultipleModules(root string) (bool, error) {
+	root = filepath.Clean(root)
+	multiModuleMu.Lock()
+	defer multiModuleMu.Unlock()
+	if multiple, ok := multiModuleCache[root]; ok {
+		return multiple, nil
+	}
+
+	walks.Add(1)
+	found := 0
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, fs.ErrPermission) && path != root {
+				return filepath.SkipDir
+			}
+			return err
+		}
+		if entry.IsDir() {
+			if path != root && skipDir(entry.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() == "go.mod" && entry.Type().IsRegular() {
+			found++
+			if found > 1 {
+				return errSecondModule
+			}
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, errSecondModule) {
+		return false, err
+	}
+	multiModuleCache[root] = found > 1
+	return found > 1, nil
+}
+
+// WalkCount reports how many repository walks HasMultipleModules has performed in this process.
+func WalkCount() int64 {
+	return walks.Load()
 }

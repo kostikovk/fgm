@@ -85,7 +85,7 @@ Output is one line per finding — `ID SEVERITY file:line message (fix: hint)` �
 
 Exit status: `0` clean, `1` findings at or above `--fail-on` (default `error`), `2` could not run (invalid invocation or a module that cannot be resolved).
 
-C7 matches lines literally, without Make or shell evaluation. Project-local tool directories (`./bin/…`, `$(LOCALBIN)/…`, `$(CURDIR)/bin/…`) are not reported — when their install target pins another version, C3 reports the disagreement — and neither are lines that only install the tool (`install.sh`, `go install`, `curl`, `wget`).
+C7 expands simple Makefile variables before matching, so `path := $(shell go env GOPATH)` followed by `$(path)/bin/golangci-lint run` is reported as `$(path)/bin/golangci-lint (expands to $(shell go env GOPATH)/bin/golangci-lint)`. It uses `=`, `:=`, `::=` and `?=` assignments from the makefiles in the same directory and from files they `include` by a literal path; `$(VAR)` and `${VAR}` references expand recursively up to four levels, and cycles stop expansion. Of Make functions, only `$(shell go env GOPATH)` and `$(shell go env GOBIN)` are recognised. A variable with no visible assignment (environment or command line), any other function, and `+=` stay unexpanded and are never reported. Recipe prefixes `@`, `-` and `+` are ignored. Workflow `run:` steps are matched literally. Project-local tool directories (`./bin/…`, `$(LOCALBIN)/…`, `$(CURDIR)/bin/…`) are not reported — when their install target pins another version, C3 reports the disagreement — and neither are lines that only install the tool (`install.sh`, `go install`, `curl`, `wget`).
 
 Skip checks for repositories whose files intentionally differ:
 
@@ -215,6 +215,8 @@ Inside a repository, FGM resolves Go in this order:
 3. The `go` directive — or, with `go = "latest-patch"`, the newest released patch of that minor (never lower than a `toolchain` directive), shown as `go 1.26.9 (latest-patch of go.mod 1.26.0)`.
 4. Global default when no project metadata is found.
 
+Since Go 1.21 a `go` directive may name a language version without a patch, such as `go 1.26`. No release is named `go1.26`; Go orders `1.26 < 1.26rc1 < 1.26.0`, so FGM selects the lowest stable release that satisfies it, `1.26.0`, and shows the mapping: `go 1.26.0 (go.mod 1.26)` (`"base": "1.26"` in JSON). The same applies to `go.work`, to `.fgm.toml` `go = "1.26"`, to `fgm pin go 1.26` (which writes `1.26.0`), and to `fgm install go 1.26` (which installs `1.26.0` and says so). Pre-1.21 directives such as `go 1.20` name real releases and are unchanged; a `toolchain` directive still wins.
+
 The `go` directive is a *minimum*: `go 1.26.0` written by `go mod init` selects the first 1.26 release with its known standard-library vulnerabilities, while CI usually runs the newest patch. `latest-patch` matches CI without editing `go.mod` for every consumer. Patch data comes from the embedded catalog (refreshed with every fgm release), then the newest installed patch of that minor, in which case `fgm current` and `fgm doctor` warn that the selection may be stale; with neither, the `go` directive is used with a warning. Selection never uses the network, so `fgm current`, `fgm exec`, and the shims always pick the same Go. `fgm check` uses the catalog only, so its findings do not depend on what is installed.
 
 ### Working directory
@@ -259,7 +261,7 @@ Detection is read-only and offline. It searches from the module root up to the r
 
 - Only exact `X.Y.Z` versions count; `latest` or `v2.5` are not pins. Make variables are matched literally, without evaluation.
 - When detected pins disagree, nothing is selected from detection: `fgm current` falls back to `auto` and prints the candidates on stderr, and `fgm doctor` reports a `WARN` with each `file:line`.
-- A workflow pin applies to a module when the step's `with.working-directory` (or the job's `defaults.run.working-directory`) equals the module path relative to the repository root, or when the repository has a single module. Reusable workflows called from another repository are not followed.
+- A workflow pin applies to a module when the step's `with.working-directory` (or the job's `defaults.run.working-directory`) equals the module path relative to the repository root. A step without a working directory runs in the repository root, and `./...` does not cross module boundaries, so it applies to the root module only; when the root has no `go.mod`, it applies only if the repository has a single module (found with one walk that stops at the second `go.mod` and is cached for the rest of the command). A step with any other working directory belongs to another module. Reusable workflows called from another repository are not followed.
 - Detected versions go through the same compatibility check as explicit pins: `fgm doctor` warns when the catalog says the linter cannot run on the resolved Go.
 - Opt out with `golangci_lint_detect = false` under `[toolchain]`.
 

@@ -150,12 +150,18 @@ func goSourceLabel(selection app.Selection) string {
 	if selection.GoSource == "latest-patch" {
 		return fmt.Sprintf("latest-patch of %s %s", filepath.Base(selection.GoSourceFile), selection.GoBase)
 	}
+	if selection.GoBase != "" {
+		return sourceLabel(selection.GoSource) + " " + selection.GoBase
+	}
 	return sourceLabel(selection.GoSource)
 }
 
 func goReportLabel(report *app.GoReport) string {
 	if report.Source == "latest-patch" {
 		return fmt.Sprintf("latest-patch of %s %s", path.Base(report.SourceFile), report.Base)
+	}
+	if report.Base != "" {
+		return report.Source + " " + report.Base
 	}
 	return report.Source
 }
