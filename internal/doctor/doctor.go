@@ -142,6 +142,9 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 	if s.resolver != nil {
 		selection, err := s.resolver.Current(ctx, workDir)
 		if err == nil {
+			for _, warning := range selection.Warnings {
+				findings = append(findings, app.DoctorFinding{Severity: "WARN", Message: warning})
+			}
 			if _, err := s.goStore.GoBinaryPath(ctx, selection.GoVersion); err == nil {
 				findings = append(findings, app.DoctorFinding{Severity: "OK", Message: "selected Go version is installed: " + selection.GoVersion})
 			} else {

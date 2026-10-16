@@ -164,10 +164,17 @@ type EnvRenderer interface {
 
 // Selection describes the currently selected toolchain.
 type Selection struct {
-	GoVersion   string
-	GoSource    string
+	GoVersion string
+	// GoSource is the go.work/go.mod path, "config", "latest-patch", or "global".
+	GoSource string
+	// GoSourceFile is the file the Go version came from; empty for "global".
+	GoSourceFile string
+	// GoBase is the go directive a "latest-patch" selection was raised from.
+	GoBase      string
 	LintVersion string
 	LintSource  string
+	// Warnings describe selections that may be stale or ambiguous.
+	Warnings []string
 }
 
 // LintConfigGenerator generates golangci-lint configuration files.

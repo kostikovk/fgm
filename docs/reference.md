@@ -22,6 +22,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm prune [--dry-run]` | Remove unused Go and `golangci-lint` versions not referenced by global default or current workspace |
 | `fgm remove go <version>` | Remove an FGM-managed Go version |
 | `fgm remove golangci-lint <version>` | Remove an FGM-managed lint version |
+| `fgm pin go <version\|latest-patch>` | Pin the Go version policy in `.fgm.toml` |
 | `fgm pin golangci-lint <version\|auto>` | Pin lint version in `.fgm.toml` |
 | `fgm lint init` | Generate a `.golangci.yml` for the resolved Go version |
 | `fgm lint doctor` | Audit an existing `.golangci.yml` or `.golangci.yaml` for issues |
@@ -127,9 +128,12 @@ After choosing a target, preview again with `--to <version>` and use that same t
 
 Inside a repository, FGM resolves Go in this order:
 
-1. Nearest `go.work` (`toolchain` directive takes precedence over `go`)
-2. Nearest `go.mod` (`toolchain` directive takes precedence over `go`)
-3. Global default when no project metadata is found
+1. `.fgm.toml` `go = "<version>"` — that version (`config`). It must not be lower than the `go` directive.
+2. Nearest `go.work`, then `go.mod`: the `toolchain` directive.
+3. The `go` directive — or, with `go = "latest-patch"`, the newest released patch of that minor (never lower than a `toolchain` directive), shown as `go 1.26.9 (latest-patch of go.mod 1.26.0)`.
+4. Global default when no project metadata is found.
+
+The `go` directive is a *minimum*: `go 1.26.0` written by `go mod init` selects the first 1.26 release with its known standard-library vulnerabilities, while CI usually runs the newest patch. `latest-patch` matches CI without editing `go.mod` for every consumer. Patch data comes from the embedded catalog, then `go.dev` releases (not used by the shims, which stay offline), then the newest installed patch of that minor, in which case `fgm current` and `fgm doctor` warn that the selection may be stale.
 
 ### Working directory
 
@@ -140,18 +144,20 @@ All workspace-aware commands accept `--chdir <dir>` (or the `FGM_CHDIR` environm
 FGM uses `.fgm.toml` for repository-level settings. Create or update it with:
 
 ```bash
+fgm pin go latest-patch   # or an explicit version, e.g. 1.26.8
 fgm pin golangci-lint <version>
 # or let FGM pick a compatible version automatically
 fgm pin golangci-lint auto
 ```
 
-`fgm pin` writes to the nearest existing `.fgm.toml` walking upward from the working directory; if none exists yet, it writes `.fgm.toml` in the nearest ancestor directory containing `go.work`, then `go.mod`, or the working directory itself. Pinning a specific version records that string directly without checking the compatibility catalog upfront (use `fgm doctor` to verify compatibility against the resolved Go version).
+`fgm pin` changes only the key it sets and writes to the nearest existing `.fgm.toml` walking upward from the working directory; if none exists yet, it writes `.fgm.toml` in the nearest ancestor directory containing `go.work`, then `go.mod`, or the working directory itself. Pinning a specific version records that string directly without checking the compatibility catalog upfront (use `fgm doctor` to verify compatibility against the resolved Go version).
 
 Example `.fgm.toml`:
 
 ```toml
 [toolchain]
-golangci_lint = "v2.11.2"
+go = "latest-patch"        # or "1.26.8"; omit to follow go.work/go.mod
+golangci_lint = "v2.11.2"  # or "auto"
 ```
 
 > [!IMPORTANT]

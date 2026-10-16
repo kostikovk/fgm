@@ -725,3 +725,42 @@ func TestDiagnoseGoToolchainEnvironment(t *testing.T) {
 		})
 	})
 }
+
+func TestDiagnoseSelectionWarnings(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should report a selection warning as WARN when the selection may be stale", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := New(Config{
+				Resolver: stubResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.28.1", Warnings: []string{"latest go 1.28 patch taken from installed versions"}}, nil
+				}},
+				GoStore: stubGoStore{
+					globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.28.1", true, nil },
+					shimDirFn:         func() string { return "/tmp/fgm/shims" },
+				},
+				PathEnv: "/tmp/fgm/shims",
+				Getenv:  func(string) string { return "" },
+			})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			for _, finding := range findings {
+				if finding.Severity == "WARN" && strings.Contains(finding.Message, "taken from installed versions") {
+					return
+				}
+			}
+			t.Errorf("findings = %+v; want the selection warning", findings)
+		})
+	})
+}

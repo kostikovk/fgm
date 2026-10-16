@@ -31,13 +31,18 @@ func newCurrentCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				colWidth = len("golangci-lint")
 			}
 
-			goLine := ui.FormatCurrentLine("go", selection.GoVersion, sourceLabel(selection.GoSource), colWidth)
+			goLine := ui.FormatCurrentLine("go", selection.GoVersion, goSourceLabel(selection), colWidth)
 			if _, err := fmt.Fprintln(cmd.OutOrStdout(), goLine); err != nil {
 				return err
 			}
 			if selection.LintVersion != "" {
 				lintLine := ui.FormatCurrentLine("golangci-lint", selection.LintVersion, sourceLabel(selection.LintSource), colWidth)
 				if _, err := fmt.Fprintln(cmd.OutOrStdout(), lintLine); err != nil {
+					return err
+				}
+			}
+			for _, warning := range selection.Warnings {
+				if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "warning: "+warning); err != nil {
 					return err
 				}
 			}
@@ -53,6 +58,13 @@ func formatCurrentLine(tool string, version string, source string) string {
 		line += " (" + label + ")"
 	}
 	return line
+}
+
+func goSourceLabel(selection app.Selection) string {
+	if selection.GoSource == "latest-patch" {
+		return fmt.Sprintf("latest-patch of %s %s", filepath.Base(selection.GoSourceFile), selection.GoBase)
+	}
+	return sourceLabel(selection.GoSource)
 }
 
 func sourceLabel(source string) string {

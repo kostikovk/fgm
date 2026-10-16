@@ -3,6 +3,7 @@ package fgmconfig
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -466,4 +467,111 @@ func TestLoadNearest_ErrorForMalformedToml(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error for malformed TOML")
 	}
+}
+
+func TestGoPolicy(t *testing.T) {
+	t.Parallel()
+
+	writeConfig := func(t *testing.T, content string) string {
+		t.Helper()
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, fileName), []byte(content), 0o644); err != nil {
+			t.Fatalf("write config: %v", err)
+		}
+		return dir
+	}
+
+	t.Run("ResolveGoPolicy", func(t *testing.T) {
+		t.Parallel()
+
+		cases := []struct {
+			name    string
+			content string
+			want    GoPolicy
+			wantOK  bool
+			wantErr bool
+		}{
+			{name: "should report no policy when the go key is absent", content: "[toolchain]\ngolangci_lint = \"v2.9.0\"\n"},
+			{name: "should return an explicit version without the go prefix when go names a version", content: "[toolchain]\ngo = \"go1.26.8\"\n", want: GoPolicy{Version: "1.26.8"}, wantOK: true},
+			{name: "should return the latest-patch policy when go is latest-patch", content: "[toolchain]\ngo = \"latest-patch\"\n", want: GoPolicy{LatestPatch: true}, wantOK: true},
+			{name: "should return an error when go is not a version or latest-patch", content: "[toolchain]\ngo = \"newest\"\n", wantErr: true},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// Arrange
+				dir := writeConfig(t, tc.content)
+
+				// Act
+				got, ok, err := ResolveGoPolicy(dir)
+
+				// Assert
+				if tc.wantErr {
+					if err == nil {
+						t.Fatalf("ResolveGoPolicy returned no error; want an error")
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("ResolveGoPolicy: %v", err)
+				}
+				if ok != tc.wantOK {
+					t.Fatalf("ok = %v; want %v", ok, tc.wantOK)
+				}
+				if ok && (got.Version != tc.want.Version || got.LatestPatch != tc.want.LatestPatch || got.Path != filepath.Join(dir, fileName)) {
+					t.Errorf("policy = %+v; want %+v at %s", got, tc.want, filepath.Join(dir, fileName))
+				}
+			})
+		}
+	})
+
+	t.Run("UpdateNearest", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should keep the golangci-lint pin when the go policy is written", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := writeConfig(t, "[toolchain]\ngolangci_lint = \"v2.9.0\"\n")
+
+			// Act
+			_, err := UpdateNearest(dir, func(file *File) { file.Toolchain.Go = "latest-patch" })
+
+			// Assert
+			if err != nil {
+				t.Fatalf("UpdateNearest: %v", err)
+			}
+			result, _, err := LoadNearest(dir)
+			if err != nil {
+				t.Fatalf("LoadNearest: %v", err)
+			}
+			if result.File.Toolchain.GolangCILint != "v2.9.0" || result.File.Toolchain.Go != "latest-patch" {
+				t.Errorf("toolchain = %+v; want both keys", result.File.Toolchain)
+			}
+		})
+
+		t.Run("should omit the golangci-lint key when only the go policy is written to a new file", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+
+			// Act
+			path, err := UpdateNearest(dir, func(file *File) { file.Toolchain.Go = "1.26.8" })
+
+			// Assert
+			if err != nil {
+				t.Fatalf("UpdateNearest: %v", err)
+			}
+			content, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read config: %v", err)
+			}
+			if strings.Contains(string(content), "golangci_lint") {
+				t.Errorf("content = %q; want no golangci_lint key", content)
+			}
+		})
+	})
 }

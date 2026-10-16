@@ -4,12 +4,60 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
 
 const fileName = ".fgm.toml"
+
+// LatestPatchPolicy selects the newest released patch of the go directive's minor version.
+const LatestPatchPolicy = "latest-patch"
+
+var goVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+)?((rc|beta)[0-9]+)?$`)
+
+// GoPolicy is the repository Go version policy from .fgm.toml.
+type GoPolicy struct {
+	// Version is an explicit Go version without the "go" prefix; empty for latest-patch.
+	Version     string
+	LatestPatch bool
+	Path        string
+}
+
+// ParseGoPolicyValue validates a toolchain.go value and returns the normalized form
+// ("latest-patch" or a version without the "go" prefix).
+func ParseGoPolicyValue(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == LatestPatchPolicy {
+		return trimmed, nil
+	}
+	version := strings.TrimPrefix(trimmed, "go")
+	if !goVersionPattern.MatchString(version) {
+		return "", fmt.Errorf("invalid Go version policy %q (want a version such as 1.26.8 or %q)", value, LatestPatchPolicy)
+	}
+	return version, nil
+}
+
+// ResolveGoPolicy returns the Go version policy from the nearest .fgm.toml.
+// Returns (GoPolicy{}, false, nil) when no config exists or the go key is empty.
+func ResolveGoPolicy(workDir string) (GoPolicy, bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return GoPolicy{}, false, err
+	}
+	if strings.TrimSpace(config.File.Toolchain.Go) == "" {
+		return GoPolicy{}, false, nil
+	}
+	value, err := ParseGoPolicyValue(config.File.Toolchain.Go)
+	if err != nil {
+		return GoPolicy{}, false, fmt.Errorf("%s: %w", config.Path, err)
+	}
+	if value == LatestPatchPolicy {
+		return GoPolicy{LatestPatch: true, Path: config.Path}, true, nil
+	}
+	return GoPolicy{Version: value, Path: config.Path}, true, nil
+}
 
 // ResolvePinnedLint returns the pinned golangci-lint version from the nearest .fgm.toml.
 // Returns ("", false, nil) when no config exists, the field is empty, or set to "auto".
@@ -29,7 +77,8 @@ func ResolvePinnedLint(workDir string) (string, bool, error) {
 
 // ToolchainConfig describes FGM-specific toolchain overrides.
 type ToolchainConfig struct {
-	GolangCILint string `toml:"golangci_lint"`
+	Go           string `toml:"go,omitempty"`
+	GolangCILint string `toml:"golangci_lint,omitempty"`
 }
 
 // File describes the supported FGM repo config.
@@ -63,6 +112,25 @@ func SaveNearest(workDir string, file File) (string, error) {
 	}
 
 	return path, nil
+}
+
+// UpdateNearest applies update to the .fgm.toml that SaveNearest would write and saves it,
+// preserving keys that update does not change.
+func UpdateNearest(workDir string, update func(*File)) (string, error) {
+	path, err := resolveWritePath(workDir)
+	if err != nil {
+		return "", err
+	}
+	var file File
+	if content, err := os.ReadFile(path); err == nil {
+		if err := toml.Unmarshal(content, &file); err != nil {
+			return "", fmt.Errorf("parse %s: %w", path, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+	update(&file)
+	return SaveNearest(workDir, file)
 }
 
 // LoadNearest loads the nearest .fgm.toml by walking upward from workDir.

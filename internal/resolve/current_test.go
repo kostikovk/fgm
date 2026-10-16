@@ -329,7 +329,7 @@ func TestParseVersionMetadata_OpenError(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(goModPath, 0o644) })
 
-	_, _, err := parseVersionMetadata(goModPath)
+	_, err := parseVersionMetadata(goModPath)
 	if err == nil {
 		t.Fatal("expected error when os.Open fails, got nil")
 	}
@@ -351,7 +351,7 @@ func TestParseVersionMetadata_ScannerError(t *testing.T) {
 		t.Fatalf("write go.mod: %v", err)
 	}
 
-	_, _, err := parseVersionMetadata(goModPath)
+	_, err := parseVersionMetadata(goModPath)
 	if err == nil {
 		t.Fatal("expected error when scanner.Err returns non-nil, got nil")
 	}

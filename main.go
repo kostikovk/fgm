@@ -121,7 +121,18 @@ func run(
 		LintInstaller:      lintInstaller,
 		GlobalStore:        goStore,
 	})
-	goResolver := resolve.New(goStore)
+	// Shims run on every go invocation, so their resolver never touches the network.
+	offlineGoResolver := resolve.NewWithConfig(resolve.Config{
+		Global:        goStore,
+		PatchCatalog:  lintReleaseProvider,
+		LocalVersions: goStore,
+	})
+	goResolver := resolve.NewWithConfig(resolve.Config{
+		Global:         goStore,
+		PatchCatalog:   lintReleaseProvider,
+		RemoteVersions: goReleaseProvider,
+		LocalVersions:  goStore,
+	})
 	currentResolver := currenttoolchain.New(currenttoolchain.Config{
 		GoResolver:          goResolver,
 		LintStore:           lintStore,
@@ -164,7 +175,7 @@ func run(
 	}
 	application := &app.App{
 		Resolver:           currentResolver,
-		GoResolver:         goResolver,
+		GoResolver:         offlineGoResolver,
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		GoRemoteProvider:   goReleaseProvider,
