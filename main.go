@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"syscall"
@@ -113,8 +114,15 @@ func run(
 		Provider:       lintReleaseProvider,
 		ProgressWriter: stderr,
 	})
+	homeDir, _ := os.UserHomeDir()
+	sdkDir := ""
+	if homeDir != "" {
+		sdkDir = filepath.Join(homeDir, "sdk")
+	}
 	goImporter := goimport.New(goimport.Config{
 		Candidates: goimport.DefaultCandidates(getenv("PATH")),
+		ModCache:   goimport.ModCacheLocator(getenv, getenv("PATH"), homeDir),
+		SDKDir:     sdkDir,
 		Registry:   goStore,
 	})
 	lintImporter := lintimport.New(lintimport.Config{
@@ -152,6 +160,7 @@ func run(
 		LintStore:          lintStore,
 		LintRemoteProvider: lintReleaseProvider,
 		LintCatalog:        lintReleaseProvider,
+		Imports:            goStore,
 		FGMUpdateChecker:   updateChecker,
 		PathEnv:            getenv("PATH"),
 		Getenv:             getenv,

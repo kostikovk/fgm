@@ -150,7 +150,17 @@ To keep Go's own switching, pass `fgm exec --gotoolchain inherit` or set `FGM_EX
 - Go: `go/<version>` points to the external `GOROOT` directory.
 - Linter: `golangci-lint/<version>/golangci-lint` points to the external binary.
 
-Imported versions depend on those source installations remaining on disk. `fgm remove` removes only the symlink inside the FGM store.
+Go is imported from these read-only, local sources (no network, no writes outside the FGM store; re-running is idempotent):
+
+| Source | Location |
+|---|---|
+| System installations | the `go` on `PATH`, `/usr/local/go`, Homebrew |
+| Module cache (Go's own toolchain switching) | `<GOMODCACHE>/golang.org/toolchain@v0.0.1-go<version>.<goos>-<goarch>`, current platform only; `GOMODCACHE` comes from `go env`, else `$GOMODCACHE`, `$GOPATH/pkg/mod`, `~/go/pkg/mod` |
+| `golang.org/dl` SDKs | `~/sdk/go<version>` |
+
+A module-cache or SDK directory is imported only when `bin/go` exists and its `VERSION` file matches the version in the directory name; otherwise it is listed as skipped with the reason. Output names the source, e.g. `Imported Go 1.26.8 from …/toolchain@v0.0.1-go1.26.8.darwin-arm64 (module cache)`.
+
+Imported versions depend on those source installations remaining on disk (`go clean -modcache` removes module-cache toolchains); `fgm doctor` warns about an imported version whose source is gone, with the `fgm install go <version>` hint. `fgm remove` removes only the symlink inside the FGM store.
 
 ## Shell profile setup
 

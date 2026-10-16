@@ -37,6 +37,11 @@ type LintCatalog interface {
 	LintCompatibility(goVersion string, lintVersion string) (compatible bool, known bool, err error)
 }
 
+// ImportLister reports imported Go versions whose source directory is gone.
+type ImportLister interface {
+	BrokenGoImports(ctx context.Context) ([]app.ImportedGo, error)
+}
+
 // Resolver provides the current toolchain selection for a workspace.
 type Resolver interface {
 	Current(ctx context.Context, workDir string) (app.Selection, error)
@@ -49,6 +54,7 @@ type Config struct {
 	LintStore          LintStore
 	LintRemoteProvider LintRemoteProvider
 	LintCatalog        LintCatalog
+	Imports            ImportLister
 	FGMUpdateChecker   app.FGMUpdateChecker
 	PathEnv            string
 	// Getenv reads the caller's environment; os.Getenv is used when nil.
@@ -62,6 +68,7 @@ type Service struct {
 	lintStore          LintStore
 	lintRemoteProvider LintRemoteProvider
 	lintCatalog        LintCatalog
+	imports            ImportLister
 	fgmUpdateChecker   app.FGMUpdateChecker
 	pathEnv            string
 	getenv             func(string) string
@@ -79,6 +86,7 @@ func New(config Config) *Service {
 		lintStore:          config.LintStore,
 		lintRemoteProvider: config.LintRemoteProvider,
 		lintCatalog:        config.LintCatalog,
+		imports:            config.Imports,
 		fgmUpdateChecker:   config.FGMUpdateChecker,
 		pathEnv:            config.PathEnv,
 		getenv:             getenv,
@@ -124,6 +132,22 @@ func (s *Service) Diagnose(ctx context.Context, workDir string) ([]app.DoctorFin
 			Severity: "WARN",
 			Message:  fmt.Sprintf("shell sets GOROOT=%s; the selected go binary may use another installation's standard library (unset it; fgm exec drops it)", value),
 		})
+	}
+
+	if s.imports != nil {
+		broken, err := s.imports.BrokenGoImports(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range broken {
+			findings = append(findings, app.DoctorFinding{
+				Severity: "WARN",
+				Message: fmt.Sprintf(
+					"imported Go %s points to a removed directory %s (run %q, or \"fgm remove go %s\")",
+					item.Version, item.Path, toolhint.InstallGoCommand(item.Version), item.Version,
+				),
+			})
+		}
 	}
 
 	if _, err := exec.LookPath("fgm"); err == nil {
