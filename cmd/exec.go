@@ -14,11 +14,12 @@ import (
 func newExecCmd(application *app.App, v *viper.Viper) *cobra.Command {
 	var installMissing bool
 	var goToolchain string
+	var allowUnselectedLint bool
 
 	cmd := &cobra.Command{
-		Use:   "exec [--install] [--gotoolchain local|inherit] -- [command] [args...]",
+		Use:   "exec [--install] [--gotoolchain local|inherit] [--allow-unselected-lint] -- [command] [args...]",
 		Short: "Run a command with the resolved Go and installed selected golangci-lint on PATH",
-		Long:  "Run a child process with the workspace's resolved Go binary directory (and installed selected golangci-lint directory, when present) prepended to PATH. Pass --install to automatically install missing resolved Go and golangci-lint versions before running the command. The child runs with GOTOOLCHAIN=local and without GOROOT so the selected Go is the Go that runs; pass --gotoolchain inherit (or set FGM_EXEC_GOTOOLCHAIN=inherit) to keep the caller's values. Use this in non-interactive sessions where shell profile changes do not persist across processes.",
+		Long:  "Run a child process with the workspace's resolved Go binary directory (and installed selected golangci-lint directory, when present) prepended to PATH. Pass --install to automatically install missing resolved Go and golangci-lint versions before running the command. The child runs with GOTOOLCHAIN=local and without GOROOT so the selected Go is the Go that runs. When the selected golangci-lint is not installed, running golangci-lint fails with an install hint (pass --install, or --allow-unselected-lint to use whatever is on PATH) and other commands warn if golangci-lint on PATH is a different binary. Pass --gotoolchain inherit (or set FGM_EXEC_GOTOOLCHAIN=inherit) to keep the caller's values. Use this in non-interactive sessions where shell profile changes do not persist across processes.",
 		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -52,7 +53,7 @@ func newExecCmd(application *app.App, v *viper.Viper) *cobra.Command {
 				cmd.Context(),
 				workDir,
 				args,
-				app.ExecOptions{GoToolchain: string(mode)},
+				app.ExecOptions{GoToolchain: string(mode), AllowUnselectedLint: allowUnselectedLint},
 				cmd.InOrStdin(),
 				cmd.OutOrStdout(),
 				cmd.ErrOrStderr(),
@@ -62,6 +63,7 @@ func newExecCmd(application *app.App, v *viper.Viper) *cobra.Command {
 
 	cmd.Flags().BoolVar(&installMissing, "install", false, "install missing resolved Go and golangci-lint versions before executing")
 	cmd.Flags().StringVar(&goToolchain, "gotoolchain", "", "GOTOOLCHAIN handling for the child: local (default) or inherit (overrides "+goenv.ModeEnvVar+")")
+	cmd.Flags().BoolVar(&allowUnselectedLint, "allow-unselected-lint", false, "let golangci-lint resolve from the inherited PATH when the selected version is not installed")
 	cmd.Flags().SetInterspersed(false)
 	return cmd
 }

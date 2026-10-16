@@ -148,6 +148,8 @@ type Doctor interface {
 type ExecOptions struct {
 	// GoToolchain is "local" (used when empty) or "inherit"; see internal/goenv.
 	GoToolchain string
+	// AllowUnselectedLint lets golangci-lint resolve from the inherited PATH when the selected version is missing.
+	AllowUnselectedLint bool
 }
 
 // Executor runs commands with a selected Go toolchain on PATH.

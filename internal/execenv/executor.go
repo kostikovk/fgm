@@ -12,7 +12,10 @@ import (
 
 	"github.com/kostikovk/fgm/internal/app"
 	"github.com/kostikovk/fgm/internal/goenv"
+	"github.com/kostikovk/fgm/internal/toolhint"
 )
+
+const lintCommand = "golangci-lint"
 
 // SelectionResolver resolves the selected Go version for a working directory.
 type SelectionResolver interface {
@@ -36,6 +39,7 @@ type Executor struct {
 	lintLocator LintBinaryLocator
 	pathEnv     string
 	environ     func() []string
+	shimDir     string
 }
 
 // Config configures an Executor.
@@ -46,6 +50,8 @@ type Config struct {
 	PathEnv     string
 	// Environ returns the inherited environment; os.Environ is used when nil.
 	Environ func() []string
+	// ShimDir is the FGM shim directory; a golangci-lint shim found there reports a missing selection itself.
+	ShimDir string
 }
 
 // New constructs an Executor.
@@ -56,6 +62,7 @@ func New(config Config) *Executor {
 		lintLocator: config.LintLocator,
 		pathEnv:     config.PathEnv,
 		environ:     config.Environ,
+		shimDir:     config.ShimDir,
 	}
 }
 
@@ -80,6 +87,7 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, opti
 	}
 
 	pathDirs := []string{filepath.Dir(goBinaryPath)}
+	selectedLintMissing := false
 	if selection.LintVersion != "" && e.lintLocator != nil {
 		lintBinaryPath, err := e.lintLocator.LintBinaryPath(ctx, selection.LintVersion)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -87,7 +95,16 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, opti
 		}
 		if err == nil {
 			pathDirs = append(pathDirs, filepath.Dir(lintBinaryPath))
+		} else {
+			selectedLintMissing = true
 		}
+	}
+	if selectedLintMissing && !options.AllowUnselectedLint && commandName(args[0]) == lintCommand {
+		return fmt.Errorf(
+			"selected golangci-lint %s is not installed; refusing to run another version from PATH (run %q, pass --install, or --allow-unselected-lint)",
+			selection.LintVersion,
+			toolhint.InstallLintCommand(selection.LintVersion),
+		)
 	}
 
 	inherited := os.Environ()
@@ -98,6 +115,13 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, opti
 	if warning != "" && stderr != nil {
 		if _, err := fmt.Fprintln(stderr, warning); err != nil {
 			return err
+		}
+	}
+	if selectedLintMissing && !options.AllowUnselectedLint && stderr != nil {
+		if found, err := resolveCommandPath(lintCommand, env); err == nil && filepath.Dir(found) != e.shimDir {
+			if _, err := fmt.Fprintf(stderr, "fgm: warning: selected golangci-lint %s is not installed; golangci-lint on PATH resolves to %s\n", selection.LintVersion, found); err != nil {
+				return err
+			}
 		}
 	}
 	commandPath, err := resolveCommandPath(args[0], env)
@@ -113,6 +137,10 @@ func (e *Executor) Exec(ctx context.Context, workDir string, args []string, opti
 	cmd.Env = env
 
 	return cmd.Run()
+}
+
+func commandName(command string) string {
+	return strings.TrimSuffix(filepath.Base(command), ".exe")
 }
 
 func withPrependedPath(env []string, toolDirs []string, fallbackPath string) []string {

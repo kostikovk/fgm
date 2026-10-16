@@ -11,7 +11,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 | `fgm current` | Show resolved Go and lint versions with source labels |
 | `fgm doctor [--fix]` | Check installation health and environment (`--fix` adds shell integration to `zsh`/`bash`/`fish` profile) |
 | `fgm env` | Print shell setup (`--shell zsh\|bash\|fish\|powershell`) |
-| `fgm exec [--install] [--gotoolchain local\|inherit] -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` and `GOTOOLCHAIN=local` (`--install` installs missing resolved toolchains first) |
+| `fgm exec [--install] [--gotoolchain local\|inherit] [--allow-unselected-lint] -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` and `GOTOOLCHAIN=local` (`--install` installs missing resolved toolchains first) |
 | `fgm import auto` | Auto-import existing Go and `golangci-lint` installations from system locations |
 | `fgm install` | Install resolved Go (and selected `golangci-lint`, if resolved) for the workspace |
 | `fgm install go <version>` | Install a specific Go version |
@@ -65,7 +65,12 @@ The resolved Go version must be installed locally. `fgm exec` searches `PATH` in
 2. Selected `golangci-lint` installation, when installed in the FGM store.
 3. Inherited `PATH`.
 
-It does not auto-install missing tools. If the selected linter is missing, unrelated commands still run, but `golangci-lint` may fall back to a different version on the inherited `PATH` or fail to start. Run `fgm install` before relying on the selected linter.
+It does not auto-install missing tools unless `--install` is given. When the selected linter is not installed:
+
+- `fgm exec -- golangci-lint ...` exits non-zero with the `fgm install golangci-lint <version>` hint instead of running another version from the inherited `PATH` (`--install` installs it first);
+- any other command (for example `make lint`) still runs, and fgm prints one stderr warning naming the `golangci-lint` binary that `PATH` resolves to. Absolute paths inside scripts cannot be intercepted.
+
+`--allow-unselected-lint` restores the previous behaviour: no error and no warning.
 
 ### Go toolchain environment
 

@@ -149,6 +149,7 @@ func run(
 		GoLocator:   goStore,
 		LintLocator: lintStore,
 		PathEnv:     getenv("PATH"),
+		ShimDir:     goStore.ShimDir(),
 	})
 	envRenderer := envsetup.New(envsetup.Config{
 		GoStore:   goStore,

@@ -677,7 +677,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		}
 	})
 
-	t.Run("should use inherited lint when selected lint is absent", func(t *testing.T) {
+	t.Run("should use inherited lint when unselected lint is allowed for a missing selection", func(t *testing.T) {
 		// Arrange
 		workDir := t.TempDir()
 		goBinDir := filepath.Join(t.TempDir(), "go-bin")
@@ -724,7 +724,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		err := executor.Exec(
 			context.Background(),
 			workDir,
-			[]string{"golangci-lint", "version"}, app.ExecOptions{},
+			[]string{"golangci-lint", "version"}, app.ExecOptions{AllowUnselectedLint: true},
 			strings.NewReader(""),
 			&stdout,
 			&stderr,
@@ -739,7 +739,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		}
 	})
 
-	t.Run("should report command lookup failure when lint is absent everywhere", func(t *testing.T) {
+	t.Run("should report command lookup failure when unselected lint is allowed and lint is absent everywhere", func(t *testing.T) {
 		// Arrange
 		workDir := t.TempDir()
 		goBinDir := filepath.Join(t.TempDir(), "go-bin")
@@ -778,7 +778,7 @@ func TestExecutorExec_LintContractScenarios(t *testing.T) {
 		err := executor.Exec(
 			context.Background(),
 			workDir,
-			[]string{"golangci-lint", "run"}, app.ExecOptions{},
+			[]string{"golangci-lint", "run"}, app.ExecOptions{AllowUnselectedLint: true},
 			strings.NewReader(""),
 			&stdout,
 			&stderr,
@@ -1001,6 +1001,99 @@ func TestExecutorGoToolchainEnvironment(t *testing.T) {
 			// Assert
 			if err == nil {
 				t.Fatal("Exec returned no error; want an invalid mode error")
+			}
+		})
+	})
+}
+
+func TestExecutorUnselectedLint(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	type fixture struct {
+		executor   *Executor
+		foreignDir string
+	}
+	newFixture := func(t *testing.T) fixture {
+		t.Helper()
+		goBinary := filepath.Join(t.TempDir(), "go")
+		if err := os.WriteFile(goBinary, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatalf("write fake go binary: %v", err)
+		}
+		foreignDir := t.TempDir()
+		foreignLint := filepath.Join(foreignDir, "golangci-lint")
+		if err := os.WriteFile(foreignLint, []byte("#!/bin/sh\nprintf 'foreign lint\\n'\n"), 0o755); err != nil {
+			t.Fatalf("write foreign lint: %v", err)
+		}
+		executor := New(Config{
+			Resolver: stubResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.26.0", LintVersion: "v2.9.0", LintSource: "config"}, nil
+			}},
+			GoLocator: stubLocator{goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return goBinary, nil
+			}},
+			LintLocator: stubLocator{lintBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return "", fmt.Errorf("golangci-lint %s is not installed: %w", version, os.ErrNotExist)
+			}},
+			Environ: func() []string { return []string{"PATH=" + foreignDir + ":/bin:/usr/bin"} },
+		})
+		return fixture{executor: executor, foreignDir: foreignDir}
+	}
+
+	t.Run("Exec", func(t *testing.T) {
+		t.Run("should return an install hint when golangci-lint runs and the selected version is missing", func(t *testing.T) {
+			// Arrange
+			fx := newFixture(t)
+			var stdout, stderr bytes.Buffer
+
+			// Act
+			err := fx.executor.Exec(context.Background(), t.TempDir(), []string{"golangci-lint", "run"}, app.ExecOptions{}, strings.NewReader(""), &stdout, &stderr)
+
+			// Assert
+			if err == nil {
+				t.Fatalf("Exec returned no error; stdout = %q", stdout.String())
+			}
+			if !strings.Contains(err.Error(), "fgm install golangci-lint v2.9.0") {
+				t.Errorf("err = %q; want the install hint", err)
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q; want the foreign linter not to run", stdout.String())
+			}
+		})
+
+		t.Run("should run the linter found on PATH when unselected lint is allowed", func(t *testing.T) {
+			// Arrange
+			fx := newFixture(t)
+			var stdout, stderr bytes.Buffer
+
+			// Act
+			err := fx.executor.Exec(context.Background(), t.TempDir(), []string{"golangci-lint", "run"}, app.ExecOptions{AllowUnselectedLint: true}, strings.NewReader(""), &stdout, &stderr)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			if stdout.String() != "foreign lint\n" {
+				t.Errorf("stdout = %q; want the foreign linter output", stdout.String())
+			}
+		})
+
+		t.Run("should warn naming the PATH linter when another command runs while the selected version is missing", func(t *testing.T) {
+			// Arrange
+			fx := newFixture(t)
+			var stdout, stderr bytes.Buffer
+
+			// Act
+			err := fx.executor.Exec(context.Background(), t.TempDir(), []string{"sh", "-c", "true"}, app.ExecOptions{}, strings.NewReader(""), &stdout, &stderr)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Exec: %v", err)
+			}
+			want := filepath.Join(fx.foreignDir, "golangci-lint")
+			if !strings.Contains(stderr.String(), want) {
+				t.Errorf("stderr = %q; want a warning naming %s", stderr.String(), want)
 			}
 		})
 	})

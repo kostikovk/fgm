@@ -762,3 +762,35 @@ func TestExecCommandGoToolchainMode(t *testing.T) {
 		})
 	})
 }
+
+func TestExecCommandAllowUnselectedLint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should allow unselected lint when the allow-unselected-lint flag is set", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			application := &app.App{Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					got = options
+					return nil
+				},
+			}}
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "exec", "--allow-unselected-lint", "--", "golangci-lint", "run")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if !got.AllowUnselectedLint {
+				t.Error("AllowUnselectedLint = false; want true")
+			}
+		})
+	})
+}
