@@ -8,7 +8,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 
 | Command | Description |
 |---------|-------------|
-| `fgm current` | Show resolved Go and lint versions with source labels |
+| `fgm current [--json] [--all]` | Show resolved Go and lint versions with source labels (`--json`: machine-readable; `--all`: every module) |
 | `fgm doctor [--fix]` | Check installation health and environment (`--fix` adds shell integration to `zsh`/`bash`/`fish` profile) |
 | `fgm env` | Print shell setup (`--shell zsh\|bash\|fish\|powershell`) |
 | `fgm exec [--install] [--gotoolchain local\|inherit] [--allow-unselected-lint] -- <cmd> [args...]` | Run command with resolved Go (and installed selected lint) on `PATH` and `GOTOOLCHAIN=local` (`--install` installs missing resolved toolchains first) |
@@ -32,6 +32,38 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 
 > [!TIP]
 > `fgm current` shows where each version was resolved from, e.g. `go 1.25.0 (go.mod)` or `golangci-lint v2.11.2 (config)`.
+
+## Machine-readable output
+
+`fgm current --json` prints one object (never styled, regardless of TTY). Paths in `source_file` are relative to `dir`:
+
+```json
+{
+  "schema": 1,
+  "dir": "/abs/path/services/api",
+  "module_root": "/abs/path/services/api",
+  "go": {"version": "1.26.9", "source": "latest-patch", "source_file": "go.mod",
+         "base": "1.26.0", "installed": true, "path": "/…/go/1.26.9/bin/go"},
+  "golangci_lint": {"version": "v2.9.0", "source": "detected", "source_file": "Makefile",
+         "source_line": 31, "installed": false, "compatible": true},
+  "warnings": []
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `schema` | Document version. Changes within a schema version are additive only. |
+| `dir`, `module_root` | Absolute working directory and the directory of its nearest `go.mod` (`""` when none). |
+| `go.source` | `go.work`, `go.mod`, `config` (`.fgm.toml` `go`), `latest-patch` (with `base`), or `global`. |
+| `go.installed`, `go.path` | Whether the selected Go is in the FGM store (or is the imported/system Go), and its binary. |
+| `golangci_lint` | `null` when no linter is selected. `source` is `config`, `detected` (with `source_line`), `local`, or `remote`. |
+| `golangci_lint.compatible` | Catalog verdict for the selected Go; `null` when the catalog does not know the version. |
+| `warnings` | Stale `latest-patch` data, conflicting detected lint pins, and similar notes. |
+| `error` | Present only in `--all` entries whose module failed to resolve; `go` and `golangci_lint` are then `null`. |
+
+`fgm current --all [--json]` reports every module under the working directory: the `use` entries of the nearest `go.work` that lie under it, otherwise every `go.mod` below it, skipping `vendor/`, `testdata/`, `node_modules/` and dot-directories and never following symlinks out of the root. Modules are listed in lexical order; JSON output is an array, text output is one line per module.
+
+Exit status: `0` when every module resolved, `1` when at least one failed (its entry carries `error`), `2` for an invalid invocation (unknown flag or argument; this applies to every command).
 
 ## Terminal output and script compatibility
 

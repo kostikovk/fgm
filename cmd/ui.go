@@ -439,6 +439,9 @@ func Execute(ctx context.Context, root *cobra.Command, opts UIOptions) error {
 	root.CompletionOptions.DisableDefaultCmd = true
 
 	if err := root.ExecuteContext(withUIOptions(ctx, opts)); err != nil {
+		if isSilent(err) {
+			return printedError{err: err}
+		}
 		ui := uiForCommand(root, opts)
 		_, _ = fmt.Fprintln(root.ErrOrStderr(), ui.FormatError(err))
 		return printedError{err: err}

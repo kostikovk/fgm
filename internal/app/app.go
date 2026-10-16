@@ -181,6 +181,51 @@ type Selection struct {
 	Warnings []string
 }
 
+// CurrentReportSchema is the version of the `fgm current --json` document. Changes within a
+// schema version are additive only.
+const CurrentReportSchema = 1
+
+// CurrentReport is the machine-readable selection for one directory (`fgm current --json`).
+type CurrentReport struct {
+	Schema       int         `json:"schema"`
+	Dir          string      `json:"dir"`
+	ModuleRoot   string      `json:"module_root"`
+	Go           *GoReport   `json:"go"`
+	GolangCILint *LintReport `json:"golangci_lint"`
+	Warnings     []string    `json:"warnings"`
+	Error        string      `json:"error,omitempty"`
+}
+
+// GoReport describes the selected Go toolchain in a CurrentReport.
+type GoReport struct {
+	Version string `json:"version"`
+	// Source is "go.work", "go.mod", "config", "latest-patch", or "global".
+	Source     string `json:"source"`
+	SourceFile string `json:"source_file,omitempty"`
+	Base       string `json:"base,omitempty"`
+	Installed  bool   `json:"installed"`
+	Path       string `json:"path,omitempty"`
+}
+
+// LintReport describes the selected golangci-lint in a CurrentReport.
+type LintReport struct {
+	Version string `json:"version"`
+	// Source is "config", "detected", "local", or "remote".
+	Source     string `json:"source"`
+	SourceFile string `json:"source_file,omitempty"`
+	SourceLine int    `json:"source_line,omitempty"`
+	Installed  bool   `json:"installed"`
+	Path       string `json:"path,omitempty"`
+	// Compatible is null when the compatibility catalog does not know the version.
+	Compatible *bool `json:"compatible"`
+}
+
+// CurrentReporter builds CurrentReports for one directory or every module below it.
+type CurrentReporter interface {
+	Report(ctx context.Context, dir string) (CurrentReport, error)
+	ReportAll(ctx context.Context, dir string) ([]CurrentReport, error)
+}
+
 // LintConfigGenerator generates golangci-lint configuration files.
 type LintConfigGenerator interface {
 	Generate(ctx context.Context, opts LintConfigOptions) ([]byte, error)
@@ -239,4 +284,5 @@ type App struct {
 	LintDoctor          LintDoctor
 	ProfileInstaller    ProfileInstaller
 	FGMUpdateChecker    FGMUpdateChecker
+	CurrentReporter     CurrentReporter
 }

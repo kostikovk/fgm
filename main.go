@@ -30,6 +30,7 @@ import (
 	"github.com/kostikovk/fgm/internal/lintinstall"
 	"github.com/kostikovk/fgm/internal/lintlocal"
 	"github.com/kostikovk/fgm/internal/lintupgrade"
+	"github.com/kostikovk/fgm/internal/report"
 	"github.com/kostikovk/fgm/internal/resolve"
 )
 
@@ -63,7 +64,7 @@ func main() {
 		if !cmd.IsPrintedError(err) {
 			_, _ = fmt.Fprintln(stderrWriter, err)
 		}
-		exitMain(1)
+		exitMain(cmd.ExitCode(err))
 	}
 	stop()
 }
@@ -199,6 +200,12 @@ func run(
 		LintConfigGenerator: lintConfigService,
 		LintDoctor:          lintConfigService,
 		FGMUpdateChecker:    updateChecker,
+		CurrentReporter: report.New(report.Config{
+			Resolver:  currentResolver,
+			GoStore:   goStore,
+			LintStore: lintStore,
+			Catalog:   lintReleaseProvider,
+		}),
 	}
 
 	return buildRoot(application).ExecuteContext(ctx)
