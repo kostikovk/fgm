@@ -180,7 +180,7 @@ fgm upgrade golangci-lint --dry-run
 - Neither command rewrites `.fgm.toml` pins.
 - An explicit `--to` linter version is installed directly without compatibility filtering.
 
-After choosing a target, preview again with `--to <version>` and use that same target for the live upgrade. Verify explicit linter pins against the target Go version. See the [agent skill](../skills/fgm/SKILL.md#6-upgrade-and-lint-configuration-safely) for handling partial upgrade results.
+After choosing a target, preview again with `--to <version>` and use that same target for the live upgrade. Verify explicit linter pins against the target Go version. See the [agent skill's upgrade reference](../skills/fgm/references/upgrades.md#upgrading-with-a-frozen-target) for handling partial upgrade results.
 
 ## Version resolution
 
