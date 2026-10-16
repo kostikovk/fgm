@@ -79,10 +79,13 @@ Exit status: `0` when every module resolved, `1` when at least one failed (its e
 | C4b | …different minor from the resolved Go (`go-version-file` is always OK; `${{ … }}` expressions are reported as INFO "not checked") | WARN |
 | C5 | Dockerfile `FROM golang:<tag>` older than the `go` directive (a floating `1.26` tag is compared by minor; `ARG`-substituted tags are INFO "not checked") | ERROR |
 | C6 | `go.work` `go` version lower than a used module's `go` directive | ERROR |
+| C7 | A Makefile/`*.mk` recipe or workflow `run:` step invokes `golangci-lint` or `go` by a path that bypasses `PATH` (`$(GOPATH)/bin/…`, `$(shell go env GOPATH)/bin/…`, `$(GOBIN)/…`, `~/go/bin/…`, `$HOME/go/bin/…`, any absolute `…/bin/…`), so `fgm exec` cannot route it | WARN |
 
 Output is one line per finding — `ID SEVERITY file:line message (fix: hint)` — or `OK no consistency findings`. `--json` prints the [`current --json`](#machine-readable-output) envelope plus a `findings` array (`id`, `severity`, `file`, `line`, `message`, `hint`; `file` is relative to `dir`); with `--all` it is an array with one entry per module. Workflows map to modules with the same `working-directory` rule as lint pin detection.
 
 Exit status: `0` clean, `1` findings at or above `--fail-on` (default `error`), `2` could not run (invalid invocation or a module that cannot be resolved).
+
+C7 matches lines literally, without Make or shell evaluation. Project-local tool directories (`./bin/…`, `$(LOCALBIN)/…`, `$(CURDIR)/bin/…`) are not reported — when their install target pins another version, C3 reports the disagreement — and neither are lines that only install the tool (`install.sh`, `go install`, `curl`, `wget`).
 
 Skip checks for repositories whose files intentionally differ:
 
@@ -127,7 +130,7 @@ The resolved Go version must be installed locally. `fgm exec` searches `PATH` in
 It does not auto-install missing tools unless `--install` is given. When the selected linter is not installed:
 
 - `fgm exec -- golangci-lint ...` exits non-zero with the `fgm install golangci-lint <version>` hint instead of running another version from the inherited `PATH` (`--install` installs it first);
-- any other command (for example `make lint`) still runs, and fgm prints one stderr warning naming the `golangci-lint` binary that `PATH` resolves to. Absolute paths inside scripts cannot be intercepted.
+- any other command (for example `make lint`) still runs, and fgm prints one stderr warning naming the `golangci-lint` binary that `PATH` resolves to. Absolute paths inside scripts cannot be intercepted; `fgm check` reports them as `C7`.
 
 `--allow-unselected-lint` restores the previous behaviour: no error and no warning.
 
