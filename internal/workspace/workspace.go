@@ -121,3 +121,18 @@ func nearestDirWith(dir string, name string) (string, bool) {
 		current = parent
 	}
 }
+
+// GoDirective returns the go directive of a go.mod or go.work file and its 1-based line.
+// found is false when the file has no go directive.
+func GoDirective(path string) (version string, line int, found bool, err error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", 0, false, err
+	}
+	for index, text := range strings.Split(string(content), "\n") {
+		if value, ok := strings.CutPrefix(strings.TrimSpace(text), "go "); ok {
+			return strings.TrimSpace(strings.SplitN(value, "//", 2)[0]), index + 1, true, nil
+		}
+	}
+	return "", 0, false, nil
+}

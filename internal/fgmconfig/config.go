@@ -109,6 +109,13 @@ type ToolchainConfig struct {
 // File describes the supported FGM repo config.
 type File struct {
 	Toolchain ToolchainConfig `toml:"toolchain"`
+	Check     CheckConfig     `toml:"check,omitempty"`
+}
+
+// CheckConfig configures `fgm check`.
+type CheckConfig struct {
+	// Skip lists check IDs (for example "C5") that fgm check does not run.
+	Skip []string `toml:"skip,omitempty"`
 }
 
 // Result wraps a loaded repo config and its source path.

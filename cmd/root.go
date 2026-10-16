@@ -61,6 +61,7 @@ func NewRootCmdWithUI(application *app.App, opts UIOptions) *cobra.Command {
 
 	_ = v.BindPFlag(flagChdir, rootCmd.PersistentFlags().Lookup(flagChdir))
 
+	rootCmd.AddCommand(newCheckCmd(application, v))
 	rootCmd.AddCommand(newCurrentCmd(application, v))
 	rootCmd.AddCommand(newDoctorCmd(application, v))
 	rootCmd.AddCommand(newEnvCmd(application))

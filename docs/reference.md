@@ -8,6 +8,7 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 
 | Command | Description |
 |---------|-------------|
+| `fgm check [--all] [--json] [--fail-on error\|warn]` | Offline repository consistency gate for CI (Go/lint versions across `go.mod`, `.fgm.toml`, workflows, Dockerfiles, lint config) |
 | `fgm current [--json] [--all]` | Show resolved Go and lint versions with source labels (`--json`: machine-readable; `--all`: every module) |
 | `fgm doctor [--fix]` | Check installation health and environment (`--fix` adds shell integration to `zsh`/`bash`/`fish` profile) |
 | `fgm env` | Print shell setup (`--shell zsh\|bash\|fish\|powershell`) |
@@ -64,6 +65,31 @@ Use `fgm --help` or `fgm <command> --help` for flags and examples.
 `fgm current --all [--json]` reports every module under the working directory: the `use` entries of the nearest `go.work` that lie under it, otherwise every `go.mod` below it, skipping `vendor/`, `testdata/`, `node_modules/` and dot-directories and never following symlinks out of the root. Modules are listed in lexical order; JSON output is an array, text output is one line per module.
 
 Exit status: `0` when every module resolved, `1` when at least one failed (its entry carries `error`), `2` for an invalid invocation (unknown flag or argument; this applies to every command).
+
+## Repository consistency check
+
+`fgm check` reads repository files only — no network, installs, or writes — so it is safe in CI and pre-commit hooks, and gives identical results offline. `fgm doctor` checks the *host*; `fgm check` checks the *repository*.
+
+| ID | Check | Severity |
+|---|---|---|
+| C1 | Selected/detected `golangci-lint` cannot run on the resolved Go (catalog `max_go_minor`) | ERROR |
+| C2 | Lint config schema does not match the linter major (`version: "2"` with v1, or missing with v2) | ERROR |
+| C3 | Linter pin sources disagree (`.fgm.toml`, [detected pins](#detected-golangci-lint-pins)) | ERROR |
+| C4 | `actions/setup-go` `go-version` minor lower than the module's `go` directive | ERROR |
+| C4b | …different minor from the resolved Go (`go-version-file` is always OK; `${{ … }}` expressions are reported as INFO "not checked") | WARN |
+| C5 | Dockerfile `FROM golang:<tag>` older than the `go` directive (a floating `1.26` tag is compared by minor; `ARG`-substituted tags are INFO "not checked") | ERROR |
+| C6 | `go.work` `go` version lower than a used module's `go` directive | ERROR |
+
+Output is one line per finding — `ID SEVERITY file:line message (fix: hint)` — or `OK no consistency findings`. `--json` prints the [`current --json`](#machine-readable-output) envelope plus a `findings` array (`id`, `severity`, `file`, `line`, `message`, `hint`; `file` is relative to `dir`); with `--all` it is an array with one entry per module. Workflows map to modules with the same `working-directory` rule as lint pin detection.
+
+Exit status: `0` clean, `1` findings at or above `--fail-on` (default `error`), `2` could not run (invalid invocation or a module that cannot be resolved).
+
+Skip checks for repositories whose files intentionally differ:
+
+```toml
+[check]
+skip = ["C5"]   # skipping C4 also skips C4b
+```
 
 ## Terminal output and script compatibility
 

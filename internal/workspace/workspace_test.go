@@ -92,3 +92,29 @@ func TestWorkspace(t *testing.T) {
 		})
 	})
 }
+
+func TestGoDirective(t *testing.T) {
+	t.Parallel()
+
+	t.Run("GoDirective", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should return the version and line when the file declares a go directive", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			path := filepath.Join(t.TempDir(), "go.mod")
+			if err := os.WriteFile(path, []byte("module m\n\ngo 1.26.0 // minimum\n"), 0o644); err != nil {
+				t.Fatalf("write: %v", err)
+			}
+
+			// Act
+			version, line, found, err := GoDirective(path)
+
+			// Assert
+			if err != nil || !found || version != "1.26.0" || line != 3 {
+				t.Errorf("GoDirective = %q, %d, %v, %v; want 1.26.0 at line 3", version, line, found, err)
+			}
+		})
+	})
+}

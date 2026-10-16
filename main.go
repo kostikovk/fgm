@@ -30,6 +30,7 @@ import (
 	"github.com/kostikovk/fgm/internal/lintinstall"
 	"github.com/kostikovk/fgm/internal/lintlocal"
 	"github.com/kostikovk/fgm/internal/lintupgrade"
+	"github.com/kostikovk/fgm/internal/repocheck"
 	"github.com/kostikovk/fgm/internal/report"
 	"github.com/kostikovk/fgm/internal/resolve"
 )
@@ -169,6 +170,21 @@ func run(
 		ShellPath: getenv("SHELL"),
 		GOOS:      runtime.GOOS,
 	})
+	// fgm check must give identical results offline: no go.dev releases, no GitHub lint
+	// releases, and no dependence on locally installed linters.
+	offlineResolver := currenttoolchain.New(currenttoolchain.Config{
+		GoResolver:          offlineGoResolver,
+		LintCatalogProvider: lintReleaseProvider,
+	})
+	repoChecker := repocheck.New(repocheck.Config{
+		Reporter: report.New(report.Config{
+			Resolver:  offlineResolver,
+			GoStore:   goStore,
+			LintStore: lintStore,
+			Catalog:   lintReleaseProvider,
+		}),
+	})
+
 	lintConfigService, err := lintconfig.New(lintconfig.Config{
 		Resolver: currentResolver,
 	})
@@ -200,6 +216,7 @@ func run(
 		LintConfigGenerator: lintConfigService,
 		LintDoctor:          lintConfigService,
 		FGMUpdateChecker:    updateChecker,
+		RepoChecker:         repoChecker,
 		CurrentReporter: report.New(report.Config{
 			Resolver:  currentResolver,
 			GoStore:   goStore,

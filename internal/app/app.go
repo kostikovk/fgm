@@ -226,6 +226,29 @@ type CurrentReporter interface {
 	ReportAll(ctx context.Context, dir string) ([]CurrentReport, error)
 }
 
+// CheckFinding is one repository consistency problem reported by `fgm check`.
+type CheckFinding struct {
+	ID       string `json:"id"`
+	Severity string `json:"severity"` // "ERROR", "WARN", "INFO"
+	// File is relative to the report's dir.
+	File    string `json:"file,omitempty"`
+	Line    int    `json:"line,omitempty"`
+	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
+}
+
+// CheckReport is a CurrentReport plus the consistency findings for that module.
+type CheckReport struct {
+	CurrentReport
+	Findings []CheckFinding `json:"findings"`
+}
+
+// RepoChecker runs offline repository consistency checks.
+type RepoChecker interface {
+	Check(ctx context.Context, dir string) (CheckReport, error)
+	CheckAll(ctx context.Context, dir string) ([]CheckReport, error)
+}
+
 // LintConfigGenerator generates golangci-lint configuration files.
 type LintConfigGenerator interface {
 	Generate(ctx context.Context, opts LintConfigOptions) ([]byte, error)
@@ -285,4 +308,5 @@ type App struct {
 	ProfileInstaller    ProfileInstaller
 	FGMUpdateChecker    FGMUpdateChecker
 	CurrentReporter     CurrentReporter
+	RepoChecker         RepoChecker
 }
