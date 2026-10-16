@@ -1364,3 +1364,35 @@ func TestStoreListLocalGoVersions_ImportedSymlinkScenarios(t *testing.T) {
 		}
 	})
 }
+
+func TestStoreSystemGoProbeEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script test is unix-only")
+	}
+
+	t.Run("GoBinaryPath", func(t *testing.T) {
+		t.Run("should probe the system go with GOTOOLCHAIN=local and no GOROOT when the shell overrides both", func(t *testing.T) {
+			// Arrange
+			t.Setenv("GOTOOLCHAIN", "go1.26.8")
+			t.Setenv("GOROOT", "/nonexistent")
+			pathDir := t.TempDir()
+			systemGoBinary := filepath.Join(pathDir, "go")
+			script := "#!/bin/sh\nif [ \"$GOTOOLCHAIN\" != local ] || [ -n \"${GOROOT+set}\" ]; then printf 'go version go1.26.8 darwin/arm64\\n'; exit 0; fi\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
+			if err := os.WriteFile(systemGoBinary, []byte(script), 0o755); err != nil {
+				t.Fatalf("write fake system go binary: %v", err)
+			}
+			store := New(t.TempDir(), pathDir)
+
+			// Act
+			binaryPath, err := store.GoBinaryPath(context.Background(), "1.25.3")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("GoBinaryPath: %v", err)
+			}
+			if binaryPath != systemGoBinary {
+				t.Errorf("binaryPath = %q; want %q", binaryPath, systemGoBinary)
+			}
+		})
+	})
+}

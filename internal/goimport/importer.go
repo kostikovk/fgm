@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/goenv"
 )
 
 // Registry registers existing Go installations in the FGM-managed store.
@@ -110,6 +111,8 @@ func DefaultCandidates(pathEnv string) []string {
 
 func detectVersion(ctx context.Context, goBinary string) (string, error) {
 	cmd := exec.CommandContext(ctx, goBinary, "version")
+	// An inherited GOTOOLCHAIN or GOROOT would report (or break on) another toolchain.
+	cmd.Env, _ = goenv.Apply(cmd.Environ(), goenv.ModeLocal)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("run %s version: %w", goBinary, err)

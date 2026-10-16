@@ -449,3 +449,33 @@ func TestDefaultCandidates_PreservesPathPriorityOrder(t *testing.T) {
 		}
 	})
 }
+
+func TestDetectVersionProbeEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script test is unix-only")
+	}
+
+	t.Run("detectVersion", func(t *testing.T) {
+		t.Run("should report the binary's own version when the shell sets GOTOOLCHAIN and GOROOT", func(t *testing.T) {
+			// Arrange
+			t.Setenv("GOTOOLCHAIN", "go1.26.8")
+			t.Setenv("GOROOT", "/nonexistent")
+			goBinary := filepath.Join(t.TempDir(), "go")
+			script := "#!/bin/sh\nif [ \"$GOTOOLCHAIN\" != local ] || [ -n \"${GOROOT+set}\" ]; then printf 'go version go1.26.8 darwin/arm64\\n'; exit 0; fi\nprintf 'go version go1.25.3 darwin/arm64\\n'\n"
+			if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+				t.Fatalf("write fake go: %v", err)
+			}
+
+			// Act
+			version, err := detectVersion(context.Background(), goBinary)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("detectVersion: %v", err)
+			}
+			if version != "1.25.3" {
+				t.Errorf("version = %q; want 1.25.3", version)
+			}
+		})
+	})
+}
