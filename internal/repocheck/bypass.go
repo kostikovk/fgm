@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/kostikovk/fgm/internal/app"
@@ -97,10 +98,8 @@ func bypassFindings(current app.CurrentReport, file string, lineNumber int, line
 // bypassesPath reports whether prefix is a shared tool directory (GOPATH/bin, GOBIN, ~/go/bin,
 // or any absolute .../bin) rather than PATH lookup or a project-local bin directory.
 func bypassesPath(prefix string) bool {
-	for _, gobin := range gobinPrefixes {
-		if prefix == gobin {
-			return true
-		}
+	if slices.Contains(gobinPrefixes, prefix) {
+		return true
 	}
 	dir, ok := strings.CutSuffix(prefix, "/bin")
 	if !ok {
