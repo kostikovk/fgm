@@ -1,0 +1,125 @@
+name: setup-fgm
+description: Install a pinned fgm, then put the Go and golangci-lint versions it resolves for the repository on PATH.
+author: kostikovk
+
+inputs:
+  version:
+    description: Exact fgm release tag to install, for example v0.4.0.
+    required: true
+  working-directory:
+    description: Directory whose toolchain fgm resolves (module root or any directory inside it).
+    required: false
+    default: "."
+  install:
+    description: Install the resolved Go and golangci-lint into the fgm store when missing.
+    required: false
+    default: "true"
+  cache:
+    description: Cache the resolved toolchains in the fgm store between runs.
+    required: false
+    default: "true"
+  token:
+    description: GitHub token for golangci-lint release lookups; unauthenticated API calls are rate-limited per runner IP.
+    required: false
+    default: ${{ github.token }}
+  fgm-binary:
+    description: Path to a prebuilt fgm binary to use instead of downloading the release (for testing fgm itself).
+    required: false
+    default: ""
+
+outputs:
+  go-version:
+    description: Resolved Go version.
+    value: ${{ steps.resolve.outputs.go-version }}
+  go-source:
+    description: Where the Go version came from (go.mod, go.work, config, latest-patch, global).
+    value: ${{ steps.resolve.outputs.go-source }}
+  golangci-lint-version:
+    description: Resolved golangci-lint version, empty when none is selected.
+    value: ${{ steps.resolve.outputs.golangci-lint-version }}
+  golangci-lint-source:
+    description: Where the golangci-lint version came from (config, detected, local, remote).
+    value: ${{ steps.resolve.outputs.golangci-lint-source }}
+  cache-hit:
+    description: Whether the toolchain store was restored from the cache.
+    value: ${{ steps.cache.outputs.cache-hit == 'true' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install fgm
+      shell: bash
+      env:
+        FGM_VERSION: ${{ inputs.version }}
+        FGM_BINARY: ${{ inputs.fgm-binary }}
+      run: |
+        set -euo pipefail
+        bin_dir="$RUNNER_TEMP/fgm-bin"
+        mkdir -p "$bin_dir"
+        if [ -n "$FGM_BINARY" ]; then
+          cp "$FGM_BINARY" "$bin_dir/fgm"
+          chmod +x "$bin_dir/fgm"
+        else
+          case "$FGM_VERSION" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::setup-fgm needs an exact release tag such as v0.4.0, got '$FGM_VERSION'"; exit 1 ;;
+          esac
+          INSTALL_DIR="$bin_dir" sh "$GITHUB_ACTION_PATH/../install.sh"
+        fi
+        echo "$bin_dir" >> "$GITHUB_PATH"
+        echo "FGM_NO_UPDATE_NOTIFIER=1" >> "$GITHUB_ENV"
+        echo "FGM_STORE=${XDG_DATA_HOME:-$HOME/.local/share}/fgm" >> "$GITHUB_ENV"
+
+    - name: Resolve toolchain
+      id: resolve
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        fgm --chdir "$WORKING_DIRECTORY" current --json > "$RUNNER_TEMP/fgm-current.json"
+        go_version="$(jq -r '.go.version' "$RUNNER_TEMP/fgm-current.json")"
+        lint_version="$(jq -r '.golangci_lint.version // ""' "$RUNNER_TEMP/fgm-current.json")"
+        {
+          echo "go-version=$go_version"
+          echo "go-source=$(jq -r '.go.source' "$RUNNER_TEMP/fgm-current.json")"
+          echo "golangci-lint-version=$lint_version"
+          echo "golangci-lint-source=$(jq -r '.golangci_lint.source // ""' "$RUNNER_TEMP/fgm-current.json")"
+          echo "cache-key=fgm-${RUNNER_OS}-${RUNNER_ARCH}-go${go_version}-lint${lint_version:-none}"
+          echo "cache-paths<<EOF"
+          echo "$FGM_STORE/go/$go_version"
+          if [ -n "$lint_version" ]; then echo "$FGM_STORE/golangci-lint/$lint_version"; fi
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Cache toolchains
+      id: cache
+      if: inputs.cache == 'true'
+      uses: actions/cache@v5
+      with:
+        path: ${{ steps.resolve.outputs.cache-paths }}
+        key: ${{ steps.resolve.outputs.cache-key }}
+
+    - name: Install toolchains
+      if: inputs.install == 'true'
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: fgm --chdir "$WORKING_DIRECTORY" exec --install -- true
+
+    - name: Add toolchains to PATH
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        fgm --chdir "$WORKING_DIRECTORY" current --json > "$RUNNER_TEMP/fgm-current.json"
+        go_path="$(jq -r '.go.path // ""' "$RUNNER_TEMP/fgm-current.json")"
+        lint_path="$(jq -r '.golangci_lint.path // ""' "$RUNNER_TEMP/fgm-current.json")"
+        if [ -n "$go_path" ]; then dirname "$go_path" >> "$GITHUB_PATH"; fi
+        if [ -n "$lint_path" ]; then dirname "$lint_path" >> "$GITHUB_PATH"; fi
+        # The go binary on PATH is the selection; keep Go from switching toolchains behind it,
+        # and let it derive GOROOT from its own location (an empty GOROOT counts as unset).
+        echo "GOTOOLCHAIN=local" >> "$GITHUB_ENV"
+        echo "GOROOT=" >> "$GITHUB_ENV"

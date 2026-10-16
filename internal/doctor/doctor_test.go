@@ -644,3 +644,202 @@ func TestDiagnose_ReportsFGMUpdateFinding(t *testing.T) {
 		}
 	})
 }
+
+func TestDiagnoseGoToolchainEnvironment(t *testing.T) {
+	t.Parallel()
+
+	newService := func(env map[string]string) *Service {
+		return New(Config{
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.26.0", true, nil },
+				shimDirFn:         func() string { return "/tmp/fgm/shims" },
+			},
+			PathEnv: "/tmp/fgm/shims",
+			Getenv:  func(key string) string { return env[key] },
+		})
+	}
+	findWarning := func(findings []app.DoctorFinding, needle string) bool {
+		for _, finding := range findings {
+			if finding.Severity == "WARN" && strings.Contains(finding.Message, needle) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should warn when the shell sets GOTOOLCHAIN to a toolchain version", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(map[string]string{"GOTOOLCHAIN": "go1.26.8"})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !findWarning(findings, "GOTOOLCHAIN=go1.26.8") {
+				t.Errorf("findings = %+v; want a GOTOOLCHAIN warning", findings)
+			}
+		})
+
+		t.Run("should warn when the shell sets GOROOT", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(map[string]string{"GOROOT": "/opt/go"})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !findWarning(findings, "GOROOT=/opt/go") {
+				t.Errorf("findings = %+v; want a GOROOT warning", findings)
+			}
+		})
+
+		t.Run("should not warn about GOTOOLCHAIN when the shell sets it to auto", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(map[string]string{"GOTOOLCHAIN": "auto"})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if findWarning(findings, "GOTOOLCHAIN") {
+				t.Errorf("findings = %+v; want no GOTOOLCHAIN warning", findings)
+			}
+		})
+	})
+}
+
+func TestDiagnoseSelectionWarnings(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should report a selection warning as WARN when the selection may be stale", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := New(Config{
+				Resolver: stubResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+					return app.Selection{GoVersion: "1.28.1", Warnings: []string{"latest go 1.28 patch taken from installed versions"}}, nil
+				}},
+				GoStore: stubGoStore{
+					globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.28.1", true, nil },
+					shimDirFn:         func() string { return "/tmp/fgm/shims" },
+				},
+				PathEnv: "/tmp/fgm/shims",
+				Getenv:  func(string) string { return "" },
+			})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			for _, finding := range findings {
+				if finding.Severity == "WARN" && strings.Contains(finding.Message, "taken from installed versions") {
+					return
+				}
+			}
+			t.Errorf("findings = %+v; want the selection warning", findings)
+		})
+	})
+}
+
+type stubLintCatalog struct {
+	compatible bool
+	known      bool
+}
+
+func (s stubLintCatalog) LintCompatibility(goVersion string, lintVersion string) (bool, bool, error) {
+	return s.compatible, s.known, nil
+}
+
+func TestDiagnoseDetectedLint(t *testing.T) {
+	t.Parallel()
+
+	newService := func(catalog stubLintCatalog) *Service {
+		return New(Config{
+			Resolver: stubResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{
+					GoVersion: "1.27.0", LintVersion: "v2.5.0", LintSource: "detected",
+					LintSourceFile: filepath.Join(workDir, "Makefile"), LintSourceLine: 3,
+				}, nil
+			}},
+			GoStore: stubGoStore{
+				globalGoVersionFn: func(ctx context.Context) (string, bool, error) { return "1.27.0", true, nil },
+				shimDirFn:         func() string { return "/tmp/fgm/shims" },
+			},
+			LintCatalog: catalog,
+			PathEnv:     "/tmp/fgm/shims",
+			Getenv:      func(string) string { return "" },
+		})
+	}
+	hasFinding := func(findings []app.DoctorFinding, severity string, needle string) bool {
+		for _, finding := range findings {
+			if finding.Severity == severity && strings.Contains(finding.Message, needle) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("Diagnose", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should warn with the pin location when the detected linter cannot run on the resolved Go", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(stubLintCatalog{compatible: false, known: true})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !hasFinding(findings, "WARN", "detected golangci-lint v2.5.0 (Makefile:3) cannot run on Go 1.27.0") {
+				t.Errorf("findings = %+v; want an incompatibility warning", findings)
+			}
+		})
+
+		t.Run("should report the detected pin as OK when the catalog marks it compatible", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			service := newService(stubLintCatalog{compatible: true, known: true})
+
+			// Act
+			findings, err := service.Diagnose(context.Background(), t.TempDir())
+
+			// Assert
+			if err != nil {
+				t.Fatalf("Diagnose: %v", err)
+			}
+			if !hasFinding(findings, "OK", "repo pins golangci-lint v2.5.0 (detected: Makefile:3)") {
+				t.Errorf("findings = %+v; want the detected pin reported", findings)
+			}
+		})
+	})
+}

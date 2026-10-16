@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "dir": "$ROOT",
+  "module_root": "$ROOT",
+  "go": {
+    "version": "1.26.0",
+    "source": "go.mod",
+    "source_file": "go.mod",
+    "installed": false
+  },
+  "golangci_lint": null,
+  "warnings": [],
+  "findings": [
+    {
+      "id": "C5",
+      "severity": "ERROR",
+      "file": "Dockerfile",
+      "line": 1,
+      "message": "golang:1.25 is older than the go 1.26.0 directive in go.mod",
+      "hint": "raise the golang image tag"
+    }
+  ]
+}

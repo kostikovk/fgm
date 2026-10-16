@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/kostikovk/fgm/internal/goenv"
 	"github.com/kostikovk/fgm/internal/toolhint"
 	"github.com/kostikovk/fgm/internal/versionutil"
 )
@@ -222,8 +223,10 @@ func (s *Store) systemGo(ctx context.Context) (string, string, error) {
 	}
 
 	cmd := exec.CommandContext(ctx, goBinary, "version")
+	// An inherited GOTOOLCHAIN or GOROOT would report (or break on) another toolchain.
+	cmd.Env, _ = goenv.Apply(cmd.Environ(), goenv.ModeLocal)
 	if s.pathEnv != "" {
-		cmd.Env = append(cmd.Environ(), "PATH="+s.pathEnv)
+		cmd.Env = append(cmd.Env, "PATH="+s.pathEnv)
 	}
 
 	output, err := cmd.Output()

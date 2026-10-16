@@ -54,10 +54,14 @@ func NewRootCmdWithUI(application *app.App, opts UIOptions) *cobra.Command {
 		},
 	}
 
+	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return usageError(err)
+	})
 	rootCmd.PersistentFlags().String(flagChdir, ".", "working directory for repo resolution")
 
 	_ = v.BindPFlag(flagChdir, rootCmd.PersistentFlags().Lookup(flagChdir))
 
+	rootCmd.AddCommand(newCheckCmd(application, v))
 	rootCmd.AddCommand(newCurrentCmd(application, v))
 	rootCmd.AddCommand(newDoctorCmd(application, v))
 	rootCmd.AddCommand(newEnvCmd(application))

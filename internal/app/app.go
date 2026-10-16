@@ -144,9 +144,17 @@ type Doctor interface {
 	Diagnose(ctx context.Context, workDir string) ([]DoctorFinding, error)
 }
 
+// ExecOptions configures how an Executor builds the child process environment.
+type ExecOptions struct {
+	// GoToolchain is "local" (used when empty) or "inherit"; see internal/goenv.
+	GoToolchain string
+	// AllowUnselectedLint lets golangci-lint resolve from the inherited PATH when the selected version is missing.
+	AllowUnselectedLint bool
+}
+
 // Executor runs commands with a selected Go toolchain on PATH.
 type Executor interface {
-	Exec(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+	Exec(ctx context.Context, workDir string, args []string, options ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 }
 
 // EnvRenderer prints shell-specific environment setup for FGM.
@@ -156,10 +164,89 @@ type EnvRenderer interface {
 
 // Selection describes the currently selected toolchain.
 type Selection struct {
-	GoVersion   string
-	GoSource    string
+	GoVersion string
+	// GoSource is the go.work/go.mod path, "config", "latest-patch", or "global".
+	GoSource string
+	// GoSourceFile is the file the Go version came from; empty for "global".
+	GoSourceFile string
+	// GoBase is the go directive a "latest-patch" selection was raised from.
+	GoBase      string
 	LintVersion string
-	LintSource  string
+	// LintSource is "config", "detected", "local", or "remote".
+	LintSource string
+	// LintSourceFile and LintSourceLine locate a "config" or "detected" lint pin.
+	LintSourceFile string
+	LintSourceLine int
+	// Warnings describe selections that may be stale or ambiguous.
+	Warnings []string
+}
+
+// CurrentReportSchema is the version of the `fgm current --json` document. Changes within a
+// schema version are additive only.
+const CurrentReportSchema = 1
+
+// CurrentReport is the machine-readable selection for one directory (`fgm current --json`).
+type CurrentReport struct {
+	Schema       int         `json:"schema"`
+	Dir          string      `json:"dir"`
+	ModuleRoot   string      `json:"module_root"`
+	Go           *GoReport   `json:"go"`
+	GolangCILint *LintReport `json:"golangci_lint"`
+	Warnings     []string    `json:"warnings"`
+	Error        string      `json:"error,omitempty"`
+}
+
+// GoReport describes the selected Go toolchain in a CurrentReport.
+type GoReport struct {
+	Version string `json:"version"`
+	// Source is "go.work", "go.mod", "config", "latest-patch", or "global".
+	Source     string `json:"source"`
+	SourceFile string `json:"source_file,omitempty"`
+	Base       string `json:"base,omitempty"`
+	Installed  bool   `json:"installed"`
+	Path       string `json:"path,omitempty"`
+}
+
+// LintReport describes the selected golangci-lint in a CurrentReport.
+type LintReport struct {
+	Version string `json:"version"`
+	// Source is "config", "detected", "local", or "remote".
+	Source     string `json:"source"`
+	SourceFile string `json:"source_file,omitempty"`
+	SourceLine int    `json:"source_line,omitempty"`
+	Installed  bool   `json:"installed"`
+	Path       string `json:"path,omitempty"`
+	// Compatible is null when the compatibility catalog does not know the version.
+	Compatible *bool `json:"compatible"`
+}
+
+// CurrentReporter builds CurrentReports for one directory or every module below it.
+type CurrentReporter interface {
+	Report(ctx context.Context, dir string) (CurrentReport, error)
+	ReportAll(ctx context.Context, dir string) ([]CurrentReport, error)
+}
+
+// CheckFinding is one repository consistency problem reported by `fgm check`.
+type CheckFinding struct {
+	ID       string `json:"id"`
+	Severity string `json:"severity"` // "ERROR", "WARN", "INFO"
+	// File is relative to the report's dir.
+	File    string `json:"file,omitempty"`
+	Line    int    `json:"line,omitempty"`
+	Message string `json:"message"`
+	Hint    string `json:"hint,omitempty"`
+}
+
+// CheckReport is a CurrentReport plus the consistency findings for that module.
+type CheckReport struct {
+	CurrentReport
+	Findings []CheckFinding `json:"findings"`
+}
+
+// RepoChecker runs offline repository consistency checks.
+type RepoChecker interface {
+	Check(ctx context.Context, dir string) (CheckReport, error)
+	CheckAll(ctx context.Context, dir string) ([]CheckReport, error)
 }
 
 // LintConfigGenerator generates golangci-lint configuration files.
@@ -220,4 +307,6 @@ type App struct {
 	LintDoctor          LintDoctor
 	ProfileInstaller    ProfileInstaller
 	FGMUpdateChecker    FGMUpdateChecker
+	CurrentReporter     CurrentReporter
+	RepoChecker         RepoChecker
 }

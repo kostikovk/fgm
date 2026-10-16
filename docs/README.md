@@ -7,12 +7,14 @@
 - [Installation](installation.md): install or upgrade FGM, configure shell integration, or remove it.
 - [Getting started](getting-started.md): install an existing project's tools and run tests, builds, and lint checks.
 - [AI coding agents](ai-agents.md): copy a setup prompt or install the standalone skill manually.
+- [CI](ci.md): pinned `install.sh`, the `setup-fgm` GitHub Action, and example workflows.
 
 ## Look up behavior
 
 - [Commands](reference.md#commands)
 - [Go version resolution and working directory](reference.md#version-resolution)
-- [Repository linter pins](reference.md#repository-configuration)
+- [Repository Go and linter pins](reference.md#repository-configuration)
+- [Machine-readable output](reference.md#machine-readable-output) and [repository consistency check](reference.md#repository-consistency-check)
 - [Lint configuration and diagnostics](reference.md#lint-configuration)
 - [Execution PATH and imported installations](reference.md#execution-and-imports)
 - [Upgrades](reference.md#upgrade-behavior)

@@ -45,8 +45,8 @@ installation, project setup, and verification steps, then report their results.
    available. File presence alone does not prove registration. If reload is
    needed, follow the readable file for this session and report reload pending.
 
-4. Inspect selection and diagnostics with `fgm --chdir DIR current` and
-   `fgm --chdir DIR doctor`. If selection succeeds, run `fgm import auto`, then
+4. Inspect selection and diagnostics with `fgm --chdir DIR current --json`,
+   `fgm --chdir DIR doctor`, and `fgm --chdir DIR check`. If selection succeeds, run `fgm import auto`, then
    `fgm --chdir DIR install`, and recheck selection and installed binaries.
    Preserve the selected Go version and existing linter pin. If no linter is
    selected, report a compatibility blocker: `pin golangci-lint auto` uses the
@@ -132,12 +132,14 @@ Copy the `skills/fgm` directory from a tagged release or commit into your projec
 | [Cursor](https://cursor.com/docs/skills) | `.cursor/skills/fgm/` or `.agents/skills/fgm/` |
 | [Gemini CLI](https://geminicli.com/docs/cli/skills/) | `.gemini/skills/fgm/` or `.agents/skills/fgm/` |
 
-For a new `.agents/skills/fgm/` directory, the current standalone skill consists of `SKILL.md`. Check that the source is available and that the destination does not already contain a skill before using this example. For a fixed revision, replace `main` in the URL with a verified commit or tag containing the skill:
+The skill is a short contract in `SKILL.md` plus details in `references/` (`selection.md`, `commands.md`, `upgrades.md`) that agents load only when needed; copy the whole directory. Check that the source is available and that the destination does not already contain a skill before using this example. For a fixed revision, replace `main` with a verified commit or tag containing the skill:
 
 ```bash
-mkdir -p .agents/skills/fgm
-curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/skills/fgm/SKILL.md \
-  -o .agents/skills/fgm/SKILL.md
+mkdir -p .agents/skills/fgm/references
+base=https://raw.githubusercontent.com/kostikovk/fgm/main/skills/fgm
+for file in SKILL.md references/selection.md references/commands.md references/upgrades.md; do
+  curl -fsSL "$base/$file" -o ".agents/skills/fgm/$file"
+done
 ```
 
 > [!NOTE]

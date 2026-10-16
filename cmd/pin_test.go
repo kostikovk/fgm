@@ -114,3 +114,140 @@ func TestPinLintCommand_UpdatesExistingRepoConfigToAuto(t *testing.T) {
 		t.Fatalf(".fgm.toml = %q, want auto lint pin", string(content))
 	}
 }
+
+func TestPinGoCommand(t *testing.T) {
+	t.Parallel()
+
+	readConfig := func(t *testing.T, dir string) string {
+		t.Helper()
+		content, err := os.ReadFile(filepath.Join(dir, ".fgm.toml"))
+		if err != nil {
+			t.Fatalf("read .fgm.toml: %v", err)
+		}
+		return string(content)
+	}
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should keep the golangci-lint pin when go latest-patch is pinned", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, ".fgm.toml"), []byte("[toolchain]\ngolangci_lint = \"v2.9.0\"\n"), 0o644); err != nil {
+				t.Fatalf("write .fgm.toml: %v", err)
+			}
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), "pin", "go", "latest-patch", "--chdir", dir)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("pin go: %v", err)
+			}
+			content := readConfig(t, dir)
+			if !strings.Contains(content, "go = 'latest-patch'") || !strings.Contains(content, "golangci_lint = 'v2.9.0'") {
+				t.Errorf(".fgm.toml = %q; want both keys", content)
+			}
+		})
+
+		t.Run("should store the version without the go prefix when an explicit version is pinned", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+
+			// Act
+			stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), "pin", "go", "go1.26.8", "--chdir", dir)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("pin go: %v", err)
+			}
+			if content := readConfig(t, dir); !strings.Contains(content, "go = '1.26.8'") {
+				t.Errorf(".fgm.toml = %q; want go = '1.26.8'", content)
+			}
+			if !strings.Contains(stdout, "Pinned Go 1.26.8") {
+				t.Errorf("stdout = %q; want a pinned message", stdout)
+			}
+		})
+
+		t.Run("should return an error when the policy is neither a version nor latest-patch", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), "pin", "go", "newest", "--chdir", dir)
+
+			// Assert
+			if err == nil {
+				t.Fatal("pin go returned no error; want an invalid policy error")
+			}
+		})
+	})
+}
+
+func TestPinLintCommandKeepsGoPolicy(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should keep the go policy when golangci-lint is pinned", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, ".fgm.toml"), []byte("[toolchain]\ngo = \"latest-patch\"\n"), 0o644); err != nil {
+				t.Fatalf("write .fgm.toml: %v", err)
+			}
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), "pin", "golangci-lint", "v2.9.0", "--chdir", dir)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("pin golangci-lint: %v", err)
+			}
+			content, err := os.ReadFile(filepath.Join(dir, ".fgm.toml"))
+			if err != nil {
+				t.Fatalf("read .fgm.toml: %v", err)
+			}
+			if !strings.Contains(string(content), "go = 'latest-patch'") {
+				t.Errorf(".fgm.toml = %q; want the go policy kept", content)
+			}
+		})
+	})
+}
+
+func TestPinGoCommandRejectsLowerVersion(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should refuse to write a version lower than the go directive", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module m\n\ngo 1.25.0\n"), 0o644); err != nil {
+				t.Fatalf("write go.mod: %v", err)
+			}
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(&app.App{}), "pin", "go", "1.24.0", "--chdir", dir)
+
+			// Assert
+			if err == nil || !strings.Contains(err.Error(), "lower than") {
+				t.Fatalf("pin go err = %v; want a lower-than-directive error", err)
+			}
+			if _, statErr := os.Stat(filepath.Join(dir, ".fgm.toml")); !os.IsNotExist(statErr) {
+				t.Errorf(".fgm.toml written despite the error (stat err %v)", statErr)
+			}
+		})
+	})
+}

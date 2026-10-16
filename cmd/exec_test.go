@@ -471,7 +471,7 @@ func TestExecCommand_InstallFlagInstallsMissingGoAndLintToStderrBeforeExec(t *te
 				},
 			},
 			Executor: stubExecutor{
-				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 					execCalled = true
 					_, err := io.WriteString(stdout, "child-stdout-only\n")
 					return err
@@ -548,7 +548,7 @@ func TestExecCommand_InstallFlagSkipsInstallWhenAlreadyInstalled(t *testing.T) {
 				},
 			},
 			Executor: stubExecutor{
-				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 					_, err := io.WriteString(stdout, "ok\n")
 					return err
 				},
@@ -583,7 +583,7 @@ func TestExecCommand_InstallFlagSkipsInstallWhenAlreadyInstalled(t *testing.T) {
 				},
 			},
 			Executor: stubExecutor{
-				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 					gotArgs = append([]string(nil), args...)
 					return nil
 				},
@@ -626,7 +626,7 @@ func TestExecCommand_InstallFlagSkipsInstallWhenAlreadyInstalled(t *testing.T) {
 				},
 			},
 			Executor: stubExecutor{
-				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 					gotArgs = append([]string(nil), args...)
 					return nil
 				},
@@ -646,5 +646,151 @@ func TestExecCommand_InstallFlagSkipsInstallWhenAlreadyInstalled(t *testing.T) {
 		if strings.Join(gotArgs, " ") != "go test -v ./..." {
 			t.Fatalf("gotArgs = %v, want [go test -v ./...]", gotArgs)
 		}
+	})
+}
+
+func TestExecCommandGoToolchainMode(t *testing.T) {
+	t.Parallel()
+
+	newCapturingApp := func(got *app.ExecOptions) *app.App {
+		return &app.App{
+			Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					*got = options
+					return nil
+				},
+			},
+		}
+	}
+	envWith := func(values map[string]string) func(string) string {
+		return func(key string) string { return values[key] }
+	}
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should request local toolchain mode when neither flag nor environment selects one", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			root := NewRootCmdWithUI(newCapturingApp(&got), UIOptions{Getenv: envWith(nil)})
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, root, "exec", "--", "go", "version")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if got.GoToolchain != "local" {
+				t.Errorf("GoToolchain = %q; want local", got.GoToolchain)
+			}
+		})
+
+		t.Run("should request inherit mode when the gotoolchain flag is inherit", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			root := NewRootCmdWithUI(newCapturingApp(&got), UIOptions{Getenv: envWith(nil)})
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, root, "exec", "--gotoolchain", "inherit", "--", "go", "version")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if got.GoToolchain != "inherit" {
+				t.Errorf("GoToolchain = %q; want inherit", got.GoToolchain)
+			}
+		})
+
+		t.Run("should request inherit mode when FGM_EXEC_GOTOOLCHAIN is inherit", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			root := NewRootCmdWithUI(newCapturingApp(&got), UIOptions{Getenv: envWith(map[string]string{"FGM_EXEC_GOTOOLCHAIN": "inherit"})})
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, root, "exec", "--", "go", "version")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if got.GoToolchain != "inherit" {
+				t.Errorf("GoToolchain = %q; want inherit", got.GoToolchain)
+			}
+		})
+
+		t.Run("should prefer the flag over FGM_EXEC_GOTOOLCHAIN when both are set", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			root := NewRootCmdWithUI(newCapturingApp(&got), UIOptions{Getenv: envWith(map[string]string{"FGM_EXEC_GOTOOLCHAIN": "inherit"})})
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, root, "exec", "--gotoolchain", "local", "--", "go", "version")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if got.GoToolchain != "local" {
+				t.Errorf("GoToolchain = %q; want local", got.GoToolchain)
+			}
+		})
+
+		t.Run("should return an error when the gotoolchain flag is not a known mode", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			root := NewRootCmdWithUI(newCapturingApp(&got), UIOptions{Getenv: envWith(nil)})
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, root, "exec", "--gotoolchain", "go1.26.8", "--", "go", "version")
+
+			// Assert
+			if err == nil {
+				t.Fatal("exec returned no error; want an invalid mode error")
+			}
+		})
+	})
+}
+
+func TestExecCommandAllowUnselectedLint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should allow unselected lint when the allow-unselected-lint flag is set", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			var got app.ExecOptions
+			application := &app.App{Executor: stubExecutor{
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+					got = options
+					return nil
+				},
+			}}
+
+			// Act
+			_, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "exec", "--allow-unselected-lint", "--", "golangci-lint", "run")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("exec: %v", err)
+			}
+			if !got.AllowUnselectedLint {
+				t.Error("AllowUnselectedLint = false; want true")
+			}
+		})
 	})
 }

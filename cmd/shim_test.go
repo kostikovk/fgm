@@ -329,3 +329,69 @@ func TestShimCommand_LintShimRejectsNilLintStore(t *testing.T) {
 		}
 	})
 }
+
+func TestShimCommandGoToolchainEnvironment(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script execution test is unix-only")
+	}
+
+	newEnvPrintingApp := func(t *testing.T) *app.App {
+		t.Helper()
+		goBinary := filepath.Join(t.TempDir(), "go")
+		script := "#!/bin/sh\nprintf 'GOTOOLCHAIN=%s GOROOT=%s\\n' \"${GOTOOLCHAIN-unset}\" \"${GOROOT-unset}\"\n"
+		if err := os.WriteFile(goBinary, []byte(script), 0o755); err != nil {
+			t.Fatalf("write fake go binary: %v", err)
+		}
+		return &app.App{
+			GoStore: stubGoStore{goBinaryPathFn: func(ctx context.Context, version string) (string, error) {
+				return goBinary, nil
+			}},
+			Resolver: stubSelectionResolver{currentFn: func(ctx context.Context, workDir string) (app.Selection, error) {
+				return app.Selection{GoVersion: "1.26.0"}, nil
+			}},
+		}
+	}
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Run("should run the go shim with GOTOOLCHAIN=local and no GOROOT when the shell sets both", func(t *testing.T) {
+			// Arrange
+			t.Setenv("GOTOOLCHAIN", "go1.26.8")
+			t.Setenv("GOROOT", "/opt/go1.26.8")
+			t.Setenv("FGM_EXEC_GOTOOLCHAIN", "")
+			root := NewRootCmd(newEnvPrintingApp(t))
+
+			// Act
+			stdout, _, err := testutil.ExecuteCommand(t, root, "__shim", "go")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("shim go: %v", err)
+			}
+			if stdout != "GOTOOLCHAIN=local GOROOT=unset\n" {
+				t.Errorf("stdout = %q; want local toolchain without GOROOT", stdout)
+			}
+		})
+
+		t.Run("should keep inherited GOTOOLCHAIN and GOROOT when FGM_EXEC_GOTOOLCHAIN is inherit", func(t *testing.T) {
+			// Arrange
+			t.Setenv("GOTOOLCHAIN", "go1.26.8")
+			t.Setenv("GOROOT", "/opt/go1.26.8")
+			t.Setenv("FGM_EXEC_GOTOOLCHAIN", "inherit")
+			root := NewRootCmd(newEnvPrintingApp(t))
+
+			// Act
+			stdout, stderr, err := testutil.ExecuteCommand(t, root, "__shim", "go")
+
+			// Assert
+			if err != nil {
+				t.Fatalf("shim go: %v", err)
+			}
+			if stdout != "GOTOOLCHAIN=go1.26.8 GOROOT=/opt/go1.26.8\n" {
+				t.Errorf("stdout = %q; want inherited values", stdout)
+			}
+			if !strings.Contains(stderr, "GOTOOLCHAIN=go1.26.8") {
+				t.Errorf("stderr = %q; want an inherit warning", stderr)
+			}
+		})
+	})
+}

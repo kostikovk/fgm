@@ -1,0 +1,24 @@
+[
+  {
+    "schema": 1,
+    "dir": "$ROOT/a",
+    "module_root": "$ROOT/a",
+    "go": {
+      "version": "1.26.0",
+      "source": "go.mod",
+      "source_file": "go.mod",
+      "installed": false
+    },
+    "golangci_lint": null,
+    "warnings": []
+  },
+  {
+    "schema": 1,
+    "dir": "$ROOT/b",
+    "module_root": "$ROOT/b",
+    "go": null,
+    "golangci_lint": null,
+    "warnings": [],
+    "error": "go directive not found in $ROOT/b/go.mod"
+  }
+]

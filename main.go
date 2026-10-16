@@ -30,6 +30,8 @@ import (
 	"github.com/kostikovk/fgm/internal/lintinstall"
 	"github.com/kostikovk/fgm/internal/lintlocal"
 	"github.com/kostikovk/fgm/internal/lintupgrade"
+	"github.com/kostikovk/fgm/internal/repocheck"
+	"github.com/kostikovk/fgm/internal/report"
 	"github.com/kostikovk/fgm/internal/resolve"
 )
 
@@ -63,7 +65,7 @@ func main() {
 		if !cmd.IsPrintedError(err) {
 			_, _ = fmt.Fprintln(stderrWriter, err)
 		}
-		exitMain(1)
+		exitMain(cmd.ExitCode(err))
 	}
 	stop()
 }
@@ -89,10 +91,15 @@ func run(
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
 	})
+	githubToken := getenv("GITHUB_TOKEN")
+	if githubToken == "" {
+		githubToken = getenv("GH_TOKEN")
+	}
 	lintReleaseProvider := golangcilint.New(golangcilint.Config{
 		Client: httpClient,
 		GOOS:   runtime.GOOS,
 		GOARCH: runtime.GOARCH,
+		Token:  githubToken,
 	})
 	goInstaller := goinstall.New(goinstall.Config{
 		Root:           goRoot,
@@ -121,7 +128,11 @@ func run(
 		LintInstaller:      lintInstaller,
 		GlobalStore:        goStore,
 	})
-	goResolver := resolve.New(goStore)
+	goResolver := resolve.NewWithConfig(resolve.Config{
+		Global:        goStore,
+		PatchCatalog:  lintReleaseProvider,
+		LocalVersions: goStore,
+	})
 	currentResolver := currenttoolchain.New(currenttoolchain.Config{
 		GoResolver:          goResolver,
 		LintStore:           lintStore,
@@ -140,20 +151,41 @@ func run(
 		GoStore:            goStore,
 		LintStore:          lintStore,
 		LintRemoteProvider: lintReleaseProvider,
+		LintCatalog:        lintReleaseProvider,
 		FGMUpdateChecker:   updateChecker,
 		PathEnv:            getenv("PATH"),
+		Getenv:             getenv,
 	})
 	executor := execenv.New(execenv.Config{
 		Resolver:    currentResolver,
 		GoLocator:   goStore,
 		LintLocator: lintStore,
 		PathEnv:     getenv("PATH"),
+		ShimDir:     goStore.ShimDir(),
 	})
 	envRenderer := envsetup.New(envsetup.Config{
 		GoStore:   goStore,
 		ShellPath: getenv("SHELL"),
 		GOOS:      runtime.GOOS,
 	})
+	// fgm check findings must not depend on the network or on what is installed locally:
+	// catalog-only Go patch data and lint selection.
+	offlineResolver := currenttoolchain.New(currenttoolchain.Config{
+		GoResolver: resolve.NewWithConfig(resolve.Config{
+			Global:       goStore,
+			PatchCatalog: lintReleaseProvider,
+		}),
+		LintCatalogProvider: lintReleaseProvider,
+	})
+	repoChecker := repocheck.New(repocheck.Config{
+		Reporter: report.New(report.Config{
+			Resolver:  offlineResolver,
+			GoStore:   goStore,
+			LintStore: lintStore,
+			Catalog:   lintReleaseProvider,
+		}),
+	})
+
 	lintConfigService, err := lintconfig.New(lintconfig.Config{
 		Resolver: currentResolver,
 	})
@@ -185,6 +217,13 @@ func run(
 		LintConfigGenerator: lintConfigService,
 		LintDoctor:          lintConfigService,
 		FGMUpdateChecker:    updateChecker,
+		RepoChecker:         repoChecker,
+		CurrentReporter: report.New(report.Config{
+			Resolver:  currentResolver,
+			GoStore:   goStore,
+			LintStore: lintStore,
+			Catalog:   lintReleaseProvider,
+		}),
 	}
 
 	return buildRoot(application).ExecuteContext(ctx)

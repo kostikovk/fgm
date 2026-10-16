@@ -540,11 +540,11 @@ func (s stubLintConfigGenerator) Generate(ctx context.Context, opts app.LintConf
 }
 
 type stubExecutor struct {
-	execFn func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
+	execFn func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error
 }
 
-func (s stubExecutor) Exec(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
-	return s.execFn(ctx, workDir, args, stdin, stdout, stderr)
+func (s stubExecutor) Exec(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+	return s.execFn(ctx, workDir, args, options, stdin, stdout, stderr)
 }
 
 func TestCommandSuccessMessagesAndRegressionsUI(t *testing.T) {
@@ -748,7 +748,7 @@ func TestCommandSuccessMessagesAndRegressionsUI(t *testing.T) {
 		var receivedStdout io.Writer
 		application := &app.App{
 			Executor: stubExecutor{
-				execFn: func(ctx context.Context, workDir string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
+				execFn: func(ctx context.Context, workDir string, args []string, options app.ExecOptions, stdin io.Reader, stdout io.Writer, stderr io.Writer) error {
 					receivedStdout = stdout
 					_, err := io.WriteString(stdout, "\x1b[32mchild-ansi\x1b[0m\n")
 					return err

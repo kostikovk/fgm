@@ -18,6 +18,8 @@ Downloads the latest release, verifies its checksum, and installs to `~/.local/b
 curl -fsSL https://raw.githubusercontent.com/kostikovk/fgm/main/install.sh | sh
 ```
 
+Set `FGM_VERSION` to install an exact release tag instead of the latest; a checksum mismatch always aborts without installing. For CI, see [pinned installation and the `setup-fgm` action](ci.md).
+
 ## Build from source
 
 Requires a Go toolchain compatible with the repository's [go.mod](../go.mod).

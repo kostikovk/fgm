@@ -4,12 +4,60 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	toml "github.com/pelletier/go-toml/v2"
 )
 
 const fileName = ".fgm.toml"
+
+// LatestPatchPolicy selects the newest released patch of the go directive's minor version.
+const LatestPatchPolicy = "latest-patch"
+
+var goVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+(\.[0-9]+)?((rc|beta)[0-9]+)?$`)
+
+// GoPolicy is the repository Go version policy from .fgm.toml.
+type GoPolicy struct {
+	// Version is an explicit Go version without the "go" prefix; empty for latest-patch.
+	Version     string
+	LatestPatch bool
+	Path        string
+}
+
+// ParseGoPolicyValue validates a toolchain.go value and returns the normalized form
+// ("latest-patch" or a version without the "go" prefix).
+func ParseGoPolicyValue(value string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == LatestPatchPolicy {
+		return trimmed, nil
+	}
+	version := strings.TrimPrefix(trimmed, "go")
+	if !goVersionPattern.MatchString(version) {
+		return "", fmt.Errorf("invalid Go version policy %q (want a version such as 1.26.8 or %q)", value, LatestPatchPolicy)
+	}
+	return version, nil
+}
+
+// ResolveGoPolicy returns the Go version policy from the nearest .fgm.toml.
+// Returns (GoPolicy{}, false, nil) when no config exists or the go key is empty.
+func ResolveGoPolicy(workDir string) (GoPolicy, bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return GoPolicy{}, false, err
+	}
+	if strings.TrimSpace(config.File.Toolchain.Go) == "" {
+		return GoPolicy{}, false, nil
+	}
+	value, err := ParseGoPolicyValue(config.File.Toolchain.Go)
+	if err != nil {
+		return GoPolicy{}, false, fmt.Errorf("%s: %w", config.Path, err)
+	}
+	if value == LatestPatchPolicy {
+		return GoPolicy{LatestPatch: true, Path: config.Path}, true, nil
+	}
+	return GoPolicy{Version: value, Path: config.Path}, true, nil
+}
 
 // ResolvePinnedLint returns the pinned golangci-lint version from the nearest .fgm.toml.
 // Returns ("", false, nil) when no config exists, the field is empty, or set to "auto".
@@ -27,14 +75,47 @@ func ResolvePinnedLint(workDir string) (string, bool, error) {
 	return version, true, nil
 }
 
+// PinnedLintPath returns the path of the .fgm.toml that pins golangci-lint, if any.
+func PinnedLintPath(workDir string) (string, bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return "", false, err
+	}
+	version := strings.TrimSpace(config.File.Toolchain.GolangCILint)
+	if version == "" || version == "auto" {
+		return "", false, nil
+	}
+	return config.Path, true, nil
+}
+
+// LintDetectionEnabled reports whether lint pins may be detected from other repository files.
+func LintDetectionEnabled(workDir string) (bool, error) {
+	config, found, err := LoadNearest(workDir)
+	if err != nil || !found {
+		return err == nil, err
+	}
+	detect := config.File.Toolchain.GolangCILintDetect
+	return detect == nil || *detect, nil
+}
+
 // ToolchainConfig describes FGM-specific toolchain overrides.
 type ToolchainConfig struct {
-	GolangCILint string `toml:"golangci_lint"`
+	Go           string `toml:"go,omitempty"`
+	GolangCILint string `toml:"golangci_lint,omitempty"`
+	// GolangCILintDetect disables reading lint pins from other repository files when false.
+	GolangCILintDetect *bool `toml:"golangci_lint_detect,omitempty"`
 }
 
 // File describes the supported FGM repo config.
 type File struct {
 	Toolchain ToolchainConfig `toml:"toolchain"`
+	Check     CheckConfig     `toml:"check,omitempty"`
+}
+
+// CheckConfig configures `fgm check`.
+type CheckConfig struct {
+	// Skip lists check IDs (for example "C5") that fgm check does not run.
+	Skip []string `toml:"skip,omitempty"`
 }
 
 // Result wraps a loaded repo config and its source path.
@@ -63,6 +144,78 @@ func SaveNearest(workDir string, file File) (string, error) {
 	}
 
 	return path, nil
+}
+
+// knownKeys lists the .fgm.toml keys owned by File; UpdateNearest keeps every other key.
+var knownKeys = map[string][]string{
+	"toolchain": {"go", "golangci_lint", "golangci_lint_detect"},
+	"check":     {"skip"},
+}
+
+// UpdateNearest applies update to the .fgm.toml that SaveNearest would write and saves it.
+// Keys and tables fgm does not know are kept; comments and formatting are not.
+func UpdateNearest(workDir string, update func(*File)) (string, error) {
+	path, err := resolveWritePath(workDir)
+	if err != nil {
+		return "", err
+	}
+	var file File
+	raw := map[string]any{}
+	if content, err := os.ReadFile(path); err == nil {
+		if err := toml.Unmarshal(content, &file); err != nil {
+			return "", fmt.Errorf("parse %s: %w", path, err)
+		}
+		if err := toml.Unmarshal(content, &raw); err != nil {
+			return "", fmt.Errorf("parse %s: %w", path, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+	update(&file)
+
+	encoded, err := toml.Marshal(file)
+	if err != nil {
+		return "", fmt.Errorf("marshal %s: %w", path, err)
+	}
+	typed := map[string]any{}
+	if err := toml.Unmarshal(encoded, &typed); err != nil {
+		return "", fmt.Errorf("marshal %s: %w", path, err)
+	}
+	for section, keys := range knownKeys {
+		merged, _ := raw[section].(map[string]any)
+		if merged == nil {
+			merged = map[string]any{}
+		}
+		values, _ := typed[section].(map[string]any)
+		for _, key := range keys {
+			if value, ok := values[key]; ok {
+				merged[key] = value
+			} else {
+				delete(merged, key)
+			}
+		}
+		if len(merged) == 0 {
+			delete(raw, section)
+		} else {
+			raw[section] = merged
+		}
+	}
+
+	content, err := toml.Marshal(raw)
+	if err != nil {
+		return "", fmt.Errorf("marshal %s: %w", path, err)
+	}
+	return path, writeConfig(path, content)
+}
+
+func writeConfig(path string, content []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
 }
 
 // LoadNearest loads the nearest .fgm.toml by walking upward from workDir.

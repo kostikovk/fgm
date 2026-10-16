@@ -496,3 +496,88 @@ func TestWorkDirResolution_RelativeAndEnvScenarios(t *testing.T) {
 		}
 	})
 }
+
+func TestCurrentCommandGoPolicyLabels(t *testing.T) {
+	t.Parallel()
+
+	runCurrent := func(t *testing.T, selection app.Selection) (string, string) {
+		t.Helper()
+		application := &app.App{Resolver: stubSelectionResolver{
+			currentFn: func(ctx context.Context, workDir string) (app.Selection, error) { return selection, nil },
+		}}
+		stdout, stderr, err := testutil.ExecuteCommand(t, NewRootCmd(application), "current")
+		if err != nil {
+			t.Fatalf("current: %v", err)
+		}
+		return stdout, stderr
+	}
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should name the base go directive when the selection comes from latest-patch", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			selection := app.Selection{GoVersion: "1.26.9", GoSource: "latest-patch", GoSourceFile: "/repo/go.mod", GoBase: "1.26.0"}
+
+			// Act
+			stdout, _ := runCurrent(t, selection)
+
+			// Assert
+			if stdout != "go 1.26.9 (latest-patch of go.mod 1.26.0)\n" {
+				t.Errorf("stdout = %q; want the latest-patch label", stdout)
+			}
+		})
+
+		t.Run("should print selection warnings on stderr when the selection may be stale", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			selection := app.Selection{GoVersion: "1.28.1", GoSource: "latest-patch", GoSourceFile: "/repo/go.mod", GoBase: "1.28.0", Warnings: []string{"selection may be stale"}}
+
+			// Act
+			_, stderr := runCurrent(t, selection)
+
+			// Assert
+			if !strings.Contains(stderr, "selection may be stale") {
+				t.Errorf("stderr = %q; want the warning", stderr)
+			}
+		})
+	})
+}
+
+func TestCurrentCommandDetectedLintLabel(t *testing.T) {
+	t.Parallel()
+
+	t.Run("RunE", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should name the file and line when the linter version was detected", func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			workDir := t.TempDir()
+			application := &app.App{Resolver: stubSelectionResolver{
+				currentFn: func(ctx context.Context, dir string) (app.Selection, error) {
+					return app.Selection{
+						GoVersion: "1.26.0", GoSource: filepath.Join(dir, "go.mod"),
+						LintVersion: "v2.5.0", LintSource: "detected",
+						LintSourceFile: filepath.Join(dir, "Makefile"), LintSourceLine: 31,
+					}, nil
+				},
+			}}
+
+			// Act
+			stdout, _, err := testutil.ExecuteCommand(t, NewRootCmd(application), "current", "--chdir", workDir)
+
+			// Assert
+			if err != nil {
+				t.Fatalf("current: %v", err)
+			}
+			if !strings.Contains(stdout, "golangci-lint v2.5.0 (detected: Makefile:31)") {
+				t.Errorf("stdout = %q; want the detected label", stdout)
+			}
+		})
+	})
+}

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "dir": "$ROOT",
+  "module_root": "$ROOT",
+  "go": null,
+  "golangci_lint": null,
+  "warnings": [],
+  "error": "go directive not found in $ROOT/go.mod"
+}
