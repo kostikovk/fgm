@@ -44,6 +44,32 @@ func TestStoreListLocalGoVersions_ReturnsManagedVersionsAndSystemGo(t *testing.T
 	}
 }
 
+func TestStoreListLocalGoVersions_OrdersPrereleases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should place a release candidate between its minor's releases and older minors when versions are listed", func(t *testing.T) {
+		t.Parallel()
+
+		// Arrange
+		root := t.TempDir()
+		createManagedGoVersion(t, root, "1.26.9")
+		createManagedGoVersion(t, root, "1.27rc1")
+		createManagedGoVersion(t, root, "1.27.0")
+		store := New(root, t.TempDir())
+
+		// Act
+		versions, err := store.ListLocalGoVersions(context.Background())
+
+		// Assert
+		if err != nil {
+			t.Fatalf("ListLocalGoVersions: %v", err)
+		}
+		if strings.Join(versions, " ") != "1.27.0 1.27rc1 1.26.9" {
+			t.Errorf("versions = %v; want [1.27.0 1.27rc1 1.26.9]", versions)
+		}
+	})
+}
+
 func TestStoreSetAndGetGlobalGoVersion(t *testing.T) {
 	t.Parallel()
 

@@ -1,6 +1,7 @@
 package golocal
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -326,7 +327,7 @@ func sortVersions(set map[string]struct{}) []string {
 	}
 
 	slices.SortFunc(versions, func(a, b string) int {
-		return -versionutil.CompareVersions(a, b)
+		return cmp.Or(-versionutil.CompareGoVersions(a, b), strings.Compare(a, b))
 	})
 	return versions
 }

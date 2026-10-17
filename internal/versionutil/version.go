@@ -1,9 +1,26 @@
 package versionutil
 
 import (
+	goversion "go/version"
 	"strconv"
 	"strings"
 )
+
+// CompareGoVersions compares Go versions such as "1.26.3", "go1.27rc1" or "1.26" the way the go
+// command orders them (1.26 < 1.26rc1 < 1.26.0). Invalid versions compare lower than valid ones.
+func CompareGoVersions(left string, right string) int {
+	return goversion.Compare(goPrefixed(left), goPrefixed(right))
+}
+
+// GoLanguageVersion returns the "major.minor" language version of a Go version, so "1.27rc1",
+// "go1.27" and "1.27.2" all give "1.27". It returns "" for an invalid version.
+func GoLanguageVersion(version string) string {
+	return strings.TrimPrefix(goversion.Lang(goPrefixed(version)), "go")
+}
+
+func goPrefixed(version string) string {
+	return "go" + strings.TrimPrefix(strings.TrimSpace(version), "go")
+}
 
 // CompareVersions compares two dotted version strings numerically.
 // Returns negative if left < right, positive if left > right, 0 if equal.

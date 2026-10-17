@@ -304,7 +304,7 @@ func checkSetupGo(current app.CurrentReport, module moduleFacts) ([]app.CheckFin
 		}
 		directiveMinor, _ := minorOf(module.goDirective)
 		switch {
-		case versionutil.CompareVersions(workflowMinor, directiveMinor) < 0:
+		case versionutil.CompareGoVersions(workflowMinor, directiveMinor) < 0:
 			findings = append(findings, app.CheckFinding{
 				ID: "C4", Severity: "ERROR", File: step.file, Line: step.goVersionLine,
 				Message: fmt.Sprintf("setup-go go-version %s is older than the go %s directive in %s", step.goVersion, module.goDirective, relative(module.dir, module.goMod)),
@@ -440,10 +440,10 @@ func checkDockerfile(path string, module moduleFacts) ([]app.CheckFinding, error
 // since the floating tag always carries the newest patch of that minor.
 func dockerTagOlder(tag string, goDirective string) bool {
 	if strings.Count(tag, ".") >= 2 {
-		return versionutil.CompareVersions(tag, goDirective) < 0
+		return versionutil.CompareGoVersions(tag, goDirective) < 0
 	}
 	directiveMinor, _ := minorOf(goDirective)
-	return versionutil.CompareVersions(tag, directiveMinor) < 0
+	return versionutil.CompareGoVersions(tag, directiveMinor) < 0
 }
 
 // C6: go.work go version lower than a used module's go directive.
@@ -467,7 +467,7 @@ func checkGoWork(module moduleFacts) ([]app.CheckFinding, error) {
 	if err != nil || !found {
 		return nil, err
 	}
-	if versionutil.CompareVersions(version, module.goDirective) >= 0 {
+	if versionutil.CompareGoVersions(version, module.goDirective) >= 0 {
 		return nil, nil
 	}
 	return []app.CheckFinding{{

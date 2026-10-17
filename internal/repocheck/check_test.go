@@ -132,6 +132,20 @@ func TestServiceCheck(t *testing.T) {
 			want: "C6 ERROR ../go.work:1",
 		},
 		{
+			name: "should report C6 when go.work declares a lower go than a module's release candidate directive",
+			files: map[string]string{
+				"go.work":    "go 1.26.0\n\nuse ./svc\n",
+				"svc/go.mod": "module m\n\ngo 1.27rc1\n",
+			},
+			dir:  "svc",
+			want: "C6 ERROR ../go.work:1",
+		},
+		{
+			name:  "should report C5 when a full golang tag is older than a release candidate go directive",
+			files: map[string]string{"go.mod": "module m\n\ngo 1.27rc1\n", "Dockerfile": "FROM golang:1.26.3\n"},
+			want:  "C5 ERROR Dockerfile:1",
+		},
+		{
 			name:  "should skip a check when .fgm.toml lists it under check.skip",
 			files: map[string]string{"go.mod": goMod126, "Dockerfile": "FROM golang:1.25\n", ".fgm.toml": "[check]\nskip = [\"C5\"]\n"},
 		},
