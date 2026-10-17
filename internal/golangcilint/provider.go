@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/kostikovk/fgm/internal/app"
+	"github.com/kostikovk/fgm/internal/versionutil"
 )
 
 const defaultBaseURL = "https://api.github.com"
@@ -293,9 +294,10 @@ func (p *Provider) FindArchive(ctx context.Context, version string) (Archive, er
 	)
 }
 
+// parseGoMinor returns the minor of version's language version, so prereleases such as
+// 1.27rc1 count as minor 27, as the go command treats them.
 func parseGoMinor(version string) (int, error) {
-	trimmed := strings.TrimPrefix(strings.TrimSpace(version), "go")
-	parts := strings.Split(trimmed, ".")
+	parts := strings.Split(versionutil.GoLanguageVersion(version), ".")
 	if len(parts) < 2 {
 		return 0, fmt.Errorf("invalid Go version %q", version)
 	}

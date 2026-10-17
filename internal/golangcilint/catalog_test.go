@@ -25,6 +25,8 @@ func TestProviderCatalog(t *testing.T) {
 			{name: "should return the newest catalog patch when the minor is known", goVersion: "1.26.0", want: "1.26.9", wantOK: true},
 			{name: "should return the newest catalog patch when the version has no patch component", goVersion: "go1.19", want: "1.19.13", wantOK: true},
 			{name: "should report not found when the minor is missing from the catalog", goVersion: "1.28.0"},
+			{name: "should return the newest catalog patch of the minor when the version is a release candidate", goVersion: "1.26rc1", want: "1.26.9", wantOK: true},
+			{name: "should return the newest catalog patch of the minor when the version is a go-prefixed beta", goVersion: "go1.26beta1", want: "1.26.9", wantOK: true},
 		}
 
 		for _, tc := range cases {
@@ -62,6 +64,7 @@ func TestProviderCatalog(t *testing.T) {
 			{name: "should report incompatible when the Go minor is above the linter range", goVersion: "1.26.3", lintVersion: "v1.64.8", wantKnown: true},
 			{name: "should accept a version without the v prefix", goVersion: "1.25.0", lintVersion: "2.9.0", wantCompatible: true, wantKnown: true},
 			{name: "should report unknown when the linter is missing from the catalog", goVersion: "1.26.3", lintVersion: "v2.99.0"},
+			{name: "should judge a release candidate by its minor when the Go version is a prerelease", goVersion: "1.26rc2", lintVersion: "v2.9.0", wantCompatible: true, wantKnown: true},
 		}
 
 		for _, tc := range cases {

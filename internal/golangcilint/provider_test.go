@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -833,4 +834,55 @@ func TestDefaultCompatibilityData_SupportsGo127(t *testing.T) {
 			t.Fatalf("versions = %#v, want sorted [v2.13.0 (Recommended), v2.11.2, v2.11.1]", versions)
 		}
 	})
+}
+
+func TestProviderListCatalogLintVersions_PrereleaseGoVersions(t *testing.T) {
+	t.Parallel()
+
+	data := []byte(`{
+		"versions": {
+			"v2.11.2": {"min_go_minor": 18, "max_go_minor": 26},
+			"v2.13.0": {"min_go_minor": 18, "max_go_minor": 27}
+		}
+	}`)
+	cases := []struct {
+		name      string
+		goVersion string
+		want      []string
+		wantErr   bool
+	}{
+		{name: "should list linters for the minor when the Go version is a release candidate", goVersion: "1.27rc1", want: []string{"v2.13.0"}},
+		{name: "should list linters for the minor when the Go version is a beta", goVersion: "1.27beta1", want: []string{"v2.13.0"}},
+		{name: "should list linters for the minor when a go-prefixed toolchain name is a release candidate", goVersion: "go1.26rc2", want: []string{"v2.13.0", "v2.11.2"}},
+		{name: "should return an error when the minor is not a number", goVersion: "1.x", wantErr: true}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			provider := New(Config{CompatibilityData: data})
+
+			// Act
+			versions, err := provider.ListCatalogLintVersions(context.Background(), tc.goVersion)
+
+			// Assert
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("ListCatalogLintVersions(%q) returned no error; want an error", tc.goVersion)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ListCatalogLintVersions(%q) returned an unexpected error: %v", tc.goVersion, err)
+			}
+			got := make([]string, 0, len(versions))
+			for _, version := range versions {
+				got = append(got, version.Version)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("ListCatalogLintVersions(%q) = %v; want %v", tc.goVersion, got, tc.want)
+			}
+		})
+	}
 }

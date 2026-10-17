@@ -76,7 +76,7 @@ func (r *Resolver) Current(ctx context.Context, workDir string) (app.Selection, 
 	}
 
 	if hasPolicy && policy.Version != "" {
-		if found && versionutil.CompareVersions(policy.Version, metadata.goDirective) < 0 {
+		if found && versionutil.CompareGoVersions(policy.Version, metadata.goDirective) < 0 {
 			return app.Selection{}, fmt.Errorf(
 				"%s pins go %s, lower than the go %s directive in %s",
 				policy.Path, policy.Version, metadata.goDirective, metadata.path,
@@ -116,7 +116,7 @@ func ValidateGoPin(workDir string, version string) error {
 	if err != nil || !found {
 		return err
 	}
-	if versionutil.CompareVersions(version, metadata.goDirective) < 0 {
+	if versionutil.CompareGoVersions(version, metadata.goDirective) < 0 {
 		return fmt.Errorf("go %s is lower than the go %s directive in %s", version, metadata.goDirective, metadata.path)
 	}
 	return nil
@@ -150,7 +150,7 @@ func (r *Resolver) latestPatchSelection(ctx context.Context, metadata versionMet
 		)}
 		return selection, nil
 	}
-	if metadata.toolchain != "" && versionutil.CompareVersions(metadata.toolchain, latest) >= 0 {
+	if metadata.toolchain != "" && versionutil.CompareGoVersions(metadata.toolchain, latest) >= 0 {
 		return directiveSelection(metadata), nil
 	}
 
@@ -202,7 +202,7 @@ func newestPatch(versions []string, goVersion string) (string, bool) {
 		if minorKey(version) != want || strings.Contains(version, "rc") || strings.Contains(version, "beta") {
 			continue
 		}
-		if best == "" || versionutil.CompareVersions(version, best) > 0 {
+		if best == "" || versionutil.CompareGoVersions(version, best) > 0 {
 			best = version
 		}
 	}
@@ -210,14 +210,17 @@ func newestPatch(versions []string, goVersion string) (string, bool) {
 }
 
 func maxVersion(left string, right string) string {
-	if versionutil.CompareVersions(left, right) >= 0 {
+	if versionutil.CompareGoVersions(left, right) >= 0 {
 		return left
 	}
 	return right
 }
 
-// minorKey returns "major.minor" for a Go version such as "1.26.3" or "go1.19".
+// minorKey returns "major.minor" for a Go version such as "1.26.3", "go1.19" or "1.27rc1".
 func minorKey(version string) string {
+	if lang := versionutil.GoLanguageVersion(version); lang != "" {
+		return lang
+	}
 	parts := strings.SplitN(strings.TrimPrefix(version, "go"), ".", 3)
 	if len(parts) < 2 {
 		return parts[0]
@@ -261,7 +264,7 @@ func parseVersionMetadata(path string) (versionMetadata, error) {
 	metadata := versionMetadata{path: path}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
+		line := strings.TrimSpace(strings.SplitN(scanner.Text(), "//", 2)[0])
 		if line == "toolchain" {
 			return versionMetadata{}, fmt.Errorf("toolchain directive is empty in %s", path)
 		}

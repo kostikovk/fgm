@@ -147,6 +147,74 @@ func TestCompareVersions(t *testing.T) {
 	}
 }
 
+func TestCompareGoVersions(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name  string
+		left  string
+		right string
+		want  int
+	}{
+		{name: "should order a release candidate above the previous minor's patches when minors differ", left: "1.27rc1", right: "1.26.9", want: 1},
+		{name: "should order a release candidate below the minor's first release when compared to x.y.0", left: "1.27rc1", right: "1.27.0", want: -1},
+		{name: "should order a beta below a release candidate when both target the same minor", left: "1.27beta1", right: "1.27rc1", want: -1},
+		{name: "should order a language version below its release candidates when the patch is absent", left: "1.27", right: "1.27rc1", want: -1},
+		{name: "should order patches numerically when the patch has two digits", left: "1.26.10", right: "1.26.9", want: 1},
+		{name: "should treat a go prefix as equal when the versions otherwise match", left: "go1.26.3", right: "1.26.3", want: 0},
+		{name: "should order an invalid version below a valid one when one side is empty", left: "", right: "1.0.0", want: -1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			left, right := tc.left, tc.right
+
+			// Act
+			got := CompareGoVersions(left, right)
+
+			// Assert
+			if sign(got) != tc.want {
+				t.Errorf("CompareGoVersions(%q, %q) = %d; want sign %d", left, right, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestGoLanguageVersion(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		version string
+		want    string
+	}{
+		{name: "should return the minor when the version is a release candidate", version: "1.27rc1", want: "1.27"},
+		{name: "should return the minor when the version has a patch and go prefix", version: "go1.26.3", want: "1.26"},
+		{name: "should return the version unchanged when it is already a language version", version: "1.19", want: "1.19"},
+		{name: "should return empty when the version is invalid", version: "1.x", want: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Arrange
+			version := tc.version
+
+			// Act
+			got := GoLanguageVersion(version)
+
+			// Assert
+			if got != tc.want {
+				t.Errorf("GoLanguageVersion(%q) = %q; want %q", version, got, tc.want)
+			}
+		})
+	}
+}
+
 func sign(n int) int {
 	if n < 0 {
 		return -1

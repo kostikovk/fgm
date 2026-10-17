@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime/debug"
 	"testing"
 
@@ -59,6 +61,70 @@ func TestRunBuildsApplicationAndExecutesRootCommand(t *testing.T) {
 	if capturedApp.BuildInfo.Version != "dev" || capturedApp.BuildInfo.Commit != "unknown" || capturedApp.BuildInfo.Date != "unknown" {
 		t.Fatalf("BuildInfo = %+v, want default build metadata", capturedApp.BuildInfo)
 	}
+}
+
+func TestRunWiresPrereleaseGoVersions(t *testing.T) {
+	cases := []struct {
+		name  string
+		goMod string
+		want  string
+	}{
+		{name: "should report and check the module when the toolchain directive is a release candidate", goMod: "module example.com/rc\n\ngo 1.26.0\n\ntoolchain go1.27rc1\n", want: "1.27rc1"},
+		{name: "should report and check the module when the toolchain directive is a beta", goMod: "module example.com/rc\n\ngo 1.26.0\n\ntoolchain go1.27beta1\n", want: "1.27beta1"},
+		{name: "should report and check the module when the go directive is a release candidate", goMod: "module example.com/rc\n\ngo 1.27rc1\n", want: "1.27rc1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			moduleDir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(moduleDir, "go.mod"), []byte(tc.goMod), 0o644); err != nil {
+				t.Fatalf("write go.mod: %v", err)
+			}
+			application := buildTestApplication(t)
+
+			// Act
+			current, currentErr := application.CurrentReporter.Report(context.Background(), moduleDir)
+			checked, checkErr := application.RepoChecker.Check(context.Background(), moduleDir)
+
+			// Assert
+			if currentErr != nil {
+				t.Fatalf("CurrentReporter.Report returned an unexpected error: %v", currentErr)
+			}
+			if checkErr != nil {
+				t.Fatalf("RepoChecker.Check returned an unexpected error: %v", checkErr)
+			}
+			if current.Go == nil || current.Go.Version != tc.want {
+				t.Errorf("current Go = %+v; want version %s", current.Go, tc.want)
+			}
+			if checked.Go == nil || checked.Go.Version != tc.want {
+				t.Errorf("checked Go = %+v; want version %s", checked.Go, tc.want)
+			}
+			if checked.GolangCILint == nil || checked.GolangCILint.Version == "" {
+				t.Errorf("checked golangci-lint = %+v; want a version selected from the catalog", checked.GolangCILint)
+			}
+		})
+	}
+}
+
+func buildTestApplication(t *testing.T) *app.App {
+	t.Helper()
+	home := t.TempDir()
+	var application *app.App
+	err := run(
+		context.Background(),
+		io.Discard,
+		func(string) string { return "" },
+		func() (string, error) { return home, nil },
+		func(built *app.App) rootCommand {
+			application = built
+			return fakeRootCommand{executeContext: func(context.Context) error { return nil }}
+		},
+	)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	return application
 }
 
 func TestResolveBuildInfo(t *testing.T) {
